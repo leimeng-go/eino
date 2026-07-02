@@ -249,6 +249,7 @@ func TestFailoverModelWrapper_Generate(t *testing.T) {
 			ShouldFailover: func(_ context.Context, _ *schema.Message, err error) bool {
 				atomic.AddInt32(&shouldCalls, 1)
 				// User decides to stop on canceled error
+				// 用户决定在 canceled 错误时停止
 				return !errors.Is(err, context.Canceled)
 			},
 			GetFailoverModel: func(_ context.Context, _ *FailoverContext[*schema.Message]) (model.BaseChatModel, []*schema.Message, error) {
@@ -263,6 +264,7 @@ func TestFailoverModelWrapper_Generate(t *testing.T) {
 		_, err := w.Generate(ctx, []*schema.Message{schema.UserMessage("hi")})
 		require.ErrorIs(t, err, context.Canceled)
 		// ShouldFailover is called once and returns false, stopping failover
+		// ShouldFailover 被调用一次并返回 false，停止故障转移
 		require.Equal(t, int32(1), atomic.LoadInt32(&shouldCalls))
 	})
 
@@ -520,6 +522,7 @@ func TestFailoverModelWrapper_Stream(t *testing.T) {
 			ShouldFailover: func(_ context.Context, _ *schema.Message, err error) bool {
 				atomic.AddInt32(&shouldCalls, 1)
 				// User decides to stop on canceled error
+				// 用户决定在 canceled 错误时停止
 				return !errors.Is(err, context.Canceled)
 			},
 			GetFailoverModel: func(_ context.Context, _ *FailoverContext[*schema.Message]) (model.BaseChatModel, []*schema.Message, error) {
@@ -535,6 +538,7 @@ func TestFailoverModelWrapper_Stream(t *testing.T) {
 		require.Nil(t, sr)
 		require.ErrorIs(t, err, context.Canceled)
 		// ShouldFailover is called once and returns false, stopping failover
+		// ShouldFailover 被调用一次并返回 false，停止故障转移
 		require.Equal(t, int32(1), atomic.LoadInt32(&shouldCalls))
 	})
 

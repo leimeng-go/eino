@@ -162,12 +162,14 @@ func TestMarshalStringEdgeCases(t *testing.T) {
 
 	t.Run("string type assertion priority", func(t *testing.T) {
 		// Test that string type assertion has priority over JSON marshaling
+		// 测试 string 类型断言优先于 JSON marshaling
 		var input interface{} = "direct string"
 		result, err := marshalString(input)
 		assert.NoError(t, err)
 		assert.Equal(t, "direct string", result)
 
 		// Verify it's not JSON encoded
+		// 验证它没有被 JSON 编码
 		assert.NotEqual(t, `"direct string"`, result)
 	})
 }
@@ -177,11 +179,13 @@ func TestMarshalStringConsistency(t *testing.T) {
 		input := `{"key": "value"}`
 
 		// Direct string should return as-is
+		// 直接的 string 应原样返回
 		result, err := marshalString(input)
 		assert.NoError(t, err)
 		assert.Equal(t, input, result)
 
 		// Should not be double-encoded
+		// 不应被双重编码
 		assert.NotEqual(t, fmt.Sprintf(`"%s"`, input), result)
 	})
 }

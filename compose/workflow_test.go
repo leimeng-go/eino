@@ -110,6 +110,7 @@ func TestWorkflow(t *testing.T) {
 		}),
 		WithOutputKey("key")).
 		AddInput(START) // []any -> map["key"][]any
+		// []any -> map["key"][]any
 	subWorkflow.AddLambdaNode(
 		"2",
 		InvokableLambda(func(_ context.Context, in []any) ([]any, error) {
@@ -118,6 +119,7 @@ func TestWorkflow(t *testing.T) {
 		WithInputKey("key"),
 		WithOutputKey("key1")).
 		AddInput("1") // map["key"][]any -> []any -> map["key1"][]any
+		// map["key"][]any -> []any -> map["key1"][]any
 	subWorkflow.AddLambdaNode(
 		"3",
 		InvokableLambda(func(_ context.Context, in struct2) (map[string]any, error) {
@@ -125,6 +127,7 @@ func TestWorkflow(t *testing.T) {
 		}),
 	).
 		AddInput("2", ToField("F")) // map["key1"][]any -> map["F"]map["key1"][]any -> struct2{F: map["key1"]any} -> map["key1"][]any
+		// map["key1"][]any -> map["F"]map["key1"][]any -> struct2{F: map["key1"]any} -> map["key1"][]any
 	subWorkflow.AddLambdaNode(
 		"4",
 		InvokableLambda(func(_ context.Context, in []any) ([]any, error) {
@@ -133,6 +136,7 @@ func TestWorkflow(t *testing.T) {
 		WithInputKey("key1"),
 	).
 		AddInput("3") // map["key1"][]any -> []any
+		// map["key1"][]any -> []any
 	subWorkflow.End().AddInput("4")
 
 	w := NewWorkflow[*structA, *structEnd](WithGenLocalState(func(context.Context) *state { return &state{} }))
@@ -853,6 +857,7 @@ func TestDependencyWithNoInput(t *testing.T) {
 
 	t.Run("simple control flow: [Start] --> [Node '0'] --> [End]", func(t *testing.T) {
 		// [Start] --> [Node "0"] --> [End]
+		// [Start] --> [Node "0"] --> [End]
 		wf := NewWorkflow[map[string]any, map[string]any]()
 		wf.AddLambdaNode("0", InvokableLambda(func(ctx context.Context, in map[string]any) (output map[string]any, err error) {
 			return map[string]any{
@@ -1546,11 +1551,13 @@ func TestIndirectDependencyWithBranch(t *testing.T) {
 		assert.NoError(t, err)
 
 		// skip lambda node "1"
+		// 跳过 lambda 节点 "1"
 		out, err := r.Invoke(context.Background(), nil)
 		assert.NoError(t, err)
 		assert.Equal(t, out, map[string]any{"static": 2})
 
 		// choose lambda node "1"
+		// 选择 lambda 节点 "1"
 		out, err = r.Invoke(context.Background(), []int{1})
 		assert.NoError(t, err)
 		assert.Equal(t, out, map[string]any{"output": 2, "static": 2})
@@ -1587,11 +1594,13 @@ func TestIndirectDependencyWithBranch(t *testing.T) {
 		assert.NoError(t, err)
 
 		// skip lambda node "1"
+		// 跳过 lambda 节点 "1"
 		out, err := r.Invoke(context.Background(), nil)
 		assert.NoError(t, err)
 		assert.Equal(t, out, map[string]any{"static": 2})
 
 		// choose lambda node "1"
+		// 选择 lambda 节点 "1"
 		_, err = r.Invoke(context.Background(), []int{1}, WithCheckPointID("123"))
 		_, ok := ExtractInterruptInfo(err)
 		assert.True(t, ok)

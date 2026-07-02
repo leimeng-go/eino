@@ -86,6 +86,7 @@ func (a *workflowAgent) Run(ctx context.Context, _ *AgentInput, opts ...AgentRun
 		}()
 
 		// Different workflow execution based on mode
+		// 根据模式执行不同的 workflow
 		switch a.mode {
 		case workflowAgentModeSequential:
 			err = a.runSequential(ctx, generator, nil, nil, opts...)
@@ -143,6 +144,7 @@ func (a *workflowAgent) Resume(ctx context.Context, info *ResumeInfo, opts ...Ag
 		}
 
 		// Different workflow execution based on the type of our restored state.
+		// 根据恢复状态的类型执行不同的 workflow。
 		switch s := state.(type) {
 		case *sequentialWorkflowState:
 			err = a.runSequential(ctx, generator, s, info, opts...)
@@ -163,6 +165,12 @@ func (a *workflowAgent) Resume(ctx context.Context, info *ResumeInfo, opts ...Ag
 // NOT RECOMMENDED: Workflow agents are built on agent transfer with full context sharing,
 // which has not proven to be more effective empirically. Consider using
 // ChatModelAgent with AgentTool or DeepAgent instead for most multi-agent scenarios.
+//
+// WorkflowInterruptInfo 存储 workflow 智能体的中断信息。
+// CheckpointSchema: 通过 InterruptInfo.Data 持久化（gob）。
+// 不推荐：Workflow 智能体基于共享完整上下文的 agent transfer，
+// 实证上未证明更有效。大多数多智能体场景建议改用
+// ChatModelAgent 搭配 AgentTool 或 DeepAgent。
 type WorkflowInterruptInfo struct {
 	OrigInput *AgentInput
 
@@ -183,6 +191,7 @@ func (a *workflowAgent) runSequential(ctx context.Context,
 	seqCtx := ctx
 
 	// If we are resuming, find which sub-agent to start from and prepare its context.
+	// 如果正在恢复，找到要从哪个子智能体开始，并准备其上下文。
 	if seqState != nil {
 		startIdx = seqState.InterruptIndex
 
@@ -200,6 +209,10 @@ func (a *workflowAgent) runSequential(ctx context.Context,
 		// Cancel check at transition boundary between sub-agents.
 		// Transition boundaries are always safe to cancel at — no sub-agent
 		// work is in progress, so any cancel mode is honoured.
+		//
+		// 在子智能体之间的转换边界检查取消。
+		// 转换边界始终可以安全取消——没有子智能体
+		// 正在执行工作，因此会遵循任何取消模式。
 		if cancelCtx := getCancelContext(ctx); cancelCtx != nil && cancelCtx.shouldCancel() {
 			state := &sequentialWorkflowState{InterruptIndex: i}
 			event := cancelAtTransition(ctx, "Sequential workflow cancel at transition", state)
@@ -212,6 +225,7 @@ func (a *workflowAgent) runSequential(ctx context.Context,
 			wfInfo, _ := info.Data.(*WorkflowInterruptInfo)
 			if wfInfo != nil && wfInfo.SequentialInterruptInfo != nil {
 				// Sub-agent was interrupted — resume it.
+				// 子智能体已中断——恢复它。
 				subIterator = subAgent.Resume(seqCtx, &ResumeInfo{
 					EnableStreaming: info.EnableStreaming,
 					InterruptInfo:   wfInfo.SequentialInterruptInfo,
@@ -235,6 +249,7 @@ func (a *workflowAgent) runSequential(ctx context.Context,
 
 			if event.Err != nil {
 				// exit if report error
+				// 如果 report 出错则退出
 				generator.Send(event)
 				return nil
 			}
@@ -254,15 +269,20 @@ func (a *workflowAgent) runSequential(ctx context.Context,
 		if lastActionEvent != nil {
 			if lastActionEvent.Action.internalInterrupted != nil {
 				// A sub-agent interrupted. Wrap it with our own state, including the index.
+				// 子智能体发生中断。用我们自己的状态包装它，包括索引。
 				state := &sequentialWorkflowState{
 					InterruptIndex: i,
 				}
 				// Use CompositeInterrupt to funnel the sub-interrupt and add our own state.
 				// The context for the composite interrupt must be the one from *before* the sub-agent ran.
+				//
+				// 使用 CompositeInterrupt 汇聚子中断，并添加我们自己的状态。
+				// 复合中断的上下文必须是子智能体运行之前的上下文。
 				event := CompositeInterrupt(ctx, "Sequential workflow interrupted", state,
 					lastActionEvent.Action.internalInterrupted)
 
 				// For backward compatibility, populate the deprecated Data field.
+				// 为保持向后兼容，填充已弃用的 Data 字段。
 				event.Action.Interrupted.Data = &WorkflowInterruptInfo{
 					OrigInput:                getRunCtx(ctx).RootInput,
 					SequentialInterruptIndex: i,
@@ -277,6 +297,7 @@ func (a *workflowAgent) runSequential(ctx context.Context,
 
 			if lastActionEvent.Action.Exit {
 				// Forward the event
+				// 转发事件
 				generator.Send(lastActionEvent)
 				return nil
 			}
@@ -295,14 +316,28 @@ func (a *workflowAgent) runSequential(ctx context.Context,
 // It will mark the BreakLoopAction as Done, signalling to any 'upper level' loop agent
 // that this action has been processed and should be ignored further up.
 // This action is not intended to be used by LLMs.
+//
+// BreakLoopAction 是一种仅供程序使用的智能体动作，用于提前
+// 终止 loop workflow 智能体的执行。
+// 当 loop workflow 智能体从子智能体收到此动作时，会停止
+// 当前迭代，并且不会进入下一次迭代。
+// 它会将 BreakLoopAction 标记为 Done，向任何“上层”loop 智能体表明
+// 此动作已被处理，后续应忽略。
+// 此动作不应由 LLM 使用。
 type BreakLoopAction struct {
 	// From records the name of the agent that initiated the break loop action.
+	// From 记录发起 break loop 动作的智能体名称。
 	From string
 	// Done is a state flag that can be used by the framework to mark when the
 	// action has been handled.
+	//
+	// Done 是一个状态标志，框架可用它标记
+	// 该动作何时已被处理。
 	Done bool
 	// CurrentIterations is populated by the framework to record at which
 	// iteration the loop was broken.
+	//
+	// CurrentIterations 由框架填充，用于记录循环在哪次迭代被中断。
 	CurrentIterations int
 }
 
@@ -312,6 +347,9 @@ type BreakLoopAction struct {
 // NOT RECOMMENDED: Workflow agents are built on agent transfer with full context sharing,
 // which has not proven to be more effective empirically. Consider using
 // ChatModelAgent with AgentTool or DeepAgent instead for most multi-agent scenarios.
+//
+// NewBreakLoopAction 创建一个新的 BreakLoopAction，表示请求终止当前循环。
+// 不推荐：Workflow agents 基于共享完整上下文的 agent transfer 构建，实证上并未证明更有效。对于大多数多智能体场景，建议改用 ChatModelAgent 搭配 AgentTool 或 DeepAgent。
 func NewBreakLoopAction(agentName string) *AgentAction {
 	return &AgentAction{BreakLoop: &BreakLoopAction{
 		From: agentName,
@@ -332,10 +370,12 @@ func (a *workflowAgent) runLoop(ctx context.Context, generator *AsyncGenerator[*
 
 	if loopState != nil {
 		// We are resuming.
+		// 正在恢复。
 		startIter = loopState.LoopIterations
 		startIdx = loopState.SubAgentIndex
 
 		// Rebuild the loopCtx to have the correct RunPath up to the point of resumption.
+		// 重建 loopCtx，使 RunPath 正确到达恢复点。
 		var steps []string
 		for i := 0; i < startIter; i++ {
 			for _, subAgent := range a.subAgents {
@@ -364,6 +404,7 @@ func (a *workflowAgent) runLoop(ctx context.Context, generator *AsyncGenerator[*
 				wfInfo, _ := resumeInfo.Data.(*WorkflowInterruptInfo)
 				if wfInfo != nil && wfInfo.SequentialInterruptInfo != nil {
 					// Sub-agent was interrupted — resume it.
+					// 子智能体已中断——恢复它。
 					subIterator = subAgent.Resume(loopCtx, &ResumeInfo{
 						EnableStreaming: resumeInfo.EnableStreaming,
 						InterruptInfo:   wfInfo.SequentialInterruptInfo,
@@ -372,6 +413,7 @@ func (a *workflowAgent) runLoop(ctx context.Context, generator *AsyncGenerator[*
 					subIterator = subAgent.Run(loopCtx, nil, opts...)
 				}
 				loopState = nil // Only resume the first time.
+				// 只在第一次恢复。
 			} else {
 				subIterator = subAgent.Run(loopCtx, nil, opts...)
 			}
@@ -417,15 +459,18 @@ func (a *workflowAgent) runLoop(ctx context.Context, generator *AsyncGenerator[*
 
 				if lastActionEvent.Action.internalInterrupted != nil {
 					// A sub-agent interrupted. Wrap it with our own loop state.
+					// 子智能体发生中断。用我们自己的循环状态包装它。
 					state := &loopWorkflowState{
 						LoopIterations: i,
 						SubAgentIndex:  j,
 					}
 					// Use CompositeInterrupt to funnel the sub-interrupt and add our own state.
+					// 使用 CompositeInterrupt 汇聚子中断，并添加我们自己的状态。
 					event := CompositeInterrupt(ctx, "Loop workflow interrupted", state,
 						lastActionEvent.Action.internalInterrupted)
 
 					// For backward compatibility, populate the deprecated Data field.
+					// 为向后兼容，填充已弃用的 Data 字段。
 					event.Action.Interrupted.Data = &WorkflowInterruptInfo{
 						OrigInput:                getRunCtx(ctx).RootInput,
 						LoopIterations:           i,
@@ -453,6 +498,7 @@ func (a *workflowAgent) runLoop(ctx context.Context, generator *AsyncGenerator[*
 		}
 
 		// Reset the sub-agent index for the next iteration of the outer loop.
+		// 重置子智能体索引，用于外层循环的下一次迭代。
 		startIdx = 0
 	}
 
@@ -477,6 +523,7 @@ func (a *workflowAgent) runParallel(ctx context.Context, generator *AsyncGenerat
 	)
 
 	// If resuming, get the scoped ResumeInfo for each child that needs to be resumed.
+	// 如果正在恢复，为每个需要恢复的子项获取其作用域内的 ResumeInfo。
 	if parState != nil {
 		agentNames, err = getNextResumeAgents(ctx, resumeInfo)
 		if err != nil {
@@ -485,13 +532,16 @@ func (a *workflowAgent) runParallel(ctx context.Context, generator *AsyncGenerat
 	}
 
 	// Fork contexts for each sub-agent
+	// 为每个子智能体派生上下文
 	for i := range a.subAgents {
 		childContexts[i] = forkRunCtx(ctx)
 
 		// If we're resuming and this agent has existing events, add them to the child context
+		// 如果正在恢复且该 agent 已有事件，将它们添加到子上下文
 		if parState != nil && parState.SubAgentEvents != nil {
 			if existingEvents, ok := parState.SubAgentEvents[i]; ok {
 				// Add existing events to the child's lane events
+				// 将已有事件添加到子项的 lane events
 				childRunCtx := getRunCtx(childContexts[i])
 				if childRunCtx != nil && childRunCtx.Session != nil {
 					if childRunCtx.Session.LaneEvents == nil {
@@ -505,6 +555,8 @@ func (a *workflowAgent) runParallel(ctx context.Context, generator *AsyncGenerat
 
 	// Cancel check before spawning parallel goroutines. No sub-agent work
 	// is in progress, so any cancel mode is honoured at this boundary.
+	//
+	// 在启动并行 goroutine 前检查取消。此时没有子智能体工作在进行，因此任何取消模式都会在该边界生效。
 	if cancelCtx := getCancelContext(ctx); cancelCtx != nil && cancelCtx.shouldCancel() {
 		state := &parallelWorkflowState{}
 		event := cancelAtTransition(ctx, "Parallel workflow cancel before spawn", state)
@@ -537,6 +589,9 @@ func (a *workflowAgent) runParallel(ctx context.Context, generator *AsyncGenerat
 			} else if parState != nil {
 				// We are resuming, but this child is not in the next points map.
 				// This means it finished successfully, so we don't run it.
+				//
+				// 正在恢复，但这个子项不在 next points map 中。
+				// 这表示它已成功完成，因此不运行它。
 				return
 			} else {
 				iterator = agent.Run(childContexts[idx], nil, opts...)
@@ -563,12 +618,14 @@ func (a *workflowAgent) runParallel(ctx context.Context, generator *AsyncGenerat
 
 	if len(subInterruptSignals) == 0 {
 		// Join all child contexts back to the parent
+		// 将所有子上下文合并回父上下文
 		joinRunCtxs(ctx, childContexts...)
 		return nil
 	}
 
 	if len(subInterruptSignals) > 0 {
 		// Before interrupting, collect the current events from each child context
+		// 中断前，收集每个子上下文中的当前事件
 		subAgentEvents := make(map[int][]*agentEventWrapper)
 		for i, childCtx := range childContexts {
 			childRunCtx := getRunCtx(childCtx)
@@ -583,6 +640,7 @@ func (a *workflowAgent) runParallel(ctx context.Context, generator *AsyncGenerat
 		event := CompositeInterrupt(ctx, "Parallel workflow interrupted", state, subInterruptSignals...)
 
 		// For backward compatibility, populate the deprecated Data field.
+		// 为向后兼容，填充已弃用的 Data 字段。
 		event.Action.Interrupted.Data = &WorkflowInterruptInfo{
 			OrigInput:             getRunCtx(ctx).RootInput,
 			ParallelInterruptInfo: dataMap,
@@ -599,6 +657,9 @@ func (a *workflowAgent) runParallel(ctx context.Context, generator *AsyncGenerat
 func cancelAtTransition(ctx context.Context, info string, state any) *AgentEvent {
 	// state is the workflow checkpoint state (e.g. sequentialWorkflowState);
 	// nil for subContexts because this is a leaf interrupt with no child signals.
+	//
+	// state 是 workflow 检查点状态（例如 sequentialWorkflowState）；
+	// subContexts 为 nil，因为这是没有子信号的叶子中断。
 	is, err := core.Interrupt(ctx, info, state, nil,
 		core.WithLayerPayload(getRunCtx(ctx).RunPath))
 	if err != nil {
@@ -622,6 +683,11 @@ func cancelAtTransition(ctx context.Context, info string, state any) *AgentEvent
 // NOT RECOMMENDED: Workflow agents are built on agent transfer with full context sharing,
 // which has not proven to be more effective empirically. Consider using
 // ChatModelAgent with AgentTool or DeepAgent instead for most multi-agent scenarios.
+//
+// SequentialAgentConfig 是 NewSequentialAgent 的配置。
+// 不推荐：Workflow 智能体基于共享完整上下文的智能体转移构建，
+// 实证上尚未证明更有效。多数多智能体场景建议改用
+// ChatModelAgent 配合 AgentTool，或使用 DeepAgent。
 type SequentialAgentConfig struct {
 	Name        string
 	Description string
@@ -633,6 +699,11 @@ type SequentialAgentConfig struct {
 // NOT RECOMMENDED: Workflow agents are built on agent transfer with full context sharing,
 // which has not proven to be more effective empirically. Consider using
 // ChatModelAgent with AgentTool or DeepAgent instead for most multi-agent scenarios.
+//
+// ParallelAgentConfig 是 NewParallelAgent 的配置。
+// 不推荐：Workflow 智能体基于共享完整上下文的智能体转移构建，
+// 实证上尚未证明更有效。多数多智能体场景建议改用
+// ChatModelAgent 配合 AgentTool，或使用 DeepAgent。
 type ParallelAgentConfig struct {
 	Name        string
 	Description string
@@ -644,6 +715,11 @@ type ParallelAgentConfig struct {
 // NOT RECOMMENDED: Workflow agents are built on agent transfer with full context sharing,
 // which has not proven to be more effective empirically. Consider using
 // ChatModelAgent with AgentTool or DeepAgent instead for most multi-agent scenarios.
+//
+// LoopAgentConfig 是 NewLoopAgent 的配置。
+// 不推荐：Workflow 智能体基于共享完整上下文的智能体转移构建，
+// 实证上尚未证明更有效。多数多智能体场景建议改用
+// ChatModelAgent 配合 AgentTool，或使用 DeepAgent。
 type LoopAgentConfig struct {
 	Name        string
 	Description string
@@ -683,6 +759,11 @@ func newWorkflowAgent(ctx context.Context, name, desc string,
 // NOT RECOMMENDED: Workflow agents are built on agent transfer with full context sharing,
 // which has not proven to be more effective empirically. Consider using
 // ChatModelAgent with AgentTool or DeepAgent instead for most multi-agent scenarios.
+//
+// NewSequentialAgent 创建一个按顺序运行子智能体的智能体。
+// 不推荐：Workflow 智能体基于共享完整上下文的智能体转移构建，
+// 实证上尚未证明更有效。多数多智能体场景建议改用
+// ChatModelAgent 配合 AgentTool，或使用 DeepAgent。
 func NewSequentialAgent(ctx context.Context, config *SequentialAgentConfig) (ResumableAgent, error) {
 	return newWorkflowAgent(ctx, config.Name, config.Description, config.SubAgents, workflowAgentModeSequential, 0)
 }
@@ -692,6 +773,11 @@ func NewSequentialAgent(ctx context.Context, config *SequentialAgentConfig) (Res
 // NOT RECOMMENDED: Workflow agents are built on agent transfer with full context sharing,
 // which has not proven to be more effective empirically. Consider using
 // ChatModelAgent with AgentTool or DeepAgent instead for most multi-agent scenarios.
+//
+// NewParallelAgent 创建一个并行运行子智能体的智能体。
+// 不推荐：Workflow 智能体基于共享完整上下文的智能体转移构建，
+// 实证上尚未证明更有效。多数多智能体场景建议改用
+// ChatModelAgent 配合 AgentTool，或使用 DeepAgent。
 func NewParallelAgent(ctx context.Context, config *ParallelAgentConfig) (ResumableAgent, error) {
 	return newWorkflowAgent(ctx, config.Name, config.Description, config.SubAgents, workflowAgentModeParallel, 0)
 }
@@ -701,6 +787,11 @@ func NewParallelAgent(ctx context.Context, config *ParallelAgentConfig) (Resumab
 // NOT RECOMMENDED: Workflow agents are built on agent transfer with full context sharing,
 // which has not proven to be more effective empirically. Consider using
 // ChatModelAgent with AgentTool or DeepAgent instead for most multi-agent scenarios.
+//
+// NewLoopAgent 创建一个按最大迭代次数限制循环运行子智能体的智能体。
+// 不推荐：Workflow 智能体基于共享完整上下文的智能体转移构建，
+// 实证上尚未证明更有效。多数多智能体场景建议改用
+// ChatModelAgent 配合 AgentTool，或使用 DeepAgent。
 func NewLoopAgent(ctx context.Context, config *LoopAgentConfig) (ResumableAgent, error) {
 	return newWorkflowAgent(ctx, config.Name, config.Description, config.SubAgents, workflowAgentModeLoop, config.MaxIterations)
 }

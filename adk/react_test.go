@@ -97,12 +97,15 @@ func (w *testModelWrapper) WithTools(tools []*schema.ToolInfo) (model.ToolCallin
 }
 
 // TestReact tests the newReact function with different scenarios
+// TestReact 测试 newReact 函数在不同场景下的行为
 func TestReact(t *testing.T) {
 	// Basic test for newReact function
+	// newReact 函数的基础测试
 	t.Run("Invoke", func(t *testing.T) {
 		ctx := context.Background()
 
 		// Create a fake tool for testing
+		// 创建用于测试的假工具
 		fakeTool := &fakeToolForTest{
 			tarCount: 3,
 		}
@@ -111,10 +114,12 @@ func TestReact(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Create a mock chat model
+		// 创建 mock 聊天模型
 		ctrl := gomock.NewController(t)
 		cm := mockModel.NewMockToolCallingChatModel(ctrl)
 
 		// Set up expectations for the mock model
+		// 设置 mock 模型的预期行为
 		times := 0
 		cm.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 			DoAndReturn(func(ctx context.Context, input []Message, opts ...model.Option) (Message, error) {
@@ -138,6 +143,7 @@ func TestReact(t *testing.T) {
 		cm.EXPECT().WithTools(gomock.Any()).Return(cm, nil).AnyTimes()
 
 		// Create a reactConfig
+		// 创建 reactConfig
 		config := &reactConfig{
 			model: &testModelWrapper{inner: cm},
 			toolsConfig: &compose.ToolsNodeConfig{
@@ -155,6 +161,7 @@ func TestReact(t *testing.T) {
 		assert.NotNil(t, compiled)
 
 		// Test with a user message
+		// 使用用户消息进行测试
 		result, err := compiled.Invoke(ctx, &reactInput{Messages: []Message{
 			{
 				Role:    schema.User,
@@ -166,10 +173,12 @@ func TestReact(t *testing.T) {
 	})
 
 	// Test with toolsReturnDirectly
+	// 使用 toolsReturnDirectly 进行测试
 	t.Run("ToolsReturnDirectly", func(t *testing.T) {
 		ctx := context.Background()
 
 		// Create a fake tool for testing
+		// 创建用于测试的假工具
 		fakeTool := &fakeToolForTest{
 			tarCount: 3,
 		}
@@ -178,10 +187,12 @@ func TestReact(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Create a mock chat model
+		// 创建 mock 聊天模型
 		ctrl := gomock.NewController(t)
 		cm := mockModel.NewMockToolCallingChatModel(ctrl)
 
 		// Set up expectations for the mock model
+		// 设置 mock 模型的预期行为
 		times := 0
 		cm.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 			DoAndReturn(func(ctx context.Context, input []Message, opts ...model.Option) (Message, error) {
@@ -205,6 +216,7 @@ func TestReact(t *testing.T) {
 		cm.EXPECT().WithTools(gomock.Any()).Return(cm, nil).AnyTimes()
 
 		// Create a reactConfig with toolsReturnDirectly
+		// 创建带有 toolsReturnDirectly 的 reactConfig
 		config := &reactConfig{
 			model: &testModelWrapper{inner: cm},
 			toolsConfig: &compose.ToolsNodeConfig{
@@ -222,6 +234,7 @@ func TestReact(t *testing.T) {
 		assert.NotNil(t, compiled)
 
 		// Test with a user message when tool returns directly
+		// 测试工具直接返回时的用户消息
 		result, err := compiled.Invoke(ctx, &reactInput{Messages: []Message{
 			{
 				Role:    schema.User,
@@ -235,10 +248,12 @@ func TestReact(t *testing.T) {
 	})
 
 	// Test streaming functionality
+	// 测试流式功能
 	t.Run("Stream", func(t *testing.T) {
 		ctx := context.Background()
 
 		// Create a fake tool for testing
+		// 创建用于测试的 fake 工具
 		fakeTool := &fakeToolForTest{
 			tarCount: 3,
 		}
@@ -248,10 +263,12 @@ func TestReact(t *testing.T) {
 		}
 
 		// Create a mock chat model
+		// 创建 mock 聊天模型
 		ctrl := gomock.NewController(t)
 		cm := mockModel.NewMockToolCallingChatModel(ctrl)
 
 		// Set up expectations for the mock model
+		// 为 mock 模型设置预期
 		times := 0
 		cm.EXPECT().Stream(gomock.Any(), gomock.Any(), gomock.Any()).
 			DoAndReturn(func(ctx context.Context, input []Message, opts ...model.Option) (
@@ -297,6 +314,7 @@ func TestReact(t *testing.T) {
 		cm.EXPECT().WithTools(gomock.Any()).Return(cm, nil).AnyTimes()
 
 		// Create a reactConfig
+		// 创建 reactConfig
 		config := &reactConfig{
 			model: &testModelWrapper{inner: cm},
 			toolsConfig: &compose.ToolsNodeConfig{
@@ -314,6 +332,7 @@ func TestReact(t *testing.T) {
 		assert.NotNil(t, compiled)
 
 		// Test streaming with a user message
+		// 测试带用户消息的流式处理
 		outStream, err := compiled.Stream(ctx, &reactInput{Messages: []Message{
 			{
 				Role:    schema.User,
@@ -342,10 +361,12 @@ func TestReact(t *testing.T) {
 	})
 
 	// Test streaming with toolsReturnDirectly
+	// 测试使用 toolsReturnDirectly 的流式处理
 	t.Run("StreamWithToolsReturnDirectly", func(t *testing.T) {
 		ctx := context.Background()
 
 		// Create a fake tool for testing
+		// 创建用于测试的 fake 工具
 		fakeTool := &fakeToolForTest{
 			tarCount: 3,
 		}
@@ -355,10 +376,12 @@ func TestReact(t *testing.T) {
 		}
 
 		// Create a mock chat model
+		// 创建 mock 聊天模型
 		ctrl := gomock.NewController(t)
 		cm := mockModel.NewMockToolCallingChatModel(ctrl)
 
 		// Set up expectations for the mock model
+		// 为 mock 模型设置预期
 		times := 0
 		cm.EXPECT().Stream(gomock.Any(), gomock.Any(), gomock.Any()).
 			DoAndReturn(func(ctx context.Context, input []Message, opts ...model.Option) (
@@ -407,6 +430,7 @@ func TestReact(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Create a reactConfig with toolsReturnDirectly
+		// 创建带 toolsReturnDirectly 的 reactConfig
 		config := &reactConfig{
 			model: &testModelWrapper{inner: cm},
 			toolsConfig: &compose.ToolsNodeConfig{
@@ -424,9 +448,11 @@ func TestReact(t *testing.T) {
 		assert.NotNil(t, compiled)
 
 		// Reset times counter
+		// 重置 times 计数器
 		times = 0
 
 		// Test streaming with a user message when tool returns directly
+		// 测试工具直接返回时带用户消息的流式处理
 		outStream, err := compiled.Stream(ctx, &reactInput{Messages: []Message{
 			{
 				Role:    schema.User,
@@ -460,6 +486,7 @@ func TestReact(t *testing.T) {
 		ctx := context.Background()
 
 		// Create a fake tool for testing
+		// 创建用于测试的 fake 工具
 		fakeTool := &fakeToolForTest{
 			tarCount: 3,
 		}
@@ -468,10 +495,12 @@ func TestReact(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Create a mock chat model
+		// 创建 mock 聊天模型
 		ctrl := gomock.NewController(t)
 		cm := mockModel.NewMockToolCallingChatModel(ctrl)
 
 		// Set up expectations for the mock model
+		// 为 mock 模型设置预期
 		times := 0
 		cm.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 			DoAndReturn(func(ctx context.Context, input []Message, opts ...model.Option) (Message, error) {
@@ -495,6 +524,7 @@ func TestReact(t *testing.T) {
 		cm.EXPECT().WithTools(gomock.Any()).Return(cm, nil).AnyTimes()
 
 		// don't exceed max iterations
+		// 不要超过 max iterations
 		config := &reactConfig{
 			model: &testModelWrapper{inner: cm},
 			toolsConfig: &compose.ToolsNodeConfig{
@@ -513,6 +543,7 @@ func TestReact(t *testing.T) {
 		assert.NotNil(t, compiled)
 
 		// Test with a user message
+		// 测试用户消息
 		result, err := compiled.Invoke(ctx, &reactInput{Messages: []Message{
 			{
 				Role:    schema.User,
@@ -523,8 +554,10 @@ func TestReact(t *testing.T) {
 		assert.Equal(t, result.Content, "bye")
 
 		// reset chat model times counter
+		// 重置聊天模型的 times 计数器
 		times = 0
 		// exceed max iterations
+		// 超过最大迭代次数
 		config = &reactConfig{
 			model: &testModelWrapper{inner: cm},
 			toolsConfig: &compose.ToolsNodeConfig{
@@ -543,6 +576,7 @@ func TestReact(t *testing.T) {
 		assert.NotNil(t, compiled)
 
 		// Test with a user message
+		// 使用一条用户消息进行测试
 		_, err = compiled.Invoke(ctx, &reactInput{Messages: []Message{
 			{
 				Role:    schema.User,
@@ -558,6 +592,7 @@ func TestReact(t *testing.T) {
 }
 
 // Helper types and functions for testing
+// 用于测试的辅助类型和函数
 
 type fakeStreamToolForTest struct {
 	tarCount int

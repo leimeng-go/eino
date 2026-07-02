@@ -40,12 +40,16 @@ type AssistantGenTextExtension struct {
 
 type ReasoningExtension struct {
 	// Content is the reasoning text content.
+	// Content 是推理文本内容。
 	Content []*ReasoningContent `json:"content,omitempty"`
 }
 
 type ReasoningContent struct {
 	// Index specifies the index position of this content in the final response.
 	// Only available in streaming response.
+	//
+	// Index 指定该内容在最终响应中的索引位置。
+	// 仅在流式响应中可用。
 	Index *int `json:"index,omitempty"`
 
 	Text string `json:"text,omitempty"`
@@ -72,6 +76,9 @@ type OutputRefusal struct {
 type TextAnnotation struct {
 	// Index specifies the index position of this annotation in the final response.
 	// Only available in streaming response.
+	//
+	// Index 指定该注释在最终响应中的索引位置。
+	// 仅在流式响应中可用。
 	Index int `json:"index,omitempty"`
 
 	Type TextAnnotationType `json:"type,omitempty"`
@@ -84,50 +91,65 @@ type TextAnnotation struct {
 
 type TextAnnotationFileCitation struct {
 	// The ID of the file.
+	// 文件的 ID。
 	FileID string `json:"file_id,omitempty"`
 	// The filename of the file cited.
+	// 被引用文件的文件名。
 	Filename string `json:"filename,omitempty"`
 
 	// The index of the file in the list of files.
+	// 文件在文件列表中的索引。
 	Index int `json:"index,omitempty"`
 }
 
 type TextAnnotationURLCitation struct {
 	// The title of the web resource.
+	// Web 资源的标题。
 	Title string `json:"title,omitempty"`
 	// The URL of the web resource.
+	// Web 资源的 URL。
 	URL string `json:"url,omitempty"`
 
 	// The index of the first character of the URL citation in the message.
+	// 消息中 URL 引用的首字符索引。
 	StartIndex int `json:"start_index,omitempty"`
 	// The index of the last character of the URL citation in the message.
+	// 消息中 URL 引用的末字符索引。
 	EndIndex int `json:"end_index,omitempty"`
 }
 
 type TextAnnotationContainerFileCitation struct {
 	// The ID of the container file.
+	// 容器文件的 ID。
 	ContainerID string `json:"container_id,omitempty"`
 
 	// The ID of the file.
+	// 文件的 ID。
 	FileID string `json:"file_id,omitempty"`
 	// The filename of the container file cited.
+	// 被引用容器文件的文件名。
 	Filename string `json:"filename,omitempty"`
 
 	// The index of the first character of the container file citation in the message.
+	// 消息中容器文件引用的首字符索引。
 	StartIndex int `json:"start_index,omitempty"`
 	// The index of the last character of the container file citation in the message.
+	// 消息中容器文件引用的最后一个字符索引。
 	EndIndex int `json:"end_index,omitempty"`
 }
 
 type TextAnnotationFilePath struct {
 	// The ID of the file.
+	// 文件的 ID。
 	FileID string `json:"file_id,omitempty"`
 
 	// The index of the file in the list of files.
+	// 文件在文件列表中的索引。
 	Index int `json:"index,omitempty"`
 }
 
 // ConcatAssistantGenTextExtensions concatenates multiple AssistantGenTextExtension chunks into a single one.
+// ConcatAssistantGenTextExtensions 将多个 AssistantGenTextExtension 块拼接为一个。
 func ConcatAssistantGenTextExtensions(chunks []*AssistantGenTextExtension) (*AssistantGenTextExtension, error) {
 	if len(chunks) == 0 {
 		return nil, fmt.Errorf("no assistant generated text extension found")
@@ -165,6 +187,7 @@ func ConcatAssistantGenTextExtensions(chunks []*AssistantGenTextExtension) (*Ass
 	for _, idx := range indices {
 		an := *indexToAnnotation[idx]
 		an.Index = 0 // clear index
+		// 清除 index
 		ret.Annotations = append(ret.Annotations, &an)
 	}
 
@@ -183,6 +206,7 @@ func ConcatAssistantGenTextExtensions(chunks []*AssistantGenTextExtension) (*Ass
 }
 
 // ConcatReasoningExtensions concatenates multiple ReasoningExtension chunks into a single one.
+// ConcatReasoningExtensions 将多个 ReasoningExtension 块拼接为一个。
 func ConcatReasoningExtensions(chunks []*ReasoningExtension) (*ReasoningExtension, error) {
 	if len(chunks) == 0 {
 		return nil, fmt.Errorf("no reasoning extension found")
@@ -239,6 +263,7 @@ func ConcatReasoningExtensions(chunks []*ReasoningExtension) (*ReasoningExtensio
 }
 
 // ConcatResponseMetaExtensions concatenates multiple ResponseMetaExtension chunks into a single one.
+// ConcatResponseMetaExtensions 将多个 ResponseMetaExtension 块拼接为一个。
 func ConcatResponseMetaExtensions(chunks []*ResponseMetaExtension) (*ResponseMetaExtension, error) {
 	if len(chunks) == 0 {
 		return nil, fmt.Errorf("no response meta extension found")

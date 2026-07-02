@@ -22,26 +22,35 @@ import (
 )
 
 // AgenticCallbackInput is the input for the callback.
+// AgenticCallbackInput 是回调的输入。
 type AgenticCallbackInput struct {
 	// Variables is the variables for the callback.
+	// Variables 是回调的变量。
 	Variables map[string]any
 	// Templates is the agentic templates for the callback.
+	// Templates 是回调的 agentic templates。
 	Templates []schema.AgenticMessagesTemplate
 	// Extra is the extra information for the callback.
+	// Extra 是回调的额外信息。
 	Extra map[string]any
 }
 
 // AgenticCallbackOutput is the output for the callback.
+// AgenticCallbackOutput 是回调的输出。
 type AgenticCallbackOutput struct {
 	// Result is the agentic result for the callback.
+	// Result 是回调的 agentic result。
 	Result []*schema.AgenticMessage
 	// Templates is the agentic templates for the callback.
+	// Templates 是回调的 agentic templates。
 	Templates []schema.AgenticMessagesTemplate
 	// Extra is the extra information for the callback.
+	// Extra 是回调的额外信息。
 	Extra map[string]any
 }
 
 // ConvAgenticCallbackInput converts the callback input to the agentic prompt callback input.
+// ConvAgenticCallbackInput 将回调输入转换为 agentic prompt 回调输入。
 func ConvAgenticCallbackInput(src callbacks.CallbackInput) *AgenticCallbackInput {
 	switch t := src.(type) {
 	case *AgenticCallbackInput:
@@ -56,6 +65,7 @@ func ConvAgenticCallbackInput(src callbacks.CallbackInput) *AgenticCallbackInput
 }
 
 // ConvAgenticCallbackOutput converts the callback output to the agentic prompt callback output.
+// ConvAgenticCallbackOutput 将回调输出转换为 agentic prompt 回调输出。
 func ConvAgenticCallbackOutput(src callbacks.CallbackOutput) *AgenticCallbackOutput {
 	switch t := src.(type) {
 	case *AgenticCallbackOutput:

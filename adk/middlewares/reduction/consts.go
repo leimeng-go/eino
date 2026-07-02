@@ -15,6 +15,7 @@
  */
 
 // Package reduction provides middlewares to trim context and clear tool results.
+// Package reduction 提供用于裁剪上下文和清理工具结果的中间件。
 package reduction
 
 import "github.com/cloudwego/eino/adk/internal"

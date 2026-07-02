@@ -159,6 +159,10 @@ type internalStruct struct {
 	// map or struct
 	// in map, the key is the serialized map key anyway todo: if key is string, don't serialize
 	// in struct, the key is the original field name
+	//
+	// map 或 struct
+	// 在 map 中，键始终是序列化后的 map 键 todo: if key is string, don't serialize
+	// 在 struct 中，键是原始字段名
 	MapValues map[string]*internalStruct `json:",omitempty"`
 
 	// slice
@@ -269,6 +273,7 @@ func internalMarshal(v any, fieldType reflect.Type) (*internalStruct, error) {
 		}
 		if typeUnspecific {
 			// need type registered
+			// 需要注册类型
 			key, ok := rm[rt]
 			if !ok {
 				return nil, fmt.Errorf("unknown type: %v", rt)
@@ -286,6 +291,7 @@ func internalMarshal(v any, fieldType reflect.Type) (*internalStruct, error) {
 	case reflect.Struct:
 		if typeUnspecific {
 			// need type registered
+			// 需要注册类型
 			key, ok := rm[rt]
 			if !ok {
 				return nil, fmt.Errorf("unknown type: %v", rt)
@@ -308,6 +314,10 @@ func internalMarshal(v any, fieldType reflect.Type) (*internalStruct, error) {
 			// Use rv.Addr() when possible so that pointer-receiver MarshalJSON methods
 			// are callable. rv is addressable when obtained from pointer dereference.
 			// When not addressable, copy into an addressable temporary.
+			//
+			// 尽可能使用 rv.Addr()，以便可调用指针接收者的 MarshalJSON 方法。
+			// 从指针解引用获得的 rv 是可寻址的。
+			// 不可寻址时，复制到一个可寻址的临时值中。
 			var marshalTarget any
 			if rv.CanAddr() {
 				marshalTarget = rv.Addr().Interface()
@@ -329,6 +339,7 @@ func internalMarshal(v any, fieldType reflect.Type) (*internalStruct, error) {
 		for i := 0; i < rt.NumField(); i++ {
 			field := rt.Field(i)
 			// only handle exported fields
+			// 只处理导出字段
 			if field.PkgPath == "" {
 				k := field.Name
 				v := rv.Field(i)
@@ -350,12 +361,14 @@ func internalMarshal(v any, fieldType reflect.Type) (*internalStruct, error) {
 				PointerNum: pointerNum,
 			}
 			// map key type
+			// map 键类型
 			ret.Type.MapKeyType, err = extractType(rt.Key())
 			if err != nil {
 				return nil, err
 			}
 
 			// map value type
+			// map 值类型
 			ret.Type.MapValueType, err = extractType(rt.Elem())
 			if err != nil {
 				return nil, err
@@ -433,6 +446,7 @@ func internalUnmarshal(v *internalStruct, typ reflect.Type) (any, error) {
 
 	if v.Type == nil {
 		// specific type
+		// 具体类型
 		if checkMarshaler(typ) {
 			pv := reflect.New(typ)
 			err := json.Unmarshal(v.JSONValue, pv.Interface())
@@ -446,6 +460,7 @@ func internalUnmarshal(v *internalStruct, typ reflect.Type) (any, error) {
 
 	if len(v.Type.SimpleType) != 0 {
 		// based type
+		// 基础类型
 		t, ok := m[v.Type.SimpleType]
 		if !ok {
 			return nil, fmt.Errorf("unknown type key: %v", v.Type)
@@ -531,6 +546,7 @@ func internalSpecificTypeUnmarshal(is *internalStruct, typ reflect.Type) (any, e
 		return result.Interface(), nil
 	}
 	// simple type
+	// 简单类型
 	v := reflect.New(typ)
 	err := sonic.Unmarshal(is.JSONValue, v.Interface())
 	if err != nil {
@@ -544,6 +560,9 @@ func setSliceElems(dResult reflect.Value, values []*internalStruct) error {
 
 	// Handle arrays differently from slices
 	// Arrays have fixed size and cannot use reflect.Append
+	//
+	// 数组与切片的处理不同
+	// 数组大小固定，不能使用 reflect.Append
 	if dResult.Kind() == reflect.Array {
 		for i, internalValue := range values {
 			if i >= dResult.Len() {
@@ -563,6 +582,7 @@ func setSliceElems(dResult reflect.Value, values []*internalStruct) error {
 	}
 
 	// For slices, use Append as before
+	// 对于切片，仍像之前一样使用 Append
 	for _, internalValue := range values {
 		value, err := internalUnmarshal(internalValue, t.Elem())
 		if err != nil {
@@ -570,6 +590,7 @@ func setSliceElems(dResult reflect.Value, values []*internalStruct) error {
 		}
 		if value == nil {
 			// empty value
+			// 空值
 			dResult.Set(reflect.Append(dResult, reflect.New(t.Elem()).Elem()))
 		} else {
 			dResult.Set(reflect.Append(dResult, reflect.ValueOf(value)))
@@ -671,12 +692,16 @@ func createValueFromType(t reflect.Type) (value reflect.Value, derefValue reflec
 
 	// Use Len() == 0 instead of IsNil() for slices to avoid panic
 	// IsNil() can panic on uninitialized slice values created via reflect.New().Elem()
+	//
+	// 对切片使用 Len() == 0 而不是 IsNil()，以避免 panic
+	// IsNil() 可能会在通过 reflect.New().Elem() 创建的未初始化切片值上 panic
 	if derefValue.Kind() == reflect.Slice {
 		if derefValue.Len() == 0 && derefValue.Cap() == 0 {
 			derefValue.Set(reflect.MakeSlice(derefValue.Type(), 0, 0))
 		}
 	}
 	// Arrays cannot be nil and don't need initialization
+	// 数组不能为 nil，也不需要初始化
 
 	return value, derefValue
 }

@@ -83,4 +83,39 @@
 //     from the convert function to skip an element.
 //
 // See https://www.cloudwego.io/docs/eino/core_modules/chain_and_graph_orchestration/stream_programming_essentials/
+//
+// Package schema 定义所有 Eino 组件共享的核心数据结构和工具。
+// # Key Types
+// [Message] 是用户、模型和工具之间通信的通用单元。它承载 role、文本内容、多模态媒体、工具调用和响应元数据。辅助构造函数 — [UserMessage]、[SystemMessage]、[AssistantMessage]、[ToolMessage] — 覆盖最常见的场景。
+// [Document] 表示一段文本及其元数据 map。类型化访问器（Score、SubIndexes、DenseVector、SparseVector、DSLInfo、ExtraInfo）读写约定的元数据键，使流水线阶段无需耦合到特定结构体类型即可传递结构化数据。
+// [ToolInfo] 描述工具的名称、描述和参数 schema。参数既可以声明为 [ParameterInfo] map（简单、类似 struct），也可以声明为原始 [jsonschema.Schema]（完整 JSON Schema 2020-12 表达能力）。[ToolChoice] 控制模型必须、可以或不得调用工具。
+// # Streaming
+// [StreamReader] 和 [StreamWriter] 是在 Eino 流水线中传递流式数据的构建块。使用 [Pipe] 创建一对关联对象：
+// sr, sw := schema.Pipe[*schema.Message](10)
+// go func() {
+// defer sw.Close()
+// sw.Send(chunk, nil)
+// }()
+// defer sr.Close()
+// for {
+// chunk, err := sr.Recv()
+// if errors.Is(err, io.EOF) { break }
+// }
+// 重要约束：
+// - StreamReader 只能读取一次：只能有一个 goroutine 调用 Recv。
+// - 即使循环因 io.EOF 结束，也始终调用 Close 以释放资源。
+// - 要将同一个流提供给多个消费者，请调用 [StreamReader.Copy]。
+// # Four Streaming Paradigms
+// Eino 组件和 Lambda 函数按其输入/输出流式形态分类。框架会自动桥接不匹配的形态：
+// - Invoke：非流式输入，非流式输出（ping-pong）。
+// - Stream：非流式输入，StreamReader 输出（server-streaming）。ChatModel 和 Tool 支持此模式。
+// - Collect：StreamReader 输入，非流式输出（client-streaming）。适用于读取首个 chunk 后再决定的分支条件。
+// - Transform：StreamReader 输入，StreamReader 输出（双向）。
+// 当上游节点输出 T，而下游节点只接受 StreamReader[T] 时，框架会将 T 包装成单 chunk 的 StreamReader —— 这称为 "fake stream"。它满足接口，但不会减少 time-to-first-chunk。反之，当下游节点只接受 T，而上游输出 StreamReader[T] 时，框架会自动将流拼接为完整的 T。
+// 工具函数：
+// - [StreamReaderFromArray] 将 slice 包装为流（测试中很有用）。
+// - [MergeStreamReaders] 将多个流 fan-in 为一个。
+// - [MergeNamedStreamReaders] 类似 MergeStreamReaders，但会在每个具名 source 结束时发出 [SourceEOF]，便于跟踪每个 source 的完成情况。
+// - [StreamReaderWithConvert] 转换元素类型；从 convert 函数返回 [ErrNoValue] 可跳过某个元素。
+// 参见 https://www.cloudwego.io/docs/eino/core_modules/chain_and_graph_orchestration/stream_programming_essentials/
 package schema

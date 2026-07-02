@@ -37,14 +37,17 @@ import (
 )
 
 // TestNewSupervisor tests the New function
+// TestNewSupervisor 测试 New 函数
 func TestNewSupervisor(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a mock controller
+	// 创建 mock controller
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	// Create mock agents
+	// 创建 mock agents
 	supervisorAgent := mockAdk.NewMockAgent(ctrl)
 	subAgent1 := mockAdk.NewMockAgent(ctrl)
 	subAgent2 := mockAdk.NewMockAgent(ctrl)
@@ -104,6 +107,7 @@ func TestNewSupervisor(t *testing.T) {
 	aIter := runner.Run(ctx, []adk.Message{schema.UserMessage("test")})
 
 	// transfer to agent1
+	// transfer 到 agent1
 	event, ok := aIter.Next()
 	assert.True(t, ok)
 	assert.Equal(t, "SupervisorAgent", event.AgentName)
@@ -117,6 +121,7 @@ func TestNewSupervisor(t *testing.T) {
 	assert.Equal(t, "SubAgent1", event.Action.TransferToAgent.DestAgentName)
 
 	// agent1's output
+	// agent1 的输出
 	event, ok = aIter.Next()
 	assert.True(t, ok)
 	assert.Equal(t, "SubAgent1", event.AgentName)
@@ -124,6 +129,7 @@ func TestNewSupervisor(t *testing.T) {
 	assert.Equal(t, subAgent1Msg.Content, event.Output.MessageOutput.Message.Content)
 
 	// transfer back to supervisor
+	// 转回 supervisor
 	event, ok = aIter.Next()
 	assert.True(t, ok)
 	assert.Equal(t, "SubAgent1", event.AgentName)
@@ -137,6 +143,7 @@ func TestNewSupervisor(t *testing.T) {
 	assert.Equal(t, "SupervisorAgent", event.Action.TransferToAgent.DestAgentName)
 
 	// transfer to agent2
+	// 转给 agent2
 	event, ok = aIter.Next()
 	assert.True(t, ok)
 	assert.Equal(t, "SupervisorAgent", event.AgentName)
@@ -150,6 +157,7 @@ func TestNewSupervisor(t *testing.T) {
 	assert.Equal(t, "SubAgent2", event.Action.TransferToAgent.DestAgentName)
 
 	// agent1's output
+	// agent1 的输出
 	event, ok = aIter.Next()
 	assert.True(t, ok)
 	assert.Equal(t, "SubAgent2", event.AgentName)
@@ -157,6 +165,7 @@ func TestNewSupervisor(t *testing.T) {
 	assert.Equal(t, subAgent2Msg.Content, event.Output.MessageOutput.Message.Content)
 
 	// transfer back to supervisor
+	// 转回 supervisor
 	event, ok = aIter.Next()
 	assert.True(t, ok)
 	assert.Equal(t, "SubAgent2", event.AgentName)
@@ -508,6 +517,7 @@ func TestSupervisorExit(t *testing.T) {
 	subAgent.EXPECT().Name(gomock.Any()).Return("SubAgent").AnyTimes()
 
 	// 1. Supervisor transfers to SubAgent
+	// 1. Supervisor 转给 SubAgent
 	aMsg, tMsg := adk.GenTransferMessages(ctx, "SubAgent")
 	i1, g1 := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
 	g1.Send(adk.EventFromMessage(aMsg, nil, schema.Assistant, ""))
@@ -518,6 +528,7 @@ func TestSupervisorExit(t *testing.T) {
 	supervisorAgent.EXPECT().Run(gomock.Any(), gomock.Any(), gomock.Any()).Return(i1).Times(1)
 
 	// 2. SubAgent emits Exit action
+	// 2. SubAgent 发出 Exit action
 	i2, g2 := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
 	exitEvent := &adk.AgentEvent{
 		AgentName: "SubAgent",
@@ -545,6 +556,7 @@ func TestSupervisorExit(t *testing.T) {
 	aIter := runner.Run(ctx, []adk.Message{schema.UserMessage("test")})
 
 	// Collect events
+	// 收集事件
 	var events []*adk.AgentEvent
 	for {
 		event, ok := aIter.Next()
@@ -588,6 +600,7 @@ func TestNestedSupervisorExit(t *testing.T) {
 	worker.EXPECT().Name(gomock.Any()).Return("Worker").AnyTimes()
 
 	// 1. TopSupervisor transfers to MidSupervisor
+	// 1. TopSupervisor 转给 MidSupervisor
 	aMsg1, tMsg1 := adk.GenTransferMessages(ctx, "MidSupervisor")
 	i1, g1 := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
 	g1.Send(adk.EventFromMessage(aMsg1, nil, schema.Assistant, ""))
@@ -598,6 +611,7 @@ func TestNestedSupervisorExit(t *testing.T) {
 	topSupervisor.EXPECT().Run(gomock.Any(), gomock.Any(), gomock.Any()).Return(i1).AnyTimes()
 
 	// 2. MidSupervisor transfers to Worker
+	// 2. MidSupervisor 转给 Worker
 	aMsg2, tMsg2 := adk.GenTransferMessages(ctx, "Worker")
 	i2, g2 := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
 	g2.Send(adk.EventFromMessage(aMsg2, nil, schema.Assistant, ""))
@@ -608,6 +622,7 @@ func TestNestedSupervisorExit(t *testing.T) {
 	midSupervisor.EXPECT().Run(gomock.Any(), gomock.Any(), gomock.Any()).Return(i2).AnyTimes()
 
 	// 3. Worker emits Exit action
+	// 3. Worker 发出 Exit action
 	i3, g3 := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
 	exitEvent := &adk.AgentEvent{
 		AgentName: "Worker",
@@ -625,6 +640,9 @@ func TestNestedSupervisorExit(t *testing.T) {
 
 	// Build Nested System
 	// Mid System: MidSupervisor -> [Worker]
+	//
+	// 构建嵌套系统
+	// Mid System: MidSupervisor -> [Worker]
 	midSystem, err := New(ctx, &Config{
 		Supervisor: midSupervisor,
 		SubAgents:  []adk.Agent{worker},
@@ -633,7 +651,12 @@ func TestNestedSupervisorExit(t *testing.T) {
 	// We need to give the midSystem the name "MidSupervisor" so TopSupervisor can find it
 	// supervisor.New returns a ResumableAgent that delegates Name() to the supervisor agent.
 	// So midSystem.Name() should already be "MidSupervisor" because midSupervisor.Name() is "MidSupervisor".
+	//
+	// 需要把 midSystem 的名称设为 "MidSupervisor"，这样 TopSupervisor 才能找到它
+	// supervisor.New 返回一个 ResumableAgent，其 Name() 委托给 supervisor agent。
+	// 所以 midSystem.Name() 应该已经是 "MidSupervisor"，因为 midSupervisor.Name() 是 "MidSupervisor"。
 
+	// Top System: TopSupervisor -> [midSystem]
 	// Top System: TopSupervisor -> [midSystem]
 	topSystem, err := New(ctx, &Config{
 		Supervisor: topSupervisor,
@@ -645,6 +668,7 @@ func TestNestedSupervisorExit(t *testing.T) {
 	aIter := runner.Run(ctx, []adk.Message{schema.UserMessage("test nested exit")})
 
 	// Collect events
+	// 收集事件
 	var events []*adk.AgentEvent
 	for {
 		event, ok := aIter.Next()
@@ -694,6 +718,7 @@ func TestChatModelAgentInternalEventsExit(t *testing.T) {
 	innerAgent.EXPECT().Description(gomock.Any()).Return("Inner Agent Description").AnyTimes()
 
 	// 1. Supervisor transfers to Worker (only once, then exits when worker transfers back)
+	// 1. Supervisor 转给 Worker（只转一次，然后在 worker 转回时退出）
 	supervisorRunCount := 0
 	supervisorAgent.EXPECT().Run(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 		func(ctx context.Context, input *adk.AgentInput, opts ...adk.AgentRunOption) *adk.AsyncIterator[*adk.AgentEvent] {
@@ -726,9 +751,13 @@ func TestChatModelAgentInternalEventsExit(t *testing.T) {
 
 	// 2. Worker runs, calls AgentTool (InnerAgent)
 	// Mock WorkerModel behavior
+	//
+	// 2. Worker 运行，调用 AgentTool (InnerAgent)
+	// Mock WorkerModel 行为
 	workerModel.EXPECT().WithTools(gomock.Any()).Return(workerModel, nil).AnyTimes()
 
 	// 2.1 Worker generates tool call
+	// 2.1 Worker 生成工具调用
 	toolCallMsg := schema.AssistantMessage("", []schema.ToolCall{
 		{
 			ID:   "call_inner_1",
@@ -743,6 +772,7 @@ func TestChatModelAgentInternalEventsExit(t *testing.T) {
 		Return(toolCallMsg, nil).Times(1)
 
 	// 2.2 InnerAgent runs and emits Exit
+	// 2.2 InnerAgent 运行并发出 Exit
 	innerAgent.EXPECT().Run(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 		func(ctx context.Context, input *adk.AgentInput, opts ...adk.AgentRunOption) *adk.AsyncIterator[*adk.AgentEvent] {
 			iter, gen := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
@@ -767,13 +797,19 @@ func TestChatModelAgentInternalEventsExit(t *testing.T) {
 	// 2.3 Worker receives tool result (empty string or whatever AgentTool returns on exit/interrupt)
 	// AgentTool implementation details: if Exit action is present, it returns whatever output is there.
 	// The Exit action itself is passed as internal event.
+	//
+	// 2.3 Worker 接收工具结果（空字符串或 AgentTool 在 exit/interrupt 时返回的任何内容）
+	// AgentTool 实现细节：如果存在 Exit action，它会返回其中的任何输出。
+	// Exit action 本身作为内部事件传递。
 
 	// 2.4 Worker generates final response
+	// 2.4 Worker 生成最终响应
 	finalMsg := schema.AssistantMessage("Worker Finished", nil)
 	workerModel.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(finalMsg, nil).AnyTimes()
 
 	// Build Worker Agent
+	// 构建 Worker Agent
 	agentTool := adk.NewAgentTool(ctx, innerAgent)
 	workerAgent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
 		Name:        "Worker",
@@ -784,11 +820,13 @@ func TestChatModelAgentInternalEventsExit(t *testing.T) {
 				Tools: []tool.BaseTool{agentTool},
 			},
 			EmitInternalEvents: true, // Key configuration
+			// 关键配置
 		},
 	})
 	assert.NoError(t, err)
 
 	// Build System
+	// 构建 System
 	sys, err := New(ctx, &Config{
 		Supervisor: supervisorAgent,
 		SubAgents:  []adk.Agent{workerAgent},
@@ -799,6 +837,7 @@ func TestChatModelAgentInternalEventsExit(t *testing.T) {
 	aIter := runner.Run(ctx, []adk.Message{schema.UserMessage("start")})
 
 	// Collect events
+	// 收集事件
 	var events []*adk.AgentEvent
 	for {
 		event, ok := aIter.Next()
@@ -813,11 +852,13 @@ func TestChatModelAgentInternalEventsExit(t *testing.T) {
 
 	for _, e := range events {
 		// Check for InnerAgent exit event (propagated as internal event)
+		// 检查 InnerAgent 退出事件（作为内部事件传播）
 		if e.AgentName == "InnerAgent" && e.Action != nil && e.Action.Exit {
 			foundInnerExit = true
 		}
 
 		// Check for transfer back to Supervisor
+		// 检查是否转回 Supervisor
 		if e.AgentName == "Worker" && e.Action != nil && e.Action.TransferToAgent != nil &&
 			e.Action.TransferToAgent.DestAgentName == "Supervisor" {
 			foundTransferBack = true

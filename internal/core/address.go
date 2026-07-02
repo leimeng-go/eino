@@ -26,12 +26,15 @@ import (
 )
 
 // AddressSegmentType defines the type of a segment in an execution address.
+// AddressSegmentType 定义执行地址中段的类型。
 type AddressSegmentType string
 
 // Address represents a full, hierarchical address to a point in the execution structure.
+// Address 表示执行结构中某一点的完整层级地址。
 type Address []AddressSegment
 
 // String converts an Address into its unique string representation.
+// String 将 Address 转换为其唯一的字符串表示。
 func (p Address) String() string {
 	if p == nil {
 		return ""
@@ -66,13 +69,21 @@ func (p Address) Equals(other Address) bool {
 
 // AddressSegment represents a single segment in the hierarchical address of an execution point.
 // A sequence of AddressSegments uniquely identifies a location within a potentially nested structure.
+//
+// AddressSegment 表示执行点层级地址中的单个段。
+// 一组 AddressSegment 可唯一标识潜在嵌套结构中的位置。
 type AddressSegment struct {
 	// ID is the unique identifier for this segment, e.g., the node's key or the tool's name.
+	// ID 是该段的唯一标识符，例如节点的 key 或工具名称。
 	ID string
 	// Type indicates whether this address segment is a graph node, a tool call, an agent, etc.
+	// Type 表示该地址段是图节点、工具调用、智能体等。
 	Type AddressSegmentType
 	// In some cases, ID alone are not unique enough, we need this SubID to guarantee uniqueness.
 	// e.g. parallel tool calls with the same name but different tool call IDs.
+	//
+	// 有些情况下，仅靠 ID 不足以保证唯一性，需要此 SubID 来保证唯一。
+	// 例如同名但工具调用 ID 不同的并行工具调用。
 	SubID string
 }
 
@@ -99,6 +110,10 @@ type globalResumeInfo struct {
 // GetCurrentAddress returns the hierarchical address of the currently executing component.
 // The address is a sequence of segments, each identifying a structural part of the execution
 // like an agent, a graph node, or a tool call. This can be useful for logging or debugging.
+//
+// GetCurrentAddress 返回当前正在执行的组件的层级地址。
+// 该地址是一组段，每个段标识执行中的一个结构部分，
+// 如智能体、图节点或工具调用。这对日志记录或调试很有用。
 func GetCurrentAddress(ctx context.Context) Address {
 	if p, ok := ctx.Value(addrCtxKey{}).(*addrCtx); ok {
 		return p.addr
@@ -115,9 +130,16 @@ func GetCurrentAddress(ctx context.Context) Address {
 //   - ctx: The parent context, typically the one passed into the component's Invoke/Stream method.
 //   - segType: The type of the new address segment (e.g., "node", "tool").
 //   - segID: The unique ID for the new address segment.
+//
+// AppendAddressSegment 为子组件创建新的执行 context（例如图节点或工具调用）。
+// 它会在当前 context 的地址后追加一个新段，并为该特定子地址填充新的 context，包含相应的中断状态和恢复数据。
+// - ctx: 父 context，通常是传入组件 Invoke/Stream 方法的 context。
+// - segType: 新地址段的类型（例如 "node"、"tool"）。
+// - segID: 新地址段的唯一 ID。
 func AppendAddressSegment(ctx context.Context, segType AddressSegmentType, segID string,
 	subID string) context.Context {
 	// get current address
+	// 获取当前地址
 	currentAddress := GetCurrentAddress(ctx)
 	if len(currentAddress) == 0 {
 		currentAddress = []AddressSegment{
@@ -187,6 +209,7 @@ func AppendAddressSegment(ctx context.Context, segType AddressSegmentType, segID
 }
 
 // GetNextResumptionPoints finds the immediate child resumption points for a given parent address.
+// GetNextResumptionPoints 查找给定父地址的直接子恢复点。
 func GetNextResumptionPoints(ctx context.Context) (map[string]bool, error) {
 	parentAddr := GetCurrentAddress(ctx)
 
@@ -203,11 +226,13 @@ func GetNextResumptionPoints(ctx context.Context) (map[string]bool, error) {
 
 	for _, addr := range rInfo.id2Addr {
 		// Check if addr is a potential child (must be longer than parent)
+		// 检查 addr 是否可能是子地址（必须比父地址更长）
 		if len(addr) <= parentAddrLen {
 			continue
 		}
 
 		// Check if it has the parent address as a prefix
+		// 检查它是否以父地址为前缀
 		var isPrefix bool
 		if parentAddrLen == 0 {
 			isPrefix = true
@@ -221,10 +246,14 @@ func GetNextResumptionPoints(ctx context.Context) (map[string]bool, error) {
 
 		// We are looking for immediate children.
 		// The address of an immediate child should be one segment longer.
+		//
+		// 我们要查找直接子级。
+		// 直接子级的地址应多一个段。
 		childAddr := addr[parentAddrLen : parentAddrLen+1]
 		childID := childAddr[0].ID
 
 		// Avoid adding duplicates.
+		// 避免添加重复项。
 		if _, ok := nextPoints[childID]; !ok {
 			nextPoints[childID] = true
 		}
@@ -242,10 +271,15 @@ func GetNextResumptionPoints(ctx context.Context) (map[string]bool, error) {
 //
 // This function is the foundation for the "Explicit Targeted Resume" strategy. Components whose interrupt IDs
 // are present as keys in the map will receive `isResumeFlow = true` when they call `GetResumeContext`.
+//
+// BatchResumeWithData 是准备恢复上下文的核心函数。它会将恢复目标及其对应数据的映射注入到上下文中。
+// `resumeData` 映射应以待恢复组件的中断 ID（地址的字符串形式）作为键。值可以是该组件的恢复数据；如果不需要数据，则可为 `nil`（等同于使用 `Resume`）。
+// 此函数是 "Explicit Targeted Resume" 策略的基础。当组件调用 `GetResumeContext` 时，若其中断 ID 作为键存在于该映射中，将收到 `isResumeFlow = true`。
 func BatchResumeWithData(ctx context.Context, resumeData map[string]any) context.Context {
 	rInfo, ok := ctx.Value(globalResumeInfoKey{}).(*globalResumeInfo)
 	if !ok {
 		// Create a new globalResumeInfo and copy the map to prevent external mutation.
+		// 创建新的 globalResumeInfo 并复制映射，以防止外部修改。
 		newMap := make(map[string]any, len(resumeData))
 		for k, v := range resumeData {
 			newMap[k] = v

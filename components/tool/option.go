@@ -19,6 +19,10 @@ package tool
 // Option defines call option for InvokableTool or StreamableTool component, which is part of component interface signature.
 // Each tool implementation could define its own options struct and option funcs within its own package,
 // then wrap the impl specific option funcs into this type, before passing to InvokableRun or StreamableRun.
+//
+// Option 定义 InvokableTool 或 StreamableTool 组件的调用选项，是组件接口签名的一部分。
+// 每个工具实现都可以在自己的包内定义自己的 options struct 和 option funcs，
+// 然后在传给 InvokableRun 或 StreamableRun 前，将实现专用的 option funcs 包装为此类型。
 type Option struct {
 	implSpecificOptFn any
 }
@@ -41,6 +45,21 @@ type Option struct {
 //	}
 //
 // .
+//
+// WrapImplSpecificOptFn 将实现专用的 option functions 包装为 Option 类型。
+// T: 实现专用 options struct 的类型。
+// 工具实现需要使用此函数将自己的 option functions 转换为统一的 Option 类型。
+// 例如，如果工具定义了自己的 options struct：
+// type customOptions struct {
+// conf string
+// }
+// 则工具需要提供如下 option function：
+// func WithConf(conf string) Option {
+// return WrapImplSpecificOptFn(func(o *customOptions) {
+// o.conf = conf
+// }
+// }
+// .
 func WrapImplSpecificOptFn[T any](optFn func(*T)) Option {
 	return Option{
 		implSpecificOptFn: optFn,
@@ -59,6 +78,17 @@ func WrapImplSpecificOptFn[T any](optFn func(*T)) Option {
 //	defaultOptions := &customOptions{}
 //
 //	customOptions := tool.GetImplSpecificOptions(defaultOptions, opts...)
+//
+// GetImplSpecificOptions 让工具作者能够从统一的 Option 类型中提取自己的自定义选项。
+// T: 实现专用 options struct 的类型。
+// 此函数应在工具实现的 InvokableRun 或 StreamableRun 函数中使用。
+// 建议将基础 T 作为第一个参数，工具作者可在其中提供实现专用选项的默认值。
+// 例如：
+// type customOptions struct {
+// conf string
+// }
+// defaultOptions := &customOptions{}
+// customOptions := tool.GetImplSpecificOptions(defaultOptions, opts...)
 func GetImplSpecificOptions[T any](base *T, opts ...Option) *T {
 	if base == nil {
 		base = new(T)

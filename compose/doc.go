@@ -16,4 +16,6 @@
 
 // Package compose provides graph and workflow primitives to build
 // composable, interruptible execution pipelines with callback support.
+//
+// Package compose 提供图和工作流原语，用于构建可组合、可中断且支持回调的执行流水线。
 package compose

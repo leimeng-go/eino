@@ -184,6 +184,9 @@ func TestToolInfoSerialization(t *testing.T) {
 
 	// json roundtrip with empty-but-non-nil params map: must not collapse to nil,
 	// otherwise the params form is silently dropped.
+	//
+	// 对空但非 nil 的 params map 进行 json 往返测试：不能折叠为 nil，
+	// 否则 params 形式会被静默丢弃。
 	tiEmpty := &ToolInfo{
 		ParamsOneOf: NewParamsOneOfByParams(map[string]*ParameterInfo{}),
 	}

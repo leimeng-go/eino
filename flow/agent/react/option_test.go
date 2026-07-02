@@ -37,6 +37,7 @@ func TestWithMessageFuture(t *testing.T) {
 	ctx := context.Background()
 
 	// Test with tool calls
+	// 测试工具调用
 	t.Run("test generate with tool calls", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		cm := mockModel.NewMockToolCallingChatModel(ctrl)
@@ -46,6 +47,7 @@ func TestWithMessageFuture(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Mock model response with tool call
+		// 模拟带工具调用的模型响应
 		cm.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(schema.AssistantMessage("",
 				[]schema.ToolCall{
@@ -64,6 +66,7 @@ func TestWithMessageFuture(t *testing.T) {
 		cm.EXPECT().WithTools(gomock.Any()).Return(cm, nil).AnyTimes()
 
 		// Create agent with MessageFuture
+		// 使用 MessageFuture 创建智能体
 		option, future := WithMessageFuture()
 		a, err := NewAgent(ctx, &AgentConfig{
 			ToolCallingModel: cm,
@@ -75,6 +78,7 @@ func TestWithMessageFuture(t *testing.T) {
 		assert.Nil(t, err)
 
 		// Generate response
+		// 生成响应
 		response, err := a.Generate(ctx, []*schema.Message{
 			schema.UserMessage("use the greet tool"),
 		}, option)
@@ -83,12 +87,14 @@ func TestWithMessageFuture(t *testing.T) {
 
 		sIter := future.GetMessageStreams()
 		// Should be no messages
+		// 应该没有消息
 		_, hasNext, err := sIter.Next()
 		assert.Nil(t, err)
 		assert.False(t, hasNext)
 
 		iter := future.GetMessages()
 		// First message should be the assistant message for tool calling
+		// 第一条消息应为用于工具调用的 assistant 消息
 		msg1, hasNext, err := iter.Next()
 		assert.Nil(t, err)
 		assert.True(t, hasNext)
@@ -96,23 +102,27 @@ func TestWithMessageFuture(t *testing.T) {
 		assert.Equal(t, 1, len(msg1.ToolCalls))
 
 		// Second message should be the tool response
+		// 第二条消息应为工具响应
 		msg2, hasNext, err := iter.Next()
 		assert.Nil(t, err)
 		assert.True(t, hasNext)
 		assert.Equal(t, schema.Tool, msg2.Role)
 
 		// Third message should be the final response
+		// 第三条消息应为最终响应
 		msg3, hasNext, err := iter.Next()
 		assert.Nil(t, err)
 		assert.True(t, hasNext)
 		assert.Equal(t, "final response", msg3.Content)
 
 		// Should be no more messages
+		// 应该没有更多消息
 		_, hasNext, err = iter.Next()
 		assert.Nil(t, err)
 		assert.False(t, hasNext)
 	})
 	// Test with streaming tool calls
+	// 测试流式工具调用
 	t.Run("test generate with streaming tool calls", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		cm := mockModel.NewMockToolCallingChatModel(ctrl)
@@ -122,6 +132,7 @@ func TestWithMessageFuture(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Mock model response with tool call
+		// 模拟带工具调用的模型响应
 		cm.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(schema.AssistantMessage("",
 				[]schema.ToolCall{
@@ -140,6 +151,7 @@ func TestWithMessageFuture(t *testing.T) {
 		cm.EXPECT().WithTools(gomock.Any()).Return(cm, nil).AnyTimes()
 
 		// Create agent with MessageFuture
+		// 使用 MessageFuture 创建智能体
 		option, future := WithMessageFuture()
 		a, err := NewAgent(ctx, &AgentConfig{
 			ToolCallingModel: cm,
@@ -151,6 +163,7 @@ func TestWithMessageFuture(t *testing.T) {
 		assert.Nil(t, err)
 
 		// Generate response
+		// 生成响应
 		response, err := a.Generate(ctx, []*schema.Message{
 			schema.UserMessage("use the greet tool"),
 		}, option)
@@ -158,9 +171,11 @@ func TestWithMessageFuture(t *testing.T) {
 		assert.Equal(t, "final response", response.Content)
 
 		// Get messages from future
+		// 从 future 获取消息
 		iter := future.GetMessages()
 
 		// First message should be the assistant message for tool calling
+		// 第一条消息应为用于工具调用的 assistant 消息
 		msg1, hasNext, err := iter.Next()
 		assert.Nil(t, err)
 		assert.True(t, hasNext)
@@ -168,24 +183,28 @@ func TestWithMessageFuture(t *testing.T) {
 		assert.Equal(t, 1, len(msg1.ToolCalls))
 
 		// Second message should be the tool response
+		// 第二条消息应为工具响应
 		msg2, hasNext, err := iter.Next()
 		assert.Nil(t, err)
 		assert.True(t, hasNext)
 		assert.Equal(t, schema.Tool, msg2.Role)
 
 		// Third message should be the final response
+		// 第三条消息应为最终响应
 		msg3, hasNext, err := iter.Next()
 		assert.Nil(t, err)
 		assert.True(t, hasNext)
 		assert.Equal(t, "final response", msg3.Content)
 
 		// Should be no more messages
+		// 应该没有更多消息
 		_, hasNext, err = iter.Next()
 		assert.Nil(t, err)
 		assert.False(t, hasNext)
 	})
 
 	// Test with non-streaming tool but using agent's Stream interface
+	// 测试非流式工具但使用智能体的 Stream 接口
 	t.Run("test stream with tool calls", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		cm := mockModel.NewMockToolCallingChatModel(ctrl)
@@ -195,6 +214,7 @@ func TestWithMessageFuture(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Mock model response with tool call
+		// 模拟带工具调用的模型响应
 		cm.EXPECT().Stream(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(schema.StreamReaderFromArray([]*schema.Message{schema.AssistantMessage("",
 				[]schema.ToolCall{
@@ -213,6 +233,7 @@ func TestWithMessageFuture(t *testing.T) {
 		cm.EXPECT().WithTools(gomock.Any()).Return(cm, nil).AnyTimes()
 
 		// Create agent with MessageFuture
+		// 使用 MessageFuture 创建智能体
 		option, future := WithMessageFuture()
 		a, err := NewAgent(ctx, &AgentConfig{
 			ToolCallingModel: cm,
@@ -224,26 +245,31 @@ func TestWithMessageFuture(t *testing.T) {
 		assert.Nil(t, err)
 
 		// Use Stream interface
+		// 使用 Stream 接口
 		stream, err := a.Stream(ctx, []*schema.Message{
 			schema.UserMessage("use the greet tool"),
 		}, option)
 		assert.Nil(t, err)
 
 		// Collect all chunks from stream
+		// 收集 stream 中的所有 chunk
 		finalResponse, err := schema.ConcatMessageStream(stream)
 		assert.Nil(t, err)
 		assert.Equal(t, "final response", finalResponse.Content)
 
 		iter := future.GetMessages()
 		// Should be no messages
+		// 不应有消息
 		_, hasNext, err := iter.Next()
 		assert.Nil(t, err)
 		assert.False(t, hasNext)
 
 		// Get message streams from future
+		// 从 future 获取消息流
 		sIter := future.GetMessageStreams()
 
 		// First message should be the assistant message for tool calling
+		// 第一条消息应是用于工具调用的 assistant 消息
 		stream1, hasNext, err := sIter.Next()
 		assert.Nil(t, err)
 		assert.True(t, hasNext)
@@ -254,6 +280,7 @@ func TestWithMessageFuture(t *testing.T) {
 		assert.Equal(t, 1, len(msg1.ToolCalls))
 
 		// Second message should be the tool response
+		// 第二条消息应是工具响应
 		stream2, hasNext, err := sIter.Next()
 		assert.Nil(t, err)
 		assert.True(t, hasNext)
@@ -263,6 +290,7 @@ func TestWithMessageFuture(t *testing.T) {
 		assert.Equal(t, schema.Tool, msg2.Role)
 
 		// Third message should be the final response
+		// 第三条消息应是最终响应
 		stream3, hasNext, err := sIter.Next()
 		assert.Nil(t, err)
 		assert.True(t, hasNext)
@@ -272,6 +300,7 @@ func TestWithMessageFuture(t *testing.T) {
 		assert.Equal(t, "final response", msg3.Content)
 
 		// Should be no more messages
+		// 不应再有消息
 		_, hasNext, err = sIter.Next()
 		assert.Nil(t, err)
 		assert.False(t, hasNext)
@@ -286,6 +315,7 @@ func TestWithMessageFuture(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Mock model response with tool call
+		// 模拟带工具调用的模型响应
 		cm.EXPECT().Stream(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(schema.StreamReaderFromArray([]*schema.Message{schema.AssistantMessage("",
 				[]schema.ToolCall{
@@ -304,6 +334,7 @@ func TestWithMessageFuture(t *testing.T) {
 		cm.EXPECT().WithTools(gomock.Any()).Return(cm, nil).AnyTimes()
 
 		// Create agent with MessageFuture
+		// 使用 MessageFuture 创建智能体
 		option, future := WithMessageFuture()
 		a, err := NewAgent(ctx, &AgentConfig{
 			ToolCallingModel: cm,
@@ -320,9 +351,11 @@ func TestWithMessageFuture(t *testing.T) {
 			defer wg.Done()
 
 			// Get message streams from future
+			// 从 future 获取消息流
 			sIter := future.GetMessageStreams()
 
 			// First message should be the assistant message for tool calling
+			// 第一条消息应是用于工具调用的 assistant 消息
 			stream1, hasNext, err_ := sIter.Next()
 			assert.Nil(t, err_)
 			assert.True(t, hasNext)
@@ -333,6 +366,7 @@ func TestWithMessageFuture(t *testing.T) {
 			assert.Equal(t, 1, len(msg1.ToolCalls))
 
 			// Second message should be the tool response
+			// 第二条消息应是工具响应
 			stream2, hasNext, err_ := sIter.Next()
 			assert.Nil(t, err_)
 			assert.True(t, hasNext)
@@ -342,6 +376,7 @@ func TestWithMessageFuture(t *testing.T) {
 			assert.Equal(t, schema.Tool, msg2.Role)
 
 			// Third message should be the final response
+			// 第三条消息应是最终响应
 			stream3, hasNext, err_ := sIter.Next()
 			assert.Nil(t, err_)
 			assert.True(t, hasNext)
@@ -351,18 +386,21 @@ func TestWithMessageFuture(t *testing.T) {
 			assert.Equal(t, "final response", msg3.Content)
 
 			// Should be no more messages
+			// 不应再有消息
 			_, hasNext, err_ = sIter.Next()
 			assert.Nil(t, err_)
 			assert.False(t, hasNext)
 		}()
 
 		// Use Stream interface
+		// 使用 Stream 接口
 		stream, err := a.Stream(ctx, []*schema.Message{
 			schema.UserMessage("use the greet tool"),
 		}, option)
 		assert.Nil(t, err)
 
 		// Collect all chunks from stream
+		// 收集 stream 中的所有 chunk
 		finalResponse, err := schema.ConcatMessageStream(stream)
 		assert.Nil(t, err)
 		assert.Equal(t, "final response", finalResponse.Content)
@@ -377,6 +415,7 @@ func TestWithToolOptions(t *testing.T) {
 	agentOpt := WithToolOptions(opt)
 	assert.NotNil(t, agentOpt)
 	// The returned value should be an agent.AgentOption (function)
+	// 返回值应是 agent.AgentOption（函数）
 	assert.IsType(t, agentOpt, agentOpt)
 }
 
@@ -388,6 +427,7 @@ func TestWithChatModelOptions(t *testing.T) {
 }
 
 // dummyBaseTool is a minimal implementation of tool.BaseTool for testing.
+// dummyBaseTool 是用于测试的 tool.BaseTool 最小实现。
 type dummyBaseTool struct{}
 
 func (d *dummyBaseTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
@@ -420,11 +460,13 @@ func TestAgentWithAllOptions(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Prepare a tool that asserts it receives the tool option
+	// 准备一个工具，用于断言它接收到了工具 option
 	toolOptVal := "tool-opt-value"
 	to := tool.WrapImplSpecificOptFn(func(o *toolOpt) { o.val = toolOptVal })
 	at := &assertTool{toolOptVal: toolOptVal}
 
 	// Prepare a mock chat model that asserts it receives the model option
+	// 准备一个模拟 chat model，并断言它收到了 model option
 	cm := mockModel.NewMockToolCallingChatModel(ctrl)
 	modelOpt := model.WithModel("test-model")
 	modelOptReceived := false

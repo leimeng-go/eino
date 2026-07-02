@@ -51,72 +51,132 @@ import (
 //     ClearRetentionSuffixLimit, it offloads tool call arguments and results
 //     to the Backend to reduce token usage, keeping the conversation within limits while retaining access to the
 //     important information. After all, ClearPostProcess will be called, which you could save or notify current state.
+//
+// TypedConfig 是工具缩减中间件的配置。
+// 该中间件分两个阶段管理工具输出，以优化 context 使用：
+// 1. Truncation Phase：
+// 在工具执行完成后立即触发。
+// 如果工具输出长度超过 MaxLengthForTrunc，完整内容会保存到配置的 Backend，工具输出会替换为截断提示。
+// 这可防止单个大型工具输出立即导致 context 溢出。
+// 2. Clear Phase：
+// 在发送消息给模型前触发（在 BeforeModelRewriteState 中）。
+// 如果总 token 数超过 MaxTokensForClear，中间件会遍历历史消息。基于 GenOffloadFilePath（或 GenOffloadFilePath 为 nil 时的 RootDir）和 ClearRetentionSuffixLimit，它会将工具调用参数和结果卸载到 Backend 以降低 token 使用量，使对话保持在限制内，同时保留对重要信息的访问。最后会调用 ClearPostProcess，你可以在其中保存或通知当前状态。
 type TypedConfig[M adk.MessageType] struct {
 	// Backend is the storage backend where offloaded content will be saved.
 	// Required when truncation is enabled (SkipTruncation is false).
 	// Optional for clear-only usage. If Backend is nil, clear will still replace tool outputs with placeholders
 	// but will not offload content.
+	//
+	// Backend 是保存已卸载内容的存储 backend。
+	// 启用截断时必填（SkipTruncation 为 false）。
+	// 仅清除场景下可选。如果 Backend 为 nil，clear 仍会用占位符替换工具输出，但不会卸载内容。
 	Backend Backend
 
 	// SkipTruncation skip truncating.
+	// SkipTruncation 跳过截断。
 	SkipTruncation bool
 
 	// SkipClear skip clearing.
+	// SkipClear 跳过清理。
 	SkipClear bool
 
 	// ReadFileToolName is tool name used to retrieve from file.
 	// After offloading content to file, you should give agent the same tool to retrieve content.
 	// Required. Default is "read_file".
+	//
+	// ReadFileToolName 是用于从文件检索内容的工具名称。
+	// 将内容卸载到文件后，应为智能体提供同一个工具来检索内容。
+	// 必填。默认值为 "read_file"。
 	ReadFileToolName string
 
 	// RootDir root dir to save truncated/cleared content.
 	// Optional.
 	// Default is /tmp, truncated content saves to ${root_dir}/trunc/{tool_call_id}, cleared content saves to  ${root_dir}/clear/{tool_call_id}
+	//
+	// RootDir 是保存截断/清理内容的根目录。
+	// 可选。
+	// 默认值为 /tmp，截断内容保存到 ${root_dir}/trunc/{tool_call_id}，清理内容保存到 ${root_dir}/clear/{tool_call_id}。
 	RootDir string
 
 	// GenTruncOffloadFilePath is used to generate offload file path for truncated content.
 	// When GenTruncOffloadFilePath is configured, RootDir will be ignored.
 	// This is useful when tool_call_id is not unique, which may cause incorrect offload file overwrite.
 	// Optional. Default is nil.
+	//
+	// GenTruncOffloadFilePath 用于为截断内容生成卸载文件路径。
+	// 配置 GenTruncOffloadFilePath 后，将忽略 RootDir。
+	// 当 tool_call_id 不唯一、可能导致卸载文件被错误覆盖时，这很有用。
+	// 可选。默认值为 nil。
 	GenTruncOffloadFilePath func(ctx context.Context, toolDetail *ToolDetail) (filePath string, err error)
 
 	// GenClearOffloadFilePath is used to generate offload file path for truncated content.
 	// When GenClearOffloadFilePath is configured, RootDir will be ignored.
 	// This is useful when tool_call_id is not unique, which may cause incorrect offload file overwrite.
 	// Optional. Default is nil.
+	//
+	// GenClearOffloadFilePath 用于为截断内容生成卸载文件路径。
+	// 配置 GenClearOffloadFilePath 后，将忽略 RootDir。
+	// 当 tool_call_id 不唯一、可能导致卸载文件被错误覆盖时，这很有用。
+	// 可选。默认值为 nil。
 	GenClearOffloadFilePath func(ctx context.Context, toolDetail *ToolDetail) (filePath string, err error)
 
 	// MaxLengthForTrunc is the maximum allowed length of the tool output.
 	// If the output exceeds this length, it will be truncated.
 	// Required. Default is 50000.
+	//
+	// MaxLengthForTrunc 是工具输出允许的最大长度。
+	// 如果输出超过该长度，将被截断。
+	// 必填。默认值为 50000。
 	MaxLengthForTrunc int
 
 	// TruncExcludeTools is list of tool names whose tool results should never be truncated.
 	// Optional. Default is nil.
+	//
+	// TruncExcludeTools 是工具名称列表，这些工具的结果永不截断。
+	// 可选。默认值为 nil。
 	TruncExcludeTools []string
 
 	// TokenCounter is used to count the number of tokens in the conversation messages.
 	// It is used to determine when to trigger clearing based on token usage, and token usage after clearing.
 	// Required.
+	//
+	// TokenCounter 用于统计对话消息中的 token 数量。
+	// 它用于根据 token 使用量判断何时触发清理，以及清理后的 token 使用量。
+	// 必填。
 	TokenCounter func(ctx context.Context, msg []M, tools []*schema.ToolInfo) (int64, error)
 
 	// MaxTokensForClear is the maximum number of tokens allowed in the conversation before clearing is attempted.
 	// Required. Default is 160000.
+	//
+	// MaxTokensForClear 是尝试清理前对话允许的最大 token 数。
+	// 必填。默认值为 160000。
 	MaxTokensForClear int64
 
 	// ClearRetentionSuffixLimit is the number of most recent messages to retain without clearing.
 	// This ensures the model has some immediate context.
 	// Optional. Default is 1.
+	//
+	// ClearRetentionSuffixLimit 是不进行清理而保留的最近消息数量。
+	// 这可确保模型保留一些即时上下文。
+	// 可选。默认值为 1。
 	ClearRetentionSuffixLimit int
 
 	// ClearAtLeastTokens ensures a minimum number of tokens is cleared each time the strategy activates.
 	// If the strategy couldn't clear at least the specified amount, clear phase will not be applied.
 	// This helps determine if context clearing is worth breaking your prompt cache.
 	// Optional. Default is 0.
+	//
+	// ClearAtLeastTokens 确保策略每次激活时至少清理指定数量的 token。
+	// 如果策略无法至少清理指定数量，则不会应用清理阶段。
+	// 这有助于判断清理上下文是否值得打破 prompt cache。
+	// 可选。默认值为 0。
 	ClearAtLeastTokens int64
 
 	// ClearExcludeTools is list of tool names whose tool uses and results should never be cleared.
 	// Optional. Default is nil.
+	//
+	// ClearExcludeTools 是工具名称列表，这些工具的使用和结果永不清理。
+	// 可选。默认值为 nil。
 	ClearExcludeTools []string
 
 	// ClearMessageRewriter is a pre-process handler before clearing specific tool call and tool response pairs.
@@ -126,19 +186,35 @@ type TypedConfig[M adk.MessageType] struct {
 	// Returned messages will replace the original tool call and tool messages and will count towards ClearAtLeastTokens.
 	// If returned messagesAfterRewrite is nil, tool call and tool messages will be removed.
 	// Optional. Default is nil, which means no rewrite.
+	//
+	// ClearMessageRewriter 是在清理特定工具调用和工具响应对之前的预处理处理器。
+	// 你可以重写作为参数提取出的工具调用和工具消息，并返回重新排列后的消息切片。
+	// 当你想移除某些工具调用（例如 write_file / edit_file）并将其重写为
+	// 用户消息（例如 <system-reminder>）时，这很有用。
+	// 返回的消息将替换原始工具调用和工具消息，并计入 ClearAtLeastTokens。
+	// 如果返回的 messagesAfterRewrite 为 nil，工具调用和工具消息将被移除。
+	// 可选。默认值为 nil，表示不重写。
 	ClearMessageRewriter func(ctx context.Context, toolCallMsg M, toolResponseMsgs []M) (messagesAfterRewrite []M, err error)
 
 	// ClearPostProcess is clear post process handler.
 	// Optional.
+	//
+	// ClearPostProcess 是清理后的处理器。
+	// 可选。
 	ClearPostProcess func(ctx context.Context, state *adk.TypedChatModelAgentState[M]) context.Context
 
 	// ToolConfig is the specific configuration that applies to tools by name.
 	// This configuration takes precedence over GeneralConfig for the specified tools.
 	// Optional.
+	//
+	// ToolConfig 是按工具名称应用的特定配置。
+	// 对于指定工具，此配置优先于 GeneralConfig。
+	// 可选。
 	ToolConfig map[string]*ToolReductionConfig
 }
 
 // Config is the backward-compatible alias for TypedConfig with *schema.Message.
+// Config 是 TypedConfig with *schema.Message 的向后兼容别名。
 type Config = TypedConfig[*schema.Message]
 
 type ToolReductionConfig struct {
@@ -146,85 +222,133 @@ type ToolReductionConfig struct {
 	// Required when truncation is enabled for this tool (SkipTruncation is false).
 	// Optional for clear-only usage. If Backend is nil, clear will still replace tool outputs with placeholders
 	// but will not offload content.
+	//
+	// Backend 是保存卸载内容的存储后端。
+	// 当此工具启用截断（SkipTruncation 为 false）时必填。
+	// 仅清理场景可选。如果 Backend 为 nil，清理仍会用占位符替换工具输出，
+	// 但不会卸载内容。
 	Backend Backend
 
 	// SkipTruncation skip truncation for this tool.
+	// SkipTruncation 跳过此工具的截断。
 	SkipTruncation bool
 
 	// TruncHandler is used to process tool call results during truncation.
 	// Optional. Default using defaultTruncHandler when SkipTruncation is false but TruncHandler is nil.
+	//
+	// TruncHandler 用于在截断期间处理工具调用结果。
+	// 可选。当 SkipTruncation 为 false 但 TruncHandler 为 nil 时，默认使用 defaultTruncHandler。
 	TruncHandler func(ctx context.Context, detail *ToolDetail) (*TruncResult, error)
 
 	// SkipClear skip clear for this tool.
+	// SkipClear 跳过对此工具的清理。
 	SkipClear bool
 
 	// ClearHandler is used to process tool call arguments and results during clearing.
 	// Optional. Default using defaultClearHandler when SkipClear is false but ClearHandler is nil.
+	//
+	// ClearHandler 用于在清理期间处理工具调用参数和结果。
+	// 可选。SkipClear 为 false 但 ClearHandler 为 nil 时，默认使用 defaultClearHandler。
 	ClearHandler func(ctx context.Context, detail *ToolDetail) (*ClearResult, error)
 }
 
 type ToolDetail struct {
 	// ToolContext provides metadata about the tool call (e.g., tool name, call ID).
+	// ToolContext 提供工具调用的元数据（例如工具名称、调用 ID）。
 	ToolContext *adk.ToolContext
 
 	// ToolArgument contains the arguments passed to the tool.
+	// ToolArgument 包含传递给工具的参数。
 	ToolArgument *schema.ToolArgument
 
 	// ToolResult contains the output returned by the invokable tool.
+	// ToolResult 包含可调用工具返回的输出。
 	ToolResult *schema.ToolResult
 
 	// StreamToolResult contains the output returned by the streamable tool.
+	// StreamToolResult 包含可流式工具返回的输出。
 	StreamToolResult *schema.StreamReader[*schema.ToolResult]
 }
 
 type TruncResult struct {
 	// NeedTrunc indicates whether the tool result should be truncated.
+	// NeedTrunc 表示是否应截断工具结果。
 	NeedTrunc bool
 
 	// ToolResult contains the result returned by the invokable tool after trunc.
 	// Required when NeedTrunc is true and ToolDetail.ToolResult is not nil.
+	//
+	// ToolResult 包含截断后可调用工具返回的结果。
+	// NeedTrunc 为 true 且 ToolDetail.ToolResult 非 nil 时必填。
 	ToolResult *schema.ToolResult
 
 	// StreamToolResult contains the output returned by the streamable tool after trunc.
 	// Required when NeedTrunc is true and ToolDetail.StreamToolResult is not nil.
+	//
+	// StreamToolResult 包含截断后可流式工具返回的输出。
+	// NeedTrunc 为 true 且 ToolDetail.StreamToolResult 非 nil 时必填。
 	StreamToolResult *schema.StreamReader[*schema.ToolResult]
 
 	// NeedOffload indicates whether the tool result should be offloaded.
+	// NeedOffload 表示是否应卸载工具结果。
 	NeedOffload bool
 
 	// OffloadFilePath is the path where the offloaded content should be stored.
 	// This path is typically relative to the backend's root.
 	// Required when NeedOffload is true.
+	//
+	// OffloadFilePath 是卸载内容应存储到的路径。
+	// 此路径通常相对于 backend 的根目录。
+	// NeedOffload 为 true 时必填。
 	OffloadFilePath string
 
 	// OffloadContent is the actual content to be written to the storage backend.
 	// Required when NeedOffload is true.
+	//
+	// OffloadContent 是要写入存储 backend 的实际内容。
+	// NeedOffload 为 true 时必填。
 	OffloadContent string
 }
 
 // ClearResult contains the result of the Handler's decision.
+// ClearResult 包含 Handler 决策的结果。
 type ClearResult struct {
 	// NeedClear indicates whether the tool argument and result should be cleared.
+	// NeedClear 表示是否应清理工具参数和结果。
 	NeedClear bool
 
 	// ToolArgument contains the arguments passed to the tool after clear.
 	// Required when NeedClear is true.
+	//
+	// ToolArgument 包含清理后传递给工具的参数。
+	// NeedClear 为 true 时必填。
 	ToolArgument *schema.ToolArgument
 
 	// ToolResult contains the output returned by the tool after clear.
 	// Required when NeedClear is true
+	//
+	// ToolResult 包含清理后工具返回的输出。
+	// NeedClear 为 true 时必填。
 	ToolResult *schema.ToolResult
 
 	// NeedOffload indicates whether the tool argument and result should be offloaded.
+	// NeedOffload 表示是否应卸载工具参数和结果。
 	NeedOffload bool
 
 	// OffloadFilePath is the path where the offloaded content should be stored.
 	// This path is typically relative to the backend's root.
 	// Required when NeedOffload is true.
+	//
+	// OffloadFilePath 是卸载内容应存储到的路径。
+	// 此路径通常相对于 backend 的根目录。
+	// NeedOffload 为 true 时必填。
 	OffloadFilePath string
 
 	// OffloadContent is the actual content to be written to the storage backend.
 	// Required when NeedOffload is true.
+	//
+	// OffloadContent 是要写入存储 backend 的实际内容。
+	// NeedOffload 为 true 时必填。
 	OffloadContent string
 }
 
@@ -304,6 +428,10 @@ func (t *TypedConfig[M]) copyAndFillDefaults() (*TypedConfig[M], error) {
 //
 // This is the generic constructor that supports both *schema.Message and *schema.AgenticMessage.
 // Both message types support the full truncation and clear phases.
+//
+// NewTyped 从 config 创建一个泛型工具 reduction middleware。
+// 这是支持 *schema.Message 和 *schema.AgenticMessage 的泛型构造函数。
+// 两种消息类型都支持完整的截断和清理阶段。
 func NewTyped[M adk.MessageType](_ context.Context, config *TypedConfig[M]) (adk.TypedChatModelAgentMiddleware[M], error) {
 	var err error
 	if config == nil {
@@ -346,6 +474,7 @@ func NewTyped[M adk.MessageType](_ context.Context, config *TypedConfig[M]) (adk
 }
 
 // New creates tool reduction middleware from config
+// New 根据 config 创建工具归约中间件
 func New(ctx context.Context, config *Config) (adk.ChatModelAgentMiddleware, error) {
 	return NewTyped(ctx, config)
 }
@@ -363,6 +492,10 @@ type typedToolReductionMiddleware[M adk.MessageType] struct {
 // getDefaultTokenCounter returns a default token counter function that operates on []M.
 // For *schema.Message it delegates to defaultTokenCounter.
 // For *schema.AgenticMessage it uses a simple character-based estimation.
+//
+// getDefaultTokenCounter 返回一个作用于 []M 的默认 token 计数函数。
+// 对于 *schema.Message，它委托给 defaultTokenCounter。
+// 对于 *schema.AgenticMessage，它使用简单的按字符估算。
 func getDefaultTokenCounter[M adk.MessageType]() func(ctx context.Context, msgs []M, tools []*schema.ToolInfo) (int64, error) {
 	var zero M
 	switch any(zero).(type) {
@@ -500,6 +633,7 @@ func (t *typedToolReductionMiddleware[M]) WrapStreamableToolCall(_ context.Conte
 			return origResp, nil
 		}
 		origResp.Close() // close err resp when not using it
+		// 不使用 err resp 时将其关闭
 
 		if truncResult.NeedOffload {
 			if cfg.Backend == nil {
@@ -597,6 +731,7 @@ func (t *typedToolReductionMiddleware[M]) WrapEnhancedStreamableToolCall(_ conte
 			return origResp, nil
 		}
 		origResp.Close() // close err resp when not using it
+		// 不使用 err resp 时将其关闭
 
 		if truncResult.NeedOffload {
 			if cfg.Backend == nil {
@@ -629,6 +764,7 @@ func (t *typedToolReductionMiddleware[M]) beforeModelRewriteStateGeneric(ctx con
 	)
 
 	// init msg tokens
+	// 初始化消息 token
 	estimatedTokens, err = t.config.TokenCounter(ctx, state.Messages, state.ToolInfos)
 	if err != nil {
 		return ctx, state, err
@@ -639,6 +775,7 @@ func (t *typedToolReductionMiddleware[M]) beforeModelRewriteStateGeneric(ctx con
 	}
 
 	// calc range
+	// 计算范围
 	var (
 		start = 0
 		end   = len(state.Messages)
@@ -675,6 +812,7 @@ func (t *typedToolReductionMiddleware[M]) beforeModelRewriteStateGeneric(ctx con
 	}
 
 	// recursively handle
+	// 递归处理
 	toolCallMsgIndex := start
 
 	for toolCallMsgIndex < end {
@@ -727,11 +865,13 @@ func (t *typedToolReductionMiddleware[M]) beforeModelRewriteStateGeneric(ctx con
 						return ctx, state, fmt.Errorf("clear: no backend for offload")
 					}
 					if clearAtLeastTokens > 0 { // delay clear offloading
+						// 延迟清理卸载
 						offloadStash = append(offloadStash, &offloadStashItem{
 							config:      cfg,
 							offloadInfo: offloadInfo,
 						})
 					} else { // instant clear offloading
+						// 立即清理卸载
 						writeErr := cfg.Backend.Write(ctx, &filesystem.WriteRequest{
 							FilePath: offloadInfo.OffloadFilePath,
 							Content:  offloadInfo.OffloadContent,
@@ -747,6 +887,7 @@ func (t *typedToolReductionMiddleware[M]) beforeModelRewriteStateGeneric(ctx con
 			}
 
 			// set dedup flag
+			// 设置去重标记
 			setMsgClearedFlagGeneric(toolCallMsg)
 		}
 		toolCallMsgIndex++
@@ -760,6 +901,7 @@ func (t *typedToolReductionMiddleware[M]) beforeModelRewriteStateGeneric(ctx con
 		tokensCleared := estimatedTokens - estimatedTokensAfterClear
 		if tokensCleared < clearAtLeastTokens {
 			// clear not applied, post process won't apply as well.
+			// 未应用清理，后处理也不会应用。
 			return ctx, state, nil
 		}
 		for _, item := range offloadStash {
@@ -774,6 +916,7 @@ func (t *typedToolReductionMiddleware[M]) beforeModelRewriteStateGeneric(ctx con
 	}
 
 	state.Messages = editTarget // replace original state messages
+	// 替换原始 state 消息
 
 	if t.config.ClearPostProcess != nil {
 		ctx = t.config.ClearPostProcess(ctx, state)
@@ -809,6 +952,7 @@ func (t *typedToolReductionMiddleware[M]) applyClearRewriteGeneric(ctx context.C
 				i++
 			} else if isToolResultMsg(msg) {
 				// tool result message (schema.Tool role or agentic user msg carrying FunctionToolResult)
+				// 工具结果消息（schema.Tool 角色，或携带 FunctionToolResult 的 agentic user msg）
 				i++
 			} else if isAssistantMsg(msg) {
 				toolCalls := getToolCallsGeneric(msg)
@@ -855,10 +999,15 @@ type offloadStashItem struct {
 }
 
 // toolCallInfo represents a tool call extracted from a message for generic processing.
+// toolCallInfo 表示从消息中提取的工具调用，用于通用处理。
 type toolCallInfo struct {
 	// BlockIndex is the index used to locate the tool call within the message.
 	// For *schema.Message: index into msg.ToolCalls slice.
 	// For *schema.AgenticMessage: index into msg.ContentBlocks slice.
+	//
+	// BlockIndex 是用于在消息中定位工具调用的索引。
+	// 对于 *schema.Message：索引 msg.ToolCalls 切片。
+	// 对于 *schema.AgenticMessage：索引 msg.ContentBlocks 切片。
 	BlockIndex int
 	CallID     string
 	Name       string
@@ -866,6 +1015,7 @@ type toolCallInfo struct {
 }
 
 // isAssistantMsg checks if a message has assistant role.
+// isAssistantMsg 检查消息是否为 assistant 角色。
 func isAssistantMsg[M adk.MessageType](msg M) bool {
 	switch m := any(msg).(type) {
 	case *schema.Message:
@@ -877,6 +1027,7 @@ func isAssistantMsg[M adk.MessageType](msg M) bool {
 }
 
 // isSystemMsg checks if a message has system role.
+// isSystemMsg 检查消息是否为 system 角色。
 func isSystemMsg[M adk.MessageType](msg M) bool {
 	switch m := any(msg).(type) {
 	case *schema.Message:
@@ -888,6 +1039,7 @@ func isSystemMsg[M adk.MessageType](msg M) bool {
 }
 
 // isUserMsg checks if a message has user role (and is not a tool-result message).
+// isUserMsg 检查消息是否为 user 角色（且不是工具结果消息）。
 func isUserMsg[M adk.MessageType](msg M) bool {
 	switch m := any(msg).(type) {
 	case *schema.Message:
@@ -900,6 +1052,10 @@ func isUserMsg[M adk.MessageType](msg M) bool {
 		// is a tool result message, not a normal user message — even if it also
 		// carries UserInput blocks. This ensures the clear flow's tool-call grouping
 		// remains correctly aligned.
+		//
+		// 包含任意 FunctionToolResult 块的 user-role agentic 消息
+		// 是工具结果消息，而不是普通用户消息——即使它也携带 UserInput 块。
+		// 这可确保清理流程中的工具调用分组保持正确对齐。
 		for _, block := range m.ContentBlocks {
 			if block != nil && block.Type == schema.ContentBlockTypeFunctionToolResult {
 				return false
@@ -911,6 +1067,7 @@ func isUserMsg[M adk.MessageType](msg M) bool {
 }
 
 // hasToolCalls checks if an assistant message contains tool calls.
+// hasToolCalls 检查 assistant 消息是否包含工具调用。
 func hasToolCalls[M adk.MessageType](msg M) bool {
 	switch m := any(msg).(type) {
 	case *schema.Message:
@@ -928,6 +1085,10 @@ func hasToolCalls[M adk.MessageType](msg M) bool {
 // isToolResultMsg checks if a message is a tool result message.
 // For *schema.Message: role == Tool.
 // For *schema.AgenticMessage: user-role message with at least one FunctionToolResult block.
+//
+// isToolResultMsg 检查消息是否为工具结果消息。
+// 对于 *schema.Message：role == Tool。
+// 对于 *schema.AgenticMessage：包含至少一个 FunctionToolResult 块的 user-role 消息。
 func isToolResultMsg[M adk.MessageType](msg M) bool {
 	switch m := any(msg).(type) {
 	case *schema.Message:
@@ -949,6 +1110,11 @@ func isToolResultMsg[M adk.MessageType](msg M) bool {
 // (no other content besides tool results).
 // For *schema.Message: role == Tool.
 // For *schema.AgenticMessage: user-role message where ALL content blocks are FunctionToolResult.
+//
+// isToolResultOnlyMsg 检查消息是否只包含工具结果
+// （除工具结果外没有其他内容）。
+// 对于 *schema.Message：role == Tool。
+// 对于 *schema.AgenticMessage：所有内容块都是 FunctionToolResult 的 user-role 消息。
 func isToolResultOnlyMsg[M adk.MessageType](msg M) bool {
 	switch m := any(msg).(type) {
 	case *schema.Message:
@@ -968,6 +1134,7 @@ func isToolResultOnlyMsg[M adk.MessageType](msg M) bool {
 }
 
 // getMsgClearedFlagGeneric checks if a message has the cleared flag set.
+// getMsgClearedFlagGeneric 检查消息是否设置了 cleared 标记。
 func getMsgClearedFlagGeneric[M adk.MessageType](msg M) bool {
 	switch m := any(msg).(type) {
 	case *schema.Message:
@@ -983,6 +1150,7 @@ func getMsgClearedFlagGeneric[M adk.MessageType](msg M) bool {
 }
 
 // setMsgClearedFlagGeneric sets the cleared flag on a message.
+// setMsgClearedFlagGeneric 设置消息的 cleared 标记。
 func setMsgClearedFlagGeneric[M adk.MessageType](msg M) {
 	switch m := any(msg).(type) {
 	case *schema.Message:
@@ -996,6 +1164,7 @@ func setMsgClearedFlagGeneric[M adk.MessageType](msg M) {
 }
 
 // getToolCallsGeneric extracts tool call info from an assistant message.
+// getToolCallsGeneric 从 assistant 消息中提取工具调用信息。
 func getToolCallsGeneric[M adk.MessageType](msg M) []toolCallInfo {
 	switch m := any(msg).(type) {
 	case *schema.Message:
@@ -1030,6 +1199,7 @@ func getToolCallsGeneric[M adk.MessageType](msg M) []toolCallInfo {
 }
 
 // setToolCallArguments updates the arguments for a tool call at the given block index.
+// setToolCallArguments 更新给定块索引处工具调用的参数。
 func setToolCallArguments[M adk.MessageType](msg M, blockIndex int, args string) {
 	switch m := any(msg).(type) {
 	case *schema.Message:
@@ -1046,6 +1216,12 @@ func setToolCallArguments[M adk.MessageType](msg M, blockIndex int, args string)
 // For *schema.AgenticMessage: iterates FunctionToolResult blocks.
 // The fromContent flag indicates whether the result came from simple content (true)
 // or multi-part content (false), which affects how setToolResultContent writes it back.
+//
+// toolResultFromMsgGeneric 从消息中提取工具结果，作为 *schema.ToolResult。
+// 对于 *schema.Message：委托给现有的 toolResultFromMessage。
+// 对于 *schema.AgenticMessage：遍历 FunctionToolResult 块。
+// fromContent 标记表示结果是否来自简单内容（true）
+// 还是多段内容（false），这会影响 setToolResultContent 写回的方式。
 func toolResultFromMsgGeneric[M adk.MessageType](msg M) (result *schema.ToolResult, fromContent bool, err error) {
 	switch m := any(msg).(type) {
 	case *schema.Message:
@@ -1077,6 +1253,10 @@ func toolResultFromMsgGeneric[M adk.MessageType](msg M) (result *schema.ToolResu
 // setToolResultContent updates the tool result content in a message.
 // For *schema.Message: sets msg.Content or msg.UserInputMultiContent.
 // For *schema.AgenticMessage: reconstructs FunctionToolResult.Content.
+//
+// setToolResultContent 更新消息中的工具结果内容。
+// 对于 *schema.Message：设置 msg.Content 或 msg.UserInputMultiContent。
+// 对于 *schema.AgenticMessage：重建 FunctionToolResult.Content。
 func setToolResultContent[M adk.MessageType](msg M, toolResult *schema.ToolResult, fromContent bool) {
 	switch m := any(msg).(type) {
 	case *schema.Message:
@@ -1102,6 +1282,7 @@ func setToolResultContent[M adk.MessageType](msg M, toolResult *schema.ToolResul
 }
 
 // copyMessagesGeneric deep-copies a slice of messages.
+// copyMessagesGeneric 深拷贝消息切片。
 func copyMessagesGeneric[M adk.MessageType](msgs []M) []M {
 	var zero M
 	switch any(zero).(type) {
@@ -1135,6 +1316,7 @@ func copyAgenticMessages(msgs []*schema.AgenticMessage) []*schema.AgenticMessage
 				}
 				cb := *block
 				// Deep copy mutable sub-fields
+				// 深拷贝可变子字段
 				if block.FunctionToolCall != nil {
 					ftc := *block.FunctionToolCall
 					cb.FunctionToolCall = &ftc
@@ -1146,8 +1328,12 @@ func copyAgenticMessages(msgs []*schema.AgenticMessage) []*schema.AgenticMessage
 						for k, rb := range block.FunctionToolResult.Content {
 							if rb != nil {
 								rbCopy := *rb // shallow copy: Image/Audio/Video/File sub-fields are not deep-copied.
+								// 浅拷贝：Image/Audio/Video/File 子字段不会被深拷贝。
 								// This is safe because the clear logic replaces entire blocks rather than
 								// mutating media fields in-place. Custom ClearHandlers should follow the same pattern.
+								//
+								// 这是安全的，因为清理逻辑会替换整个块，而不是原地修改媒体字段。
+								// 自定义 ClearHandlers 也应遵循相同模式。
 								if rb.Text != nil {
 									t := *rb.Text
 									rbCopy.Text = &t
@@ -1214,6 +1400,9 @@ func copyMessages(msgs []*schema.Message) []*schema.Message {
 
 // defaultTokenCounter estimates tokens, which treats one token as ~4 characters of text for common English text.
 // github.com/tiktoken-go/tokenizer is highly recommended to replace it.
+//
+// defaultTokenCounter 估算 token，常见英文文本按约 4 个字符算 1 个 token。
+// 强烈建议用 github.com/tiktoken-go/tokenizer 替换它。
 func defaultTokenCounter(_ context.Context, msgs []*schema.Message, tools []*schema.ToolInfo) (int64, error) {
 	var tokens int64
 	for _, msg := range msgs {
@@ -1243,6 +1432,7 @@ func defaultTokenCounter(_ context.Context, msgs []*schema.Message, tools []*sch
 				sb.WriteString("\n")
 			default:
 				// do nothing for multi-modal content
+				// 对多模态内容不做处理
 			}
 		}
 
@@ -1253,6 +1443,7 @@ func defaultTokenCounter(_ context.Context, msgs []*schema.Message, tools []*sch
 				sb.WriteString("\n")
 			default:
 				// do nothing for multi-modal content
+				// 对多模态内容不做处理
 			}
 		}
 
@@ -1296,6 +1487,25 @@ func defaultTokenCounter(_ context.Context, msgs []*schema.Message, tools []*sch
 //     buffered single-result stream (not original chunk-by-chunk streaming semantics).
 //
 // If a tool requires strict incremental streaming behavior, provide a custom TruncHandler for that tool.
+//
+// defaultTruncHandler 对非流式和流式工具输出应用相同的截断策略。
+// 处理步骤：
+// 1. 读取并合并工具输出为完整结果：
+// - 非流式：直接使用 ToolResult。
+// - 流式：消费整个 StreamToolResult，然后拼接所有 chunk。
+// 2. 如果输出为空或总文本长度未超过 truncMaxLength，
+// 返回 NeedTrunc=false。
+// 3. 如果超出限制，将过大的文本部分替换为截断提示，
+// 并卸载完整原始内容。
+// 流式相关行为：
+// - 截断不是增量执行的。处理器会等待读完整个流
+// 后再决定并生成输出。
+// - 如果流的 Recv() 返回非 EOF 错误，getJointToolResult 会将其视为
+// "skip processing"（needProcess=false, err=nil），因此该处理器返回
+// NeedTrunc=false，且不会传播该 recv 错误。
+// - 对流式工具结果应用截断时，输出会重新发射为
+// 缓冲的单结果流（不是原始逐 chunk 流式语义）。
+// 如果工具需要严格的增量流式行为，请为该工具提供自定义 TruncHandler。
 func defaultTruncHandler(
 	genOffloadFilePathFn func(ctx context.Context, toolDetail *ToolDetail) (filePath string, err error),
 	truncMaxLength int,
@@ -1477,6 +1687,7 @@ func getJointToolResult(toolDetail *ToolDetail) (toolOutputParts []schema.ToolOu
 					break
 				}
 				// return original stream reader, not sending recvErr
+				// 返回原始流读取器，不发送 recvErr
 				return nil, false, nil
 			}
 			toolResultChunks = append(toolResultChunks, toolResultChunk)
@@ -1583,6 +1794,7 @@ func convMessageInputPartToToolOutputPart(msgPart schema.MessageInputPart) (sche
 }
 
 // toolResultToOutputParts converts a FunctionToolResult's Content blocks to ToolOutputPart slice.
+// toolResultToOutputParts 将 FunctionToolResult 的 Content 块转换为 ToolOutputPart 切片。
 func toolResultToOutputParts(f *schema.FunctionToolResult) []schema.ToolOutputPart {
 	var parts []schema.ToolOutputPart
 	for _, block := range f.Content {
@@ -1618,6 +1830,9 @@ func toolResultToOutputParts(f *schema.FunctionToolResult) []schema.ToolOutputPa
 
 // setToolResultFromOutputParts converts ToolOutputPart slice back to FunctionToolResultContentBlock
 // slice and sets f.Content.
+//
+// setToolResultFromOutputParts 将 ToolOutputPart 切片转换回 FunctionToolResultContentBlock
+// 切片，并设置 f.Content。
 func setToolResultFromOutputParts(f *schema.FunctionToolResult, parts []schema.ToolOutputPart) {
 	var newBlocks []*schema.FunctionToolResultContentBlock
 	for _, part := range parts {
@@ -1661,6 +1876,7 @@ func setToolResultFromOutputParts(f *schema.FunctionToolResult, parts []schema.T
 }
 
 // strPtr returns a pointer to s, or nil if s is empty.
+// strPtr 返回指向 s 的指针；如果 s 为空则返回 nil。
 func strPtr(s string) *string {
 	if s == "" {
 		return nil
@@ -1669,6 +1885,7 @@ func strPtr(s string) *string {
 }
 
 // ptrStr safely dereferences a *string, returning "" if nil.
+// ptrStr 安全解引用 *string，nil 时返回 ""。
 func ptrStr(p *string) string {
 	if p == nil {
 		return ""

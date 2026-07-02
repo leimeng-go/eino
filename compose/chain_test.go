@@ -62,6 +62,7 @@ func TestChain(t *testing.T) {
 	parallel.
 		AddLambda("role", InvokableLambda(func(ctx context.Context, kvs map[string]any) (string, error) {
 			// may be change role to others by input kvs, for example (dentist/doctor...)
+			// 可以通过输入 kvs 将角色改为其他角色，例如 (dentist/doctor...)
 			role := kvs["role"]
 			if role.(string) == "" {
 				role = "bird"
@@ -85,6 +86,9 @@ func TestChain(t *testing.T) {
 		AppendLambda(InvokableLambda(func(ctx context.Context, kvs map[string]any) (map[string]any, error) {
 			// do some logic to prepare kv as variables for next Node
 			// just pass through
+			//
+			// 执行一些逻辑，将 kv 准备为下一个节点的变量
+			// 直接透传
 			t.Log("in view lambda: ", kvs)
 			return kvs, nil
 		})).
@@ -94,6 +98,7 @@ func TestChain(t *testing.T) {
 		AppendGraph(rolePlayChain).
 		AppendLambda(InvokableLambda(func(ctx context.Context, m *schema.Message) (string, error) {
 			// do some logic to check the output or something
+			// 执行一些逻辑来检查输出或其他内容
 			t.Log("in view of messages: ", m.Content)
 
 			return m.Content, nil
@@ -115,6 +120,9 @@ func TestChainWithException(t *testing.T) {
 		AppendLambda(InvokableLambda(func(ctx context.Context, kvs map[string]any) (map[string]any, error) {
 			// do some logic to prepare kv as variables for next Node
 			// just pass through
+			//
+			// 执行一些逻辑，将 kv 准备为下一个 Node 的变量
+			// 直接透传
 			t.Log("in view lambda: ", kvs)
 			return kvs, nil
 		})).
@@ -124,6 +132,7 @@ func TestChainWithException(t *testing.T) {
 		}), WithNodeKey("xlam"))
 
 	// items with parallels
+	// 包含并行的 items
 	parallel := NewParallel()
 	parallel.
 		AddLambda("hello", InvokableLambda(func(ctx context.Context, kvs map[string]any) (string, error) {
@@ -136,6 +145,7 @@ func TestChainWithException(t *testing.T) {
 		}))
 
 	// sequence items
+	// 顺序 items
 	nchain := NewChain[map[string]any, map[string]any]()
 	nchain.
 		AppendLambda(InvokableLambda(func(ctx context.Context, kvs map[string]any) (map[string]any, error) {
@@ -164,12 +174,15 @@ func TestChainWithException(t *testing.T) {
 	})
 
 	// sequence with branch
+	// 带分支的顺序
 	chain.AppendBranch(NewChainBranch[map[string]any](branchCond).AddLambda("b1", b1).AddLambda("b2", b2))
 
 	// parallel with sequence
+	// 包含顺序的并行
 	parallel.AddGraph("test_sequence", nchain)
 
 	// parallel with parallel
+	// 包含并行的并行
 	npara := NewParallel().
 		AddLambda("test_parallel1", InvokableLambda(func(ctx context.Context, kvs map[string]any) (map[string]any, error) {
 			return kvs, nil
@@ -179,6 +192,7 @@ func TestChainWithException(t *testing.T) {
 		}))
 
 	// parallel with graph
+	// 包含图的并行
 	ngraph := NewChain[map[string]any, map[string]any]().
 		AppendLambda(InvokableLambda(func(ctx context.Context, kvs map[string]any) (map[string]any, error) {
 			t.Log("in graph item 01")
@@ -195,6 +209,7 @@ func TestChainWithException(t *testing.T) {
 	chain.AppendPassthrough()
 
 	// sequence with parallel
+	// 包含并行的顺序
 	chain.AppendParallel(npara)
 
 	// 构建 chain
@@ -220,11 +235,13 @@ func TestEmptyList(t *testing.T) {
 	ctx := context.Background()
 
 	// no nodes in chain
+	// 链中没有节点
 	chain := NewChain[map[string]any, map[string]any]()
 	_, err := chain.Compile(ctx)
 	assert.Error(t, err)
 
 	// no nodes in parallel
+	// 并行中没有节点
 	parallel := NewParallel()
 	chain = NewChain[map[string]any, map[string]any]()
 	chain.AppendParallel(parallel)
@@ -233,6 +250,7 @@ func TestEmptyList(t *testing.T) {
 	assert.Error(t, err)
 
 	// no nodes in sequence
+	// 顺序中没有节点
 	emptyChain := NewChain[map[string]any, map[string]any]()
 	chain = NewChain[map[string]any, map[string]any]()
 
@@ -264,6 +282,7 @@ func TestChainList(t *testing.T) {
 		}))
 
 	// seq in parallel
+	// 并行中的 seq
 	nchain := NewChain[map[string]any, map[string]any]()
 	nchain.
 		AppendLambda(InvokableLambda(func(ctx context.Context, kvs map[string]any) (map[string]any, error) {
@@ -276,6 +295,7 @@ func TestChainList(t *testing.T) {
 		}))
 
 	// seq in seq
+	// seq 中的 seq
 	nchainInChain := NewChain[map[string]any, map[string]any]()
 	nchainInChain.
 		AppendLambda(InvokableLambda(func(ctx context.Context, kvs map[string]any) (map[string]any, error) {
@@ -309,6 +329,7 @@ func TestChainSingleNode(t *testing.T) {
 		}))
 
 	// single Node in chain (prepare for parallel)
+	// 链中的单个 Node（为并行做准备）
 	singleNodeChain := NewChain[map[string]any, map[string]any]()
 	singleNodeChain.
 		AppendLambda(InvokableLambda(func(ctx context.Context, kvs map[string]any) (map[string]any, error) {
@@ -317,6 +338,7 @@ func TestChainSingleNode(t *testing.T) {
 		}))
 
 	// add parallel
+	// 添加并行
 	parallel := NewParallel()
 	parallel.
 		AddLambda("test_parallel1_lambda", InvokableLambda(func(ctx context.Context, kvs map[string]any) (map[string]any, error) {
@@ -672,13 +694,17 @@ func TestChainWithNodeKey(t *testing.T) {
 			WithLambdaOption(FakeWithLambdaInfo("normal")),
 			WithLambdaOption(FakeWithLambdaInfo("info_lambda_02")).DesignateNode("lambda_02"), // branch
 			WithLambdaOption(FakeWithLambdaInfo("info_lambda_03")).DesignateNode("lambda_03"), // branch (wont run)
+			// 分支（不会运行）
 			WithLambdaOption(FakeWithLambdaInfo("info_lambda_05")).DesignateNode("lambda_05"), // parallel
 		)
 		assert.Nil(t, err)
 
 		assert.Equal(t, "info_lambda_02", res["lambda_02"]) // transmit option with DesigateNode
+		// 通过 DesigateNode 传递 option
 		assert.Equal(t, "info_lambda_05", res["lambda_05"]) // transmit option with DesigateNode
-		assert.Equal(t, "normal", res["lambda_06"])         // without DesigateNode, using default option
+		// 通过 DesigateNode 传递 option
+		assert.Equal(t, "normal", res["lambda_06"]) // without DesigateNode, using default option
+		// 没有 DesigateNode，使用默认 option
 	})
 
 	t.Run("test chain with node key option and error with correct error info", func(t *testing.T) {
@@ -716,6 +742,7 @@ func TestChainWithNodeKey(t *testing.T) {
 				assert.Nil(t, c)
 				fmt.Printf("%+v\n", err)
 				assert.Contains(t, err.Error(), "edge[node_1_branch_lambda_03]") // with no node key option, will use default node key
+				// 没有 node key option 时，将使用默认 node key
 			})
 
 			t.Run("with node key", func(t *testing.T) {
@@ -763,6 +790,7 @@ func TestChainWithNodeKey(t *testing.T) {
 				assert.Nil(t, c)
 				fmt.Printf("%+v\n", err)
 				assert.Contains(t, err.Error(), "to=node_1_parallel_1") // with no node key option, will use default node key
+				// 未指定节点 key option 时，将使用默认节点 key
 			})
 
 			t.Run("with node key", func(t *testing.T) {
@@ -808,6 +836,7 @@ func TestChainWithNodeKey(t *testing.T) {
 				fmt.Printf("%+v\n", err)
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), "node_0_branch_lambda_01") // with no node key option, will use default node key
+				// 未指定节点 key option 时，将使用默认节点 key
 			})
 
 			t.Run("branch with node key", func(t *testing.T) {
@@ -847,6 +876,7 @@ func TestChainWithNodeKey(t *testing.T) {
 				fmt.Printf("%+v\n", err)
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), "node_0_parallel_0") // with no node key option, will use default node key
+				// 未指定节点 key option 时，将使用默认节点 key
 			})
 
 			t.Run("parallel with node key", func(t *testing.T) {

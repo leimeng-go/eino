@@ -387,6 +387,7 @@ func (t *taskUpdateTool) addBlocksToTask(ctx context.Context, targetTaskID, bloc
 }
 
 // checkIfNeedDeleteAllTasks checks if all tasks are completed, if so, it deletes all tasks
+// checkIfNeedDeleteAllTasks 检查是否所有任务都已完成，如果是则删除所有任务
 func (t *taskUpdateTool) checkIfNeedDeleteAllTasks(ctx context.Context) error {
 	tasks, err := listTasks(ctx, t.Backend, t.BaseDir)
 	if err != nil {

@@ -15,6 +15,7 @@
  */
 
 // Package claude defines constants for claude.
+// Package claude 定义 claude 的常量。
 package claude
 
 type TextCitationType string

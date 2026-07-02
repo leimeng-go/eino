@@ -30,10 +30,14 @@ type newGraphOptions struct {
 
 // NewGraphOption configures behavior when creating a new graph, such as
 // providing local state generation.
+//
+// NewGraphOption 配置创建新图时的行为，例如提供本地状态生成。
 type NewGraphOption func(ngo *newGraphOptions)
 
 // WithGenLocalState registers a function to generate per-run local state
 // that can be shared across nodes in the graph.
+//
+// WithGenLocalState 注册一个函数，用于生成每次运行的本地状态，可在图中的节点之间共享。
 func WithGenLocalState[S any](gls GenLocalState[S]) NewGraphOption {
 	return func(ngo *newGraphOptions) {
 		ngo.withState = func(ctx context.Context) any {
@@ -69,6 +73,28 @@ func WithGenLocalState[S any](gls GenLocalState[S]) NewGraphOption {
 //		// do something with state
 //		return out, nil
 //	}))
+//
+// NewGraph 创建一个有向图，可组合组件、lambda、链、parallel 等。
+// 同时提供灵活且多粒度的 aspect 治理能力。
+// I：图编译产物的输入类型
+// O：图编译产物的输出类型
+// 要在节点之间共享状态，请使用 WithGenLocalState 选项：
+// type testState struct {
+// UserInfo *UserInfo
+// KVs     map[string]any
+// }
+// genStateFunc := func(ctx context.Context) *testState {
+// return &testState{}
+// }
+// graph := compose.NewGraph[string, string](WithGenLocalState(genStateFunc))
+// 可以使用 WithStatePreHandler 和 WithStatePostHandler 对 state 执行操作
+// graph.AddNode("node1", someNode, compose.WithPreHandler(func(ctx context.Context, in string, state *testState) (string, error) {
+// 对 state 执行操作
+// return in, nil
+// }), compose.WithPostHandler(func(ctx context.Context, out string, state *testState) (string, error) {
+// 对 state 执行操作
+// return out, nil
+// }))
 func NewGraph[I, O any](opts ...NewGraphOption) *Graph[I, O] {
 	options := &newGraphOptions{}
 	for _, opt := range opts {
@@ -90,6 +116,10 @@ func NewGraph[I, O any](opts ...NewGraphOption) *Graph[I, O] {
 // Graph is a generic graph that can be used to compose components.
 // I: the input type of graph compiled product
 // O: the output type of graph compiled product
+//
+// Graph 是可用于组合组件的泛型图。
+// I：图编译产物的输入类型
+// O：图编译产物的输出类型
 type Graph[I, O any] struct {
 	*graph
 }
@@ -103,6 +133,14 @@ type Graph[I, O any] struct {
 //	graph.AddNode("end_node_key", compose.NewPassthroughNode())
 //
 //	err := graph.AddEdge("start_node_key", "end_node_key")
+//
+// AddEdge 向图中添加一条边，边表示从 startNode 到 endNode 的数据流。
+// 前一个节点的输出类型必须可赋给下一个节点的输入类型。
+// 注意：添加边之前，startNode 和 endNode 必须已添加到图中。
+// 例如：
+// graph.AddNode("start_node_key", compose.NewPassthroughNode())
+// graph.AddNode("end_node_key", compose.NewPassthroughNode())
+// err := graph.AddEdge("start_node_key", "end_node_key")
 func (g *Graph[I, O]) AddEdge(startNode, endNode string) (err error) {
 	return g.graph.addEdgeWithMappings(startNode, endNode, false, false)
 }
@@ -120,6 +158,17 @@ func (g *Graph[I, O]) AddEdge(startNode, endNode string) (err error) {
 //	runnable.Stream(ctx, "input") // stream
 //	runnable.Collect(ctx, inputReader) // collect
 //	runnable.Transform(ctx, inputReader) // transform
+//
+// Compile 接收原始图，并将其编译为可运行的形式。
+// 例如：
+// graph, err := compose.NewGraph[string, string]()
+// if err != nil {...}
+// runnable, err := graph.Compile(ctx, compose.WithGraphName("my_graph"))
+// if err != nil {...}
+// runnable.Invoke(ctx, "input") // invoke
+// runnable.Stream(ctx, "input") // stream
+// runnable.Collect(ctx, inputReader) // collect
+// runnable.Transform(ctx, inputReader) // transform
 func (g *Graph[I, O]) Compile(ctx context.Context, opts ...GraphCompileOption) (Runnable[I, O], error) {
 	return compileAnyGraph[I, O](ctx, g, opts...)
 }

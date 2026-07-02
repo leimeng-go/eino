@@ -36,4 +36,13 @@
 // documents.
 //
 // See https://www.cloudwego.io/docs/eino/core_modules/components/indexer_guide/
+//
+// Package indexer 定义用于将文档及其向量表示存储到后端存储的 Indexer 组件接口。
+// 概览
+// Indexer 是 RAG 流水线的写入路径。它接收 [schema.Document] 值，可选择生成向量嵌入，并将其持久化到后端（向量数据库、搜索引擎等）以供后续检索。
+// 具体实现（VikingDB、Milvus、Elasticsearch 等）位于 eino-ext：
+// github.com/cloudwego/eino-ext/components/indexer/
+// 向量维度一致性
+// 使用 [Options.Embedding] option 时，嵌入模型必须与配对的 [retriever.Retriever] 使用的模型完全相同。模型不匹配会产生处于不同空间的向量——查询将无法匹配已存储文档。
+// 参见 https://www.cloudwego.io/docs/eino/core_modules/components/indexer_guide/
 package indexer

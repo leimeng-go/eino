@@ -16,6 +16,8 @@
 
 // Package multiquery implements a query-rewriting retriever that expands
 // user queries into multiple variants to improve recall.
+//
+// Package multiquery 实现了一个查询改写检索器，可将用户查询扩展为多个变体以提升召回率。
 package multiquery
 
 import (
@@ -66,10 +68,21 @@ var deduplicateFusion = func(ctx context.Context, docs [][]*schema.Document) ([]
 //		...
 //	}
 //	println(docs)
+//
+// NewRetriever 创建一个多查询检索器。
+// 当你想用不同查询从多个检索器检索文档时，多查询检索器很有用。
+// 例如：
+// multiRetriever := multiquery.NewRetriever(ctx, &multiquery.Config{})
+// docs, err := multiRetriever.Retrieve(ctx, "how to build agent with eino")
+// if err != nil {
+// ...
+// }
+// println(docs)
 func NewRetriever(ctx context.Context, config *Config) (retriever.Retriever, error) {
 	var err error
 
 	// config validate
+	// config 校验
 	if config.OrigRetriever == nil {
 		return nil, fmt.Errorf("OrigRetriever is required")
 	}
@@ -78,6 +91,7 @@ func NewRetriever(ctx context.Context, config *Config) (retriever.Retriever, err
 	}
 
 	// construct rewrite chain
+	// 构造改写链
 	rewriteChain := compose.NewChain[string, []string]()
 	if config.RewriteHandler != nil {
 		rewriteChain.AppendLambda(compose.InvokableLambda(config.RewriteHandler), compose.WithNodeName("CustomQueryRewriter"))
@@ -127,26 +141,38 @@ func NewRetriever(ctx context.Context, config *Config) (retriever.Retriever, err
 }
 
 // Config is the config for multi-query retriever.
+// Config 是多查询检索器的 config。
 type Config struct {
 	// Rewrite
 	// 1. set the following fields to use llm to generate multi queries
 	// 	a. chat model, required
+	//
+	// 重写
+	// 1. 设置以下字段以使用 llm 生成多查询
+	// a. chat model，必填
 	RewriteLLM model.ChatModel
 	//	b. prompt llm to generate multi queries, we provide default template so you can leave this field blank
+	// b. 提示 llm 生成多查询；我们提供默认模板，因此该字段可留空
 	RewriteTemplate prompt.ChatTemplate
 	//	c. origin query variable of your custom template, it can be empty if you use default template
+	// c. 自定义模板中的原始查询变量；如果使用默认模板，可为空
 	QueryVar string
 	//	d. parser llm output to queries, split content using "\n" by default
+	// d. 将 llm 输出解析为查询，默认使用 "\n" 分割内容
 	LLMOutputParser func(context.Context, *schema.Message) ([]string, error)
 	// 2. set RewriteHandler to provide custom query generation logic, possibly without a ChatModel. If this field is set, it takes precedence over other configurations above
+	// 2. 设置 RewriteHandler 以提供自定义查询生成逻辑，可不使用 ChatModel。如果设置了该字段，它优先于上面的其他配置
 	RewriteHandler func(ctx context.Context, query string) ([]string, error)
 	// limit max queries num that Rewrite generates, and excess queries will be truncated, 5 by default
+	// 限制 Rewrite 生成的最大查询数，超出的查询会被截断，默认 5
 	MaxQueriesNum int
 
 	// Origin Retriever
+	// 原始 Retriever
 	OrigRetriever retriever.Retriever
 
 	// fusion docs recalled from multi retrievers, remove dup based on document id by default
+	// 融合多个 retriever 召回的文档，默认按 document id 去重
 	FusionFunc func(ctx context.Context, docs [][]*schema.Document) ([]*schema.Document, error)
 }
 
@@ -158,8 +184,10 @@ type multiQueryRetriever struct {
 }
 
 // Retrieve retrieves documents from the multi-query retriever.
+// Retrieve 从多查询检索器中检索文档。
 func (m *multiQueryRetriever) Retrieve(ctx context.Context, query string, opts ...retriever.Option) ([]*schema.Document, error) {
 	// generate queries
+	// 生成查询
 	queries, err := m.queryRunner.Invoke(ctx, query)
 	if err != nil {
 		return nil, err
@@ -195,6 +223,7 @@ func (m *multiQueryRetriever) Retrieve(ctx context.Context, query string, opts .
 }
 
 // GetType returns the type of the retriever (MultiQuery).
+// GetType 返回检索器的类型（MultiQuery）。
 func (m *multiQueryRetriever) GetType() string {
 	return "MultiQuery"
 }

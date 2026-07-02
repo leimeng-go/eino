@@ -37,6 +37,7 @@ import (
 
 func isValidUUID(s string) bool {
 	// UUID v4 format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (8-4-4-4-12 = 36 chars)
+	// UUID v4 格式：xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx（8-4-4-4-12 = 36 个字符）
 	if len(s) != 36 {
 		return false
 	}
@@ -53,6 +54,7 @@ func isValidUUID(s string) bool {
 }
 
 // collectEvents drains all events from the iterator (non-streaming).
+// collectEvents 从迭代器中取尽所有事件（非流式）。
 func collectEvents(t *testing.T, iter *AsyncIterator[*AgentEvent]) []*AgentEvent {
 	t.Helper()
 	var events []*AgentEvent
@@ -67,6 +69,7 @@ func collectEvents(t *testing.T, iter *AsyncIterator[*AgentEvent]) []*AgentEvent
 }
 
 // Scenario 1: AgentEvent messages have IDs (Generate mode)
+// 场景 1：AgentEvent 消息带有 ID（Generate 模式）
 func TestMessageID_EventHasID_Generate(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
@@ -101,6 +104,7 @@ func TestMessageID_EventHasID_Generate(t *testing.T) {
 }
 
 // Scenario 2: Event and state messages share the same ID
+// 场景 2：Event 和 state 消息共享同一个 ID
 func TestMessageID_EventAndStateShareSameID(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
@@ -121,6 +125,7 @@ func TestMessageID_EventAndStateShareSameID(t *testing.T) {
 			{
 				AfterChatModel: func(ctx context.Context, state *ChatModelAgentState) error {
 					// Capture state messages after model call (including the model output)
+					// 在 model 调用后捕获 state 消息（包括 model 输出）
 					stateMessagesAfterModel = make([]*schema.Message, len(state.Messages))
 					copy(stateMessagesAfterModel, state.Messages)
 					return nil
@@ -143,6 +148,7 @@ func TestMessageID_EventAndStateShareSameID(t *testing.T) {
 	assert.NotEmpty(t, eventMsgID)
 
 	// The last message in state should be the model output with the same ID
+	// state 中最后一条消息应为 model 输出，并带有相同 ID
 	require.NotEmpty(t, stateMessagesAfterModel)
 	lastStateMsg := stateMessagesAfterModel[len(stateMessagesAfterModel)-1]
 	stateMsgID := GetMessageID(lastStateMsg)
@@ -152,6 +158,7 @@ func TestMessageID_EventAndStateShareSameID(t *testing.T) {
 }
 
 // Scenario 3: Stream — first chunk carries ID, concatenated message has correct ID
+// 场景 3：Stream — 第一个 chunk 携带 ID，拼接后的消息有正确的 ID
 func TestMessageID_Stream_FirstChunkOnly(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
@@ -198,22 +205,26 @@ func TestMessageID_Stream_FirstChunkOnly(t *testing.T) {
 	require.GreaterOrEqual(t, len(chunks), 1)
 
 	// First chunk should have the ID
+	// 第一个 chunk 应带有该 ID
 	firstChunkID := GetMessageID(chunks[0])
 	assert.NotEmpty(t, firstChunkID, "first chunk should carry the message ID")
 	assert.True(t, isValidUUID(firstChunkID))
 
 	// Subsequent chunks should NOT have the ID in Extra (first-chunk-only injection)
+	// 后续 chunk 的 Extra 中不应带有该 ID（仅注入第一个 chunk）
 	for i := 1; i < len(chunks); i++ {
 		chunkID := GetMessageID(chunks[i])
 		assert.Empty(t, chunkID, "chunk %d should not have message ID (first-chunk-only)", i)
 	}
 
 	// No more events
+	// 没有更多事件
 	_, ok = iter.Next()
 	assert.False(t, ok)
 }
 
 // Scenario 4: Tool messages have IDs
+// 场景 4：Tool 消息带有 ID
 func TestMessageID_ToolMessagesHaveID(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
@@ -243,6 +254,7 @@ func TestMessageID_ToolMessagesHaveID(t *testing.T) {
 	cm.EXPECT().WithTools(gomock.Any()).Return(cm, nil).AnyTimes()
 
 	// Capture tool result messages from state via BeforeChatModel on the 2nd model call.
+	// 在第 2 次 model 调用时，通过 BeforeChatModel 从 state 捕获工具结果消息。
 	var toolMsgIDInState string
 	beforeModelCount := 0
 	agent, err := NewChatModelAgent(ctx, &ChatModelAgentConfig{
@@ -260,6 +272,7 @@ func TestMessageID_ToolMessagesHaveID(t *testing.T) {
 					beforeModelCount++
 					if beforeModelCount == 2 {
 						// 2nd model call: state.Messages contains tool result messages
+						// 第 2 次 model 调用：state.Messages 包含工具结果消息
 						for _, m := range state.Messages {
 							if m.Role == schema.Tool && m.ToolCallID == "tc-1" {
 								toolMsgIDInState = GetMessageID(m)
@@ -279,9 +292,11 @@ func TestMessageID_ToolMessagesHaveID(t *testing.T) {
 
 	events := collectEvents(t, iter)
 	// Expect 3 events: model(tool_call) + tool(result) + model(final)
+	// 预期 3 个事件：model(tool_call) + tool(result) + model(final)
 	require.Len(t, events, 3)
 
 	// Tool event (index 1)
+	// 工具事件（index 1）
 	toolEvent := events[1]
 	require.Nil(t, toolEvent.Err)
 	require.NotNil(t, toolEvent.Output.MessageOutput)
@@ -294,6 +309,7 @@ func TestMessageID_ToolMessagesHaveID(t *testing.T) {
 	assert.True(t, isValidUUID(toolMsgID))
 
 	// All events should have IDs
+	// 所有事件都应有 ID
 	for i, ev := range events {
 		require.Nil(t, ev.Err)
 		require.NotNil(t, ev.Output.MessageOutput)
@@ -303,12 +319,14 @@ func TestMessageID_ToolMessagesHaveID(t *testing.T) {
 	}
 
 	// The tool message in state should share the same ID as the event tool message.
+	// state 中的工具消息应与事件中的工具消息共享同一 ID。
 	assert.NotEmpty(t, toolMsgIDInState, "tool message in state should have an ID")
 	assert.Equal(t, toolMsgID, toolMsgIDInState,
 		"tool event msg ID (%s) and state msg ID (%s) must match", toolMsgID, toolMsgIDInState)
 }
 
 // Scenario 5: Retry — the final accepted result carries a message ID
+// 场景 5：重试 — 最终接受的结果带有消息 ID
 func TestMessageID_Retry_FinalResultHasID(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
@@ -356,6 +374,7 @@ func TestMessageID_Retry_FinalResultHasID(t *testing.T) {
 }
 
 // Scenario 6: WrapModel handler sees model output with ID
+// 场景 6：WrapModel 处理器看到带 ID 的模型输出
 func TestMessageID_WrapModelSeesID(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
@@ -395,12 +414,14 @@ func TestMessageID_WrapModelSeesID(t *testing.T) {
 	assert.True(t, isValidUUID(capturedMsgID))
 
 	// The event should carry the same ID
+	// 事件应携带相同的 ID
 	eventMsgID := GetMessageID(events[0].Output.MessageOutput.Message)
 	assert.Equal(t, capturedMsgID, eventMsgID,
 		"WrapModel-captured ID (%s) should match event ID (%s)", capturedMsgID, eventMsgID)
 }
 
 // wrapModelIDCheckHandler wraps the model to inspect the output for message ID.
+// wrapModelIDCheckHandler 包装模型以检查输出中的消息 ID。
 type wrapModelIDCheckHandler struct {
 	*BaseChatModelAgentMiddleware
 	onGenerate func(result *schema.Message)
@@ -429,6 +450,9 @@ func (w *idCheckModelWrapper) Stream(ctx context.Context, input []*schema.Messag
 
 // Scenario 7: User input messages do NOT get automatic IDs (they are external, not framework-created).
 // Only framework-created messages (model output, tool results, TypedSendEvent) get auto-assigned IDs.
+//
+// 场景 7：用户输入消息不会自动获得 ID（它们是外部的，不是框架创建的）。
+// 只有框架创建的消息（模型输出、工具结果、TypedSendEvent）会自动分配 ID。
 func TestMessageID_UserInputNoAutoID(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
@@ -440,6 +464,7 @@ func TestMessageID_UserInputNoAutoID(t *testing.T) {
 	cm.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(func(ctx context.Context, input []*schema.Message, opts ...model.Option) (*schema.Message, error) {
 			// Capture input messages
+			// 捕获输入消息
 			stateMessagesBeforeModel = make([]*schema.Message, len(input))
 			copy(stateMessagesBeforeModel, input)
 			return schema.AssistantMessage("response", nil), nil
@@ -462,6 +487,9 @@ func TestMessageID_UserInputNoAutoID(t *testing.T) {
 
 	// User input messages should NOT have auto-assigned IDs.
 	// Framework only assigns IDs to messages it creates (model output, tool results, SendEvent).
+	//
+	// 用户输入消息不应自动分配 ID。
+	// 框架只为它创建的消息（模型输出、工具结果、SendEvent）分配 ID。
 	require.NotEmpty(t, stateMessagesBeforeModel)
 
 	for i, msg := range stateMessagesBeforeModel {
@@ -474,6 +502,11 @@ func TestMessageID_UserInputNoAutoID(t *testing.T) {
 // TestMessageID_SendEvent_MiddlewareMustEnsureID verifies that TypedSendEvent is a pure
 // transport and does NOT auto-assign message IDs. Middleware authors must call
 // EnsureMessageID themselves before sending.
+//
+// 场景 8：中间件必须在 SendEvent 前调用 EnsureMessageID；指针身份保证 state 一致性
+// TestMessageID_SendEvent_MiddlewareMustEnsureID 验证 TypedSendEvent 是纯
+// 传输层，不会自动分配消息 ID。中间件作者必须在发送前自行调用
+// EnsureMessageID。
 func TestMessageID_SendEvent_MiddlewareMustEnsureID(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
@@ -485,6 +518,7 @@ func TestMessageID_SendEvent_MiddlewareMustEnsureID(t *testing.T) {
 		Times(1)
 
 	// Track the message pointer that the middleware creates and writes to both state and event
+	// 跟踪中间件创建并写入 state 和 event 的消息指针
 	var middlewareMsg *schema.Message
 	var stateMsgIDAfterSendEvent string
 
@@ -496,15 +530,19 @@ func TestMessageID_SendEvent_MiddlewareMustEnsureID(t *testing.T) {
 			{
 				AfterChatModel: func(ctx context.Context, state *ChatModelAgentState) error {
 					// Middleware creates a new message and writes the SAME pointer to both state and event
+					// 中间件创建一条新消息，并将同一个指针写入 state 和 event
 					middlewareMsg = schema.AssistantMessage("middleware injected", nil)
 
 					// Middleware is responsible for assigning the ID before sending
+					// 中间件负责在发送前分配 ID
 					EnsureMessageID(middlewareMsg)
 
 					// Write to state
+					// 写入 state
 					state.Messages = append(state.Messages, middlewareMsg)
 
 					// Send as event — TypedSendEvent does NOT auto-assign ID
+					// 作为事件发送 — TypedSendEvent 不会自动分配 ID
 					event := EventFromMessage(middlewareMsg, nil, schema.Assistant, "")
 					err := SendEvent(ctx, event)
 					if err != nil {
@@ -513,6 +551,9 @@ func TestMessageID_SendEvent_MiddlewareMustEnsureID(t *testing.T) {
 
 					// Because we called EnsureMessageID on the shared pointer,
 					// the state copy also has the ID (pointer identity)
+					//
+					// 因为我们在共享指针上调用了 EnsureMessageID，
+					// state 副本也有该 ID（指针身份）
 					stateMsgIDAfterSendEvent = internal.GetMessageID(middlewareMsg.Extra)
 
 					return nil
@@ -536,20 +577,24 @@ func TestMessageID_SendEvent_MiddlewareMustEnsureID(t *testing.T) {
 	}
 
 	// We expect at least 2 events: model response + middleware injected message
+	// 预期至少有 2 个事件：模型响应 + 中间件注入的消息
 	require.GreaterOrEqual(t, len(allEvents), 2)
 
 	// The middleware message pointer should have an ID (assigned by middleware via EnsureMessageID)
+	// 中间件消息指针应有 ID（由中间件通过 EnsureMessageID 分配）
 	require.NotNil(t, middlewareMsg)
 	middlewareMsgID := GetMessageID(middlewareMsg)
 	assert.NotEmpty(t, middlewareMsgID, "middleware should have assigned an ID via EnsureMessageID")
 	assert.True(t, isValidUUID(middlewareMsgID))
 
 	// The ID captured right after SendEvent (via pointer identity) should be the same
+	// 通过指针身份在 SendEvent 后立即捕获的 ID 应相同
 	assert.Equal(t, middlewareMsgID, stateMsgIDAfterSendEvent,
 		"pointer identity: ID read from state pointer (%s) should match message ID (%s)",
 		stateMsgIDAfterSendEvent, middlewareMsgID)
 
 	// Find the middleware event in the collected events
+	// 在收集到的事件中查找 middleware 事件
 	var middlewareEventMsgID string
 	for _, ev := range allEvents {
 		if ev.Err != nil || ev.Output == nil || ev.Output.MessageOutput == nil {
@@ -578,6 +623,7 @@ func TestAttack_ConcatCorruptsIDIfMultipleChunksCarryIt(t *testing.T) {
 
 	resultID := internal.GetMessageID(concatenated.Extra)
 	// ConcatMessages string-concatenates duplicate Extra keys, corrupting the ID
+	// ConcatMessages 会对重复的 Extra 键做字符串拼接，导致 ID 损坏
 	assert.NotEqual(t, id, resultID, "ConcatMessages should corrupt the ID when multiple chunks carry it")
 	assert.NotEqual(t, 36, len(resultID), "corrupted ID should not be 36 chars")
 	assert.Equal(t, "chunk1chunk2chunk3", concatenated.Content)
@@ -604,6 +650,7 @@ func TestAttack_ConcurrentGenerate_NoSharedExtraMutation(t *testing.T) {
 	defer ctrl.Finish()
 
 	// Shared singleton message - same pointer returned every time
+	// 共享的单例 message——每次都返回同一个指针
 	sharedMsg := schema.AssistantMessage("shared response", nil)
 
 	cm := mockModel.NewMockToolCallingChatModel(ctrl)
@@ -639,6 +686,7 @@ func TestAttack_ConcurrentGenerate_NoSharedExtraMutation(t *testing.T) {
 	wg.Wait()
 
 	// All IDs should be unique and valid
+	// 所有 ID 都应唯一且有效
 	seen := make(map[string]bool)
 	for i, id := range ids {
 		assert.NotEmpty(t, id, "goroutine %d should have an ID", i)
@@ -649,6 +697,9 @@ func TestAttack_ConcurrentGenerate_NoSharedExtraMutation(t *testing.T) {
 
 	// The original shared message should NOT have been mutated (or if it was, it should still be valid)
 	// The important thing is no panic and unique IDs
+	//
+	// 原始共享 message 不应被修改（如果被修改，也应仍然有效）
+	// 关键是没有 panic 且 ID 唯一
 }
 
 func TestAttack_GenerateCopyDoesNotAffectOriginal(t *testing.T) {
@@ -683,6 +734,9 @@ func TestAttack_GenerateCopyDoesNotAffectOriginal(t *testing.T) {
 
 	// The ORIGINAL message returned by the model should NOT have an ID
 	// because wrapGenerateEndpoint copies before mutating
+	//
+	// 模型返回的 ORIGINAL message 不应带有 ID
+	// 因为 wrapGenerateEndpoint 会先复制再修改
 	originalID := GetMessageID(originalMsg)
 	assert.Empty(t, originalID, "original model output should NOT be mutated by ID assignment")
 }
@@ -690,10 +744,18 @@ func TestAttack_GenerateCopyDoesNotAffectOriginal(t *testing.T) {
 // ============================================================
 // AgenticMessage Integration Tests
 // ============================================================
+//
+// ============================================================
+// AgenticMessage 集成测试
+// ============================================================
 
 // TestMessageID_AgenticGenerate verifies that AgenticMessage-typed agents
 // get message IDs assigned on Generate output, covering the *schema.AgenticMessage
 // branches in EnsureMessageID, GetMessageID, and copyMessage.
+//
+// TestMessageID_AgenticGenerate 验证 AgenticMessage 类型的智能体
+// 在 Generate 输出上会被分配 message ID，并覆盖 EnsureMessageID、GetMessageID 和 copyMessage 中的 *schema.AgenticMessage
+// 分支。
 func TestMessageID_AgenticGenerate(t *testing.T) {
 	ctx := context.Background()
 
@@ -731,15 +793,18 @@ func TestMessageID_AgenticGenerate(t *testing.T) {
 	require.NotNil(t, msg)
 
 	// Verify via the AgenticMessage-specific public API
+	// 通过 AgenticMessage 专用的公开 API 验证
 	msgID := GetMessageID(msg)
 	assert.NotEmpty(t, msgID, "agentic model output should have message ID")
 	assert.True(t, isValidUUID(msgID), "agentic message ID should be valid UUID: %s", msgID)
 
 	// Original message should NOT be mutated (copyMessage for AgenticMessage branch)
+	// 原始 message 不应被修改（copyMessage 的 AgenticMessage 分支）
 	originalID := GetMessageID(agenticResponse)
 	assert.Empty(t, originalID, "original agentic model output should NOT be mutated")
 
 	// Drain iterator
+	// 耗尽 iterator
 	for {
 		_, ok := iter.Next()
 		if !ok {
@@ -749,6 +814,7 @@ func TestMessageID_AgenticGenerate(t *testing.T) {
 }
 
 // TestMessageID_AgenticStream verifies first-chunk-only ID injection for AgenticMessage streams.
+// TestMessageID_AgenticStream 验证 AgenticMessage 流只在首个 chunk 注入 ID。
 func TestMessageID_AgenticStream(t *testing.T) {
 	ctx := context.Background()
 
@@ -806,11 +872,13 @@ func TestMessageID_AgenticStream(t *testing.T) {
 			streamMsgID = chunkID
 		} else if chunkID != "" {
 			// Subsequent chunks should not have ID (first-chunk-only)
+			// 后续 chunk 不应带 ID（仅首个 chunk）
 			t.Errorf("expected only first chunk to have ID, got ID on later chunk: %s", chunkID)
 		}
 	}
 
 	// Drain remaining events
+	// 耗尽剩余事件
 	for {
 		_, ok := iter.Next()
 		if !ok {
@@ -824,6 +892,9 @@ func TestMessageID_AgenticStream(t *testing.T) {
 
 // TestMessageID_AgenticPublicAPIHelpers tests the batch helpers and ensures
 // the AgenticMessage public API variants work correctly.
+//
+// TestMessageID_AgenticPublicAPIHelpers 测试批量 helper，并确保
+// AgenticMessage 的公开 API 变体正常工作。
 func TestMessageID_AgenticPublicAPIHelpers(t *testing.T) {
 	t.Run("EnsureMessageID_idempotent", func(t *testing.T) {
 		msg := &schema.AgenticMessage{
@@ -840,6 +911,7 @@ func TestMessageID_AgenticPublicAPIHelpers(t *testing.T) {
 		assert.True(t, isValidUUID(id1))
 
 		// Idempotent: second call should not change the ID
+		// 幂等：第二次调用不应改变 ID
 		EnsureMessageID(msg)
 		id2 := GetMessageID(msg)
 		assert.Equal(t, id1, id2)
@@ -867,26 +939,34 @@ func TestMessageID_AgenticPublicAPIHelpers(t *testing.T) {
 }
 
 // --- Adversarial attack tests for message ID system ---
+// --- message ID 系统的对抗攻击测试 ---
 
 // TestAttack_PopToolMsgID_DoublePop tests that calling popToolMsgID twice for the
 // same key returns "" on second call.
+//
+// TestAttack_PopToolMsgID_DoublePop 测试对同一个 key 调用 popToolMsgID 两次时
+// 第二次调用返回 ""。
 func TestAttack_PopToolMsgID_DoublePop(t *testing.T) {
 	st := &typedState[*schema.Message]{}
 	st.setToolMsgID("myTool", "call-1", "uuid-abc")
 
 	// First pop returns the ID
+	// 第一次 pop 返回 ID
 	id1 := st.popToolMsgID("myTool", "call-1")
 	assert.Equal(t, "uuid-abc", id1)
 
 	// Second pop returns empty
+	// 第二次 pop 返回空
 	id2 := st.popToolMsgID("myTool", "call-1")
 	assert.Empty(t, id2, "double-pop should return empty")
 
 	// Inner map should be cleaned up
+	// 应清理内部 map
 	assert.Nil(t, st.ToolMsgIDs["myTool"], "inner map should be removed when empty")
 }
 
 // namedFakeToolForTest is a variant of fakeToolForTest with a configurable name.
+// namedFakeToolForTest 是 fakeToolForTest 的变体，名称可配置。
 type namedFakeToolForTest struct {
 	name string
 }
@@ -913,6 +993,8 @@ func (t *namedFakeToolForTest) InvokableRun(_ context.Context, _ string, _ ...to
 // TestAttack_ToolMsgIDConsistency_MultipleTools is an integration test: when an agent
 // has multiple tools called in one turn, verify that EACH tool's event message ID
 // matches its corresponding state message ID.
+//
+// TestAttack_ToolMsgIDConsistency_MultipleTools 是集成测试：当一个智能体在一轮中调用多个工具时，验证每个工具的事件消息 ID 都与其对应的状态消息 ID 匹配。
 func TestAttack_ToolMsgIDConsistency_MultipleTools(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
@@ -942,7 +1024,9 @@ func TestAttack_ToolMsgIDConsistency_MultipleTools(t *testing.T) {
 	cm.EXPECT().WithTools(gomock.Any()).Return(cm, nil).AnyTimes()
 
 	// Capture state message IDs
+	// 捕获状态消息 ID
 	var stateMsgIDs map[string]string // callID -> msgID
+	// callID -> msgID
 	beforeModelCount := 0
 	agent, err := NewChatModelAgent(ctx, &ChatModelAgentConfig{
 		Name:        "TestMultiTool",
@@ -978,10 +1062,13 @@ func TestAttack_ToolMsgIDConsistency_MultipleTools(t *testing.T) {
 
 	events := collectEvents(t, iter)
 	// Expect: model(tool_calls) + tool1(result) + tool2(result) + model(final) = 4 events
+	// 期望：model(tool_calls) + tool1(result) + tool2(result) + model(final) = 4 个事件
 	require.GreaterOrEqual(t, len(events), 4)
 
 	// Collect tool event IDs
+	// 收集工具事件 ID
 	eventMsgIDs := make(map[string]string) // callID -> msgID
+	// callID -> msgID
 	for _, ev := range events {
 		if ev.Err != nil {
 			continue
@@ -995,6 +1082,7 @@ func TestAttack_ToolMsgIDConsistency_MultipleTools(t *testing.T) {
 	}
 
 	// Each tool call should have an ID in both event and state, and they must match
+	// 每个工具调用都应在事件和状态中都有 ID，且二者必须匹配
 	require.NotEmpty(t, stateMsgIDs, "state should have tool message IDs")
 	for callID, stateID := range stateMsgIDs {
 		assert.NotEmpty(t, stateID, "state msg for %s should have ID", callID)
@@ -1008,6 +1096,8 @@ func TestAttack_ToolMsgIDConsistency_MultipleTools(t *testing.T) {
 
 // TestAttack_ToolResultToBlocks_EdgeCases verifies toolResultToBlocks handles
 // nil ToolResult, empty Parts, and Parts with nil media fields.
+//
+// TestAttack_ToolResultToBlocks_EdgeCases 验证 toolResultToBlocks 能处理 nil ToolResult、空 Parts，以及带 nil media 字段的 Parts。
 func TestAttack_ToolResultToBlocks_EdgeCases(t *testing.T) {
 	t.Run("nil ToolResult", func(t *testing.T) {
 		blocks := toolResultToBlocks(nil)

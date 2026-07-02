@@ -24,6 +24,11 @@ import (
 // the main purpose of this function is to create an instance of a type, can handle the type of T is a pointer or not.
 // eg. NewInstance[int] returns 0.
 // eg. NewInstance[*int] returns *0 (will be ptr of 0, not nil!).
+//
+// NewInstance 创建给定类型 T 的实例。
+// 此函数的主要目的是创建某个类型的实例，可处理 T 是否为指针类型。
+// 例如：NewInstance[int] returns 0。
+// 例如：NewInstance[*int] returns *0（将是 0 的指针，不是 nil！）。
 func NewInstance[T any]() T {
 	typ := TypeOf[T]()
 
@@ -53,6 +58,10 @@ func NewInstance[T any]() T {
 // TypeOf returns the type of T.
 // eg. TypeOf[int] returns reflect.TypeOf(int).
 // eg. TypeOf[*int] returns reflect.TypeOf(*int).
+//
+// TypeOf 返回 T 的类型。
+// 例如：TypeOf[int] returns reflect.TypeOf(int)。
+// 例如：TypeOf[*int] returns reflect.TypeOf(*int)。
 func TypeOf[T any]() reflect.Type {
 	return reflect.TypeOf((*T)(nil)).Elem()
 }
@@ -61,6 +70,11 @@ func TypeOf[T any]() reflect.Type {
 // useful when you want to get a pointer of a value, in some config, for example.
 // eg. PtrOf[int] returns *int.
 // eg. PtrOf[*int] returns **int.
+//
+// PtrOf 返回 T 的指针。
+// 例如在某些配置中，当你想获取某个值的指针时很有用。
+// 例如：PtrOf[int] returns *int。
+// 例如：PtrOf[*int] returns **int。
 func PtrOf[T any](v T) *T {
 	return &v
 }
@@ -71,6 +85,7 @@ type Pair[F, S any] struct {
 }
 
 // Reverse returns a new slice with elements in reversed order.
+// Reverse 返回一个元素顺序反转的新切片。
 func Reverse[S ~[]E, E any](s S) S {
 	d := make(S, len(s))
 	for i := 0; i < len(s); i++ {
@@ -81,6 +96,7 @@ func Reverse[S ~[]E, E any](s S) S {
 }
 
 // CopyMap copies a map to a new map.
+// CopyMap 将 map 复制到一个新 map。
 func CopyMap[K comparable, V any](src map[K]V) map[K]V {
 	dst := make(map[K]V, len(src))
 	for k, v := range src {

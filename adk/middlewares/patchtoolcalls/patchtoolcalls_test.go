@@ -162,9 +162,10 @@ func testPatchToolCallsGeneric[M adk.MessageType](t *testing.T) {
 		messages       []M
 		wantLen        int
 		checkPatchedAt int // index of the patched message to check (-1 if no check needed)
-		wantCallID     string
-		wantToolName   string
-		wantContent    string
+		// 要检查的补丁消息索引（如无需检查则为 -1）
+		wantCallID   string
+		wantToolName string
+		wantContent  string
 	}{
 		{
 			name:           "empty messages",
@@ -314,6 +315,8 @@ func TestPatchToolCallsAgenticToolSearchResult(t *testing.T) {
 
 // TestPatchToolCalls_NilFunctionToolCallInBlock verifies the middleware handles
 // a ContentBlock with Type=FunctionToolCall but FunctionToolCall=nil without panicking.
+//
+// TestPatchToolCalls_NilFunctionToolCallInBlock 验证中间件能处理 Type=FunctionToolCall 但 FunctionToolCall=nil 的 ContentBlock，且不会 panic。
 func TestPatchToolCalls_NilFunctionToolCallInBlock(t *testing.T) {
 	ctx := context.Background()
 	mw, err := NewTyped[*schema.AgenticMessage](ctx, nil)
@@ -327,6 +330,7 @@ func TestPatchToolCalls_NilFunctionToolCallInBlock(t *testing.T) {
 				{
 					Type:             schema.ContentBlockTypeFunctionToolCall,
 					FunctionToolCall: nil, // nil despite type indicating tool call
+					// 尽管类型表示工具调用，但值为 nil
 				},
 				schema.NewContentBlock(&schema.FunctionToolCall{
 					CallID: "call_1",
@@ -355,6 +359,8 @@ func TestPatchToolCalls_NilFunctionToolCallInBlock(t *testing.T) {
 
 // TestPatchToolCalls_AgenticMessage_NilBlockInUserMessage verifies the middleware handles
 // a User Agentic Message with nil ContentBlock without panicking.
+//
+// TestPatchToolCalls_AgenticMessage_NilBlockInUserMessage 验证中间件能处理带 nil ContentBlock 的 User Agentic Message，且不会 panic。
 func TestPatchToolCalls_AgenticMessage_NilBlockInUserMessage(t *testing.T) {
 	ctx := context.Background()
 	mw, err := NewTyped[*schema.AgenticMessage](ctx, nil)
@@ -369,6 +375,7 @@ func TestPatchToolCalls_AgenticMessage_NilBlockInUserMessage(t *testing.T) {
 			Role: schema.AgenticRoleTypeUser,
 			ContentBlocks: []*schema.ContentBlock{
 				nil, // nil block to test robustness
+				// 用于测试健壮性的 nil block
 			},
 		},
 	}
@@ -379,6 +386,7 @@ func TestPatchToolCalls_AgenticMessage_NilBlockInUserMessage(t *testing.T) {
 	assert.Len(t, newState.Messages, 4, "should patch call_1 and insert tool response")
 
 	// Verify the patched message is inserted at index 2
+	// 验证补丁消息插入在索引 2 处
 	patchMsg := newState.Messages[2]
 	assert.Equal(t, schema.AgenticRoleTypeUser, patchMsg.Role)
 

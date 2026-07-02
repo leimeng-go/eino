@@ -195,6 +195,7 @@ func TestNewStreamCopy(t *testing.T) {
 		wg.Add(2)
 
 		//buf := scp[0].csr.parent.mem.buf
+		// buf := scp[0].csr.parent.mem.buf
 		go func() {
 			defer func() {
 				scp[0].Close()
@@ -216,12 +217,14 @@ func TestNewStreamCopy(t *testing.T) {
 			time.Sleep(time.Millisecond * 100)
 			scp[1].Close()
 			scp[1].Close() // try close multiple times
+			// 尝试多次 close
 			wg.Done()
 		}()
 
 		wg.Wait()
 
 		//assert.Equal(t, 0, buf.Len())
+		// assert.Equal(t, 0, buf.Len())
 	})
 
 	t.Run("test long time recv", func(t *testing.T) {
@@ -267,6 +270,10 @@ func TestNewStreamCopy(t *testing.T) {
 		//memo := copies[0].csr.parent.mem
 		//assert.Equal(t, true, memo.hasFinished)
 		//assert.Equal(t, 0, memo.buf.Len())
+		//
+		// memo := copies[0].csr.parent.mem
+		// assert.Equal(t, true, memo.hasFinished)
+		// assert.Equal(t, 0, memo.buf.Len())
 	})
 
 	t.Run("test closes", func(t *testing.T) {
@@ -366,6 +373,7 @@ func TestNewStreamCopy(t *testing.T) {
 
 		wg.Wait()
 		assert.Equal(t, 0, int(copies[0].csr.parent.closedNum)) // not closed
+		// 未关闭
 	})
 
 }
@@ -627,13 +635,18 @@ func TestMultiStream(t *testing.T) {
 
 // TestMergeNamedStreamReaders tests the functionality of MergeNamedStreamReaders
 // with a focus on SourceEOF error handling.
+//
+// TestMergeNamedStreamReaders 测试 MergeNamedStreamReaders 的功能，
+// 重点关注 SourceEOF 错误处理。
 func TestMergeNamedStreamReaders(t *testing.T) {
 	t.Run("BasicSourceEOF", func(t *testing.T) {
 		// Create two named streams
+		// 创建两个命名流
 		sr1, sw1 := Pipe[string](2)
 		sr2, sw2 := Pipe[string](2)
 
 		// Merge the streams with names
+		// 合并带名称的流
 		namedStreams := map[string]*StreamReader[string]{
 			"stream1": sr1,
 			"stream2": sr2,
@@ -642,23 +655,28 @@ func TestMergeNamedStreamReaders(t *testing.T) {
 		mergedSR.SetAutomaticClose()
 
 		// Send data to the first stream and close it immediately
+		// 向第一个流发送数据并立即关闭它
 		go func() {
 			defer sw1.Close()
 			sw1.Send("data1-1", nil)
 			sw1.Send("data1-2", nil)
 			// First stream ends
+			// 第一个流结束
 		}()
 
 		// Send data to the second stream with a delay before closing
+		// 向第二个流发送数据，并在关闭前延迟
 		go func() {
 			defer sw2.Close()
 			sw2.Send("data2-1", nil)
 			sw2.Send("data2-2", nil)
 			sw2.Send("data2-3", nil)
 			// Second stream ends
+			// 第二个流结束
 		}()
 
 		// Track received data and EOF sources
+		// 跟踪接收到的数据和 EOF 来源
 		receivedData := make(map[string][]string)
 		eofSources := make([]string, 0, 2)
 
@@ -666,23 +684,28 @@ func TestMergeNamedStreamReaders(t *testing.T) {
 			chunk, err := mergedSR.Recv()
 			if err != nil {
 				// Check if it's a SourceEOF error
+				// 检查它是否为 SourceEOF 错误
 				if sourceName, ok := GetSourceName(err); ok {
 					eofSources = append(eofSources, sourceName)
 					t.Logf("Received EOF from source: %s", sourceName)
 					continue // Continue receiving from other streams
+					// 继续从其他流接收
 				}
 
 				// If it's a regular EOF, all streams have ended
+				// 如果是普通 EOF，则所有流都已结束
 				if errors.Is(err, io.EOF) {
 					break
 				}
 
 				// Handle other errors
+				// 处理其他错误
 				t.Errorf("Error receiving data: %v", err)
 				break
 			}
 
 			// Categorize data by prefix
+			// 按前缀对数据分类
 			if len(chunk) >= 5 {
 				prefix := chunk[:5]
 				if prefix == "data1" {
@@ -694,11 +717,13 @@ func TestMergeNamedStreamReaders(t *testing.T) {
 		}
 
 		// Verify we received both SourceEOF errors
+		// 验证已收到两个 SourceEOF 错误
 		if len(eofSources) != 2 {
 			t.Errorf("Expected 2 SourceEOF errors, got %d", len(eofSources))
 		}
 
 		// Verify the source names are correct
+		// 验证源名称正确
 		expectedSources := map[string]bool{"stream1": false, "stream2": false}
 		for _, source := range eofSources {
 			if _, exists := expectedSources[source]; !exists {
@@ -709,6 +734,7 @@ func TestMergeNamedStreamReaders(t *testing.T) {
 		}
 
 		// Verify all expected sources were seen
+		// 验证已看到所有预期的源
 		for source, seen := range expectedSources {
 			if !seen {
 				t.Errorf("Did not receive SourceEOF for %s", source)
@@ -716,6 +742,7 @@ func TestMergeNamedStreamReaders(t *testing.T) {
 		}
 
 		// Verify we received all expected data
+		// 验证已收到所有预期数据
 		if len(receivedData["stream1"]) != 2 {
 			t.Errorf("Expected 2 items from stream1, got %d", len(receivedData["stream1"]))
 		}
@@ -727,13 +754,16 @@ func TestMergeNamedStreamReaders(t *testing.T) {
 
 	t.Run("EmptyStream", func(t *testing.T) {
 		// Create two streams, one will be empty
+		// 创建两个流，其中一个为空
 		sr1, sw1 := Pipe[string](2)
 		sr2, sw2 := Pipe[string](2)
 
 		// Close the first stream immediately to make it empty
+		// 立即关闭第一个流，使其为空
 		sw1.Close()
 
 		// Merge the streams with names
+		// 带名称合并这些流
 		namedStreams := map[string]*StreamReader[string]{
 			"empty": sr1,
 			"data":  sr2,
@@ -742,12 +772,14 @@ func TestMergeNamedStreamReaders(t *testing.T) {
 		mergedSR.SetAutomaticClose()
 
 		// Send data to the second stream
+		// 向第二个流发送数据
 		go func() {
 			defer sw2.Close()
 			sw2.Send("test-data", nil)
 		}()
 
 		// Track received EOFs and data
+		// 跟踪收到的 EOF 和数据
 		eofSources := make(map[string]bool, 2)
 		receivedData := make([]string, 0, 1)
 
@@ -771,6 +803,7 @@ func TestMergeNamedStreamReaders(t *testing.T) {
 		}
 
 		// Verify we received EOF from the empty stream
+		// 验证已从空流收到 EOF
 		if len(eofSources) != 2 {
 			t.Errorf("Expected 2 SourceEOF errors, got %d", len(eofSources))
 		}
@@ -783,6 +816,7 @@ func TestMergeNamedStreamReaders(t *testing.T) {
 		}
 
 		// Verify we received the data from the non-empty stream
+		// 验证已收到来自非空流的数据
 		if len(receivedData) != 1 || receivedData[0] != "test-data" {
 			t.Errorf("Expected to receive 'test-data', got %v", receivedData)
 		}
@@ -790,11 +824,13 @@ func TestMergeNamedStreamReaders(t *testing.T) {
 
 	t.Run("ArraySource", func(t *testing.T) {
 		// Create three named streams
+		// 创建三个命名流
 		sr1, sw1 := Pipe[string](2)
 		sr2, sw2 := Pipe[string](2)
 		sr3 := StreamReaderFromArray([]string{"data3-1", "data3-2", "data3-3"})
 
 		// Merge the streams with names
+		// 带名称合并这些流
 		namedStreams := map[string]*StreamReader[string]{
 			"stream1": sr1,
 			"stream2": sr2,
@@ -804,18 +840,22 @@ func TestMergeNamedStreamReaders(t *testing.T) {
 		mergedSR.SetAutomaticClose()
 
 		// Send data and close streams in sequence
+		// 按顺序发送数据并关闭流
 		go func() {
 			// First stream sends one item then closes
+			// 第一个流发送一个条目后关闭
 			sw1.Send("data1", nil)
 			sw1.Close()
 
 			// Second stream sends two items then closes
+			// 第二个流发送两个条目后关闭
 			sw2.Send("data2-1", nil)
 			sw2.Send("data2-2", nil)
 			sw2.Close()
 		}()
 
 		// Track EOF order and data count
+		// 跟踪 EOF 顺序和数据数量
 		eofOrder := make([]string, 0, 3)
 		dataCount := 0
 
@@ -839,11 +879,13 @@ func TestMergeNamedStreamReaders(t *testing.T) {
 		}
 
 		// Verify EOF count
+		// 验证 EOF 数量
 		if len(eofOrder) != 3 {
 			t.Errorf("Expected 3 SourceEOF errors, got %d", len(eofOrder))
 		}
 
 		// Verify data count
+		// 验证数据数量
 		if dataCount != 6 {
 			t.Errorf("Expected 6 data items, got %d", dataCount)
 		}
@@ -851,10 +893,12 @@ func TestMergeNamedStreamReaders(t *testing.T) {
 
 	t.Run("ErrorPropagation", func(t *testing.T) {
 		// Create two streams
+		// 创建两个流
 		sr1, sw1 := Pipe[string](2)
 		sr2, sw2 := Pipe[string](2)
 
 		// Merge the streams with names
+		// 按名称合并这些流
 		namedStreams := map[string]*StreamReader[string]{
 			"normal": sr1,
 			"error":  sr2,
@@ -865,24 +909,28 @@ func TestMergeNamedStreamReaders(t *testing.T) {
 		testError := errors.New("test error")
 
 		// Send normal data to first stream
+		// 向第一个流发送普通数据
 		go func() {
 			defer sw1.Close()
 			sw1.Send("normal-data", nil)
 		}()
 
 		// Send error to second stream
+		// 向第二个流发送错误
 		go func() {
 			defer sw2.Close()
 			sw2.Send("", testError)
 		}()
 
 		// Track received errors
+		// 跟踪收到的错误
 		var receivedError error
 
 		for {
 			_, err := mergedSR.Recv()
 			if err != nil {
 				// Skip SourceEOF errors
+				// 跳过 SourceEOF 错误
 				if _, ok := GetSourceName(err); ok {
 					continue
 				}
@@ -892,12 +940,14 @@ func TestMergeNamedStreamReaders(t *testing.T) {
 				}
 
 				// Store the first non-EOF error
+				// 存储第一个非 EOF 错误
 				receivedError = err
 				break
 			}
 		}
 
 		// Verify we received the test error
+		// 验证收到了测试错误
 		if receivedError == nil || receivedError.Error() != testError.Error() {
 			t.Errorf("Expected error '%v', got '%v'", testError, receivedError)
 		}

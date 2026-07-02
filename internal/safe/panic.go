@@ -32,6 +32,10 @@ func (p *panicErr) Error() string {
 // NewPanicErr creates a new panic error.
 // panicErr is a wrapper of panic info and stack trace.
 // it implements the error interface, can print error message of info and stack trace.
+//
+// NewPanicErr 创建一个新的 panic 错误。
+// panicErr 是 panic 信息和堆栈跟踪的包装。
+// 它实现了 error 接口，可以打印信息和堆栈跟踪的错误消息。
 func NewPanicErr(info any, stack []byte) error {
 	return &panicErr{
 		info:  info,

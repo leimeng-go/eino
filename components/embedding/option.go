@@ -17,12 +17,15 @@
 package embedding
 
 // Options is the options for the embedding.
+// Options 是 embedding 的选项。
 type Options struct {
 	// Model is the model name for the embedding.
+	// Model 是 embedding 的模型名称。
 	Model *string
 }
 
 // Option is a call-time option for an Embedder.
+// Option 是 Embedder 的调用时选项。
 type Option struct {
 	apply func(opts *Options)
 
@@ -30,6 +33,7 @@ type Option struct {
 }
 
 // WithModel is the option to set the model for the embedding.
+// WithModel 是用于设置 embedding 模型的选项。
 func WithModel(model string) Option {
 	return Option{
 		apply: func(opts *Options) {
@@ -46,6 +50,14 @@ func WithModel(model string) Option {
 //		Model: &defaultModelName,
 //	}
 //	embeddingOption := embedding.GetCommonOptions(embeddingOption, opts...)
+//
+// GetCommonOptions 从 Option 列表中提取 embedding Options，可选提供带默认值的基础 Options。
+// 例如：
+// defaultModelName := "default_model"
+// embeddingOption := &embedding.Options{
+// Model: &defaultModelName,
+// }
+// embeddingOption := embedding.GetCommonOptions(embeddingOption, opts...)
 func GetCommonOptions(base *Options, opts ...Option) *Options {
 	if base == nil {
 		base = &Options{}
@@ -69,6 +81,13 @@ func GetCommonOptions(base *Options, opts ...Option) *Options {
 //	        o.MyParam = v
 //	    })
 //	}
+//
+// WrapImplSpecificOptFn 包装特定实现的选项函数，使其可与标准选项一起传入。供 Embedder 实现者使用：
+// func WithMyParam(v string) embedding.Option {
+// return embedding.WrapImplSpecificOptFn(func(o *MyOptions) {
+// o.MyParam = v
+// })
+// }
 func WrapImplSpecificOptFn[T any](optFn func(*T)) Option {
 	return Option{
 		implSpecificOptFn: optFn,
@@ -83,6 +102,13 @@ func WrapImplSpecificOptFn[T any](optFn func(*T)) Option {
 //	    mine  := embedding.GetImplSpecificOptions(&MyOptions{}, opts...)
 //	    // use common.Model, mine.MyParam, etc.
 //	}
+//
+// GetImplSpecificOptions 从 opts 中提取特定实现的选项，并将其合并到 base。可在 EmbedStrings 内与 [GetCommonOptions] 一起调用：
+// func (e *MyEmbedder) EmbedStrings(ctx context.Context, texts []string, opts ...embedding.Option) ([][]float64, error) {
+// common := embedding.GetCommonOptions(nil, opts...)
+// mine  := embedding.GetImplSpecificOptions(&MyOptions{}, opts...)
+// use common.Model, mine.MyParam, etc.
+// }
 func GetImplSpecificOptions[T any](base *T, opts ...Option) *T {
 	if base == nil {
 		base = new(T)

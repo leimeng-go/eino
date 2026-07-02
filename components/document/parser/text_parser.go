@@ -25,6 +25,7 @@ import (
 
 const (
 	// MetaKeySource is the metadata key storing the document's source URI.
+	// MetaKeySource 是用于存储文档源 URI 的元数据键。
 	MetaKeySource = "_source"
 )
 
@@ -33,9 +34,15 @@ const (
 //
 //	docs, err := TextParser.Parse(ctx, strings.NewReader("hello world"))
 //	fmt.Println(docs[0].Content) // "hello world"
+//
+// TextParser 是一个简单解析器，从读取器读取文本并返回单个文档。
+// 例如：
+// docs, err := TextParser.Parse(ctx, strings.NewReader("hello world"))
+// fmt.Println(docs[0].Content) // "hello world"
 type TextParser struct{}
 
 // Parse reads the text from a reader and returns a single document.
+// Parse 从读取器读取文本并返回单个文档。
 func (dp TextParser) Parse(ctx context.Context, reader io.Reader, opts ...Option) ([]*schema.Document, error) {
 	data, err := io.ReadAll(reader)
 	if err != nil {

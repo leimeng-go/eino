@@ -85,6 +85,7 @@ type CitationWebSearchResultLocation struct {
 }
 
 // ConcatAssistantGenTextExtensions merges multiple AssistantGenTextExtension chunks into one.
+// ConcatAssistantGenTextExtensions 将多个 AssistantGenTextExtension chunk 合并为一个。
 func ConcatAssistantGenTextExtensions(chunks []*AssistantGenTextExtension) (*AssistantGenTextExtension, error) {
 	if len(chunks) == 0 {
 		return nil, fmt.Errorf("no assistant generated text extension found")
@@ -105,6 +106,7 @@ func ConcatAssistantGenTextExtensions(chunks []*AssistantGenTextExtension) (*Ass
 }
 
 // ConcatResponseMetaExtensions merges multiple ResponseMetaExtension chunks into one.
+// ConcatResponseMetaExtensions 将多个 ResponseMetaExtension chunk 合并为一个。
 func ConcatResponseMetaExtensions(chunks []*ResponseMetaExtension) (*ResponseMetaExtension, error) {
 	if len(chunks) == 0 {
 		return nil, fmt.Errorf("no response meta extension found")

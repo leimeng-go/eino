@@ -40,11 +40,18 @@ var _ AgenticChatTemplate = &DefaultAgenticChatTemplate{}
 // that Format expects.
 //
 // See [FromMessages] and [schema.MessagesPlaceholder] for construction helpers.
+//
+// ChatTemplate 将变量 map 格式化为供 ChatModel 使用的消息列表。
+// Format 将 vs 中的值替换到模板的消息列表中，并返回生成的 []*schema.Message。具体替换语法（FString、GoTemplate、Jinja2）在构造时确定。
+// 模板中存在但 vs 中缺失的变量 key 会产生运行时错误——没有编译期安全保障。建议在模板和调用方之间保持变量命名一致。
+// 在 Graph 或 Chain 中，ChatTemplate 通常位于 ChatModel 之前。使用 compose.WithOutputKey 将前一节点的输出转换为 Format 期望的 map[string]any。
+// 构造辅助函数见 [FromMessages] 和 [schema.MessagesPlaceholder]。
 type ChatTemplate interface {
 	Format(ctx context.Context, vs map[string]any, opts ...Option) ([]*schema.Message, error)
 }
 
 // AgenticChatTemplate formats variables into a list of agentic messages according to a prompt schema.
+// AgenticChatTemplate 根据 prompt schema 将变量格式化为 agentic 消息列表。
 type AgenticChatTemplate interface {
 	Format(ctx context.Context, vs map[string]any, opts ...Option) ([]*schema.AgenticMessage, error)
 }

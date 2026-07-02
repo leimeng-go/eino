@@ -39,71 +39,88 @@ import (
 )
 
 // TestNewPlanner tests the NewPlanner function with ChatModelWithFormattedOutput
+// TestNewPlanner 测试使用 ChatModelWithFormattedOutput 的 NewPlanner 函数
 func TestNewPlannerWithFormattedOutput(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a mock controller
+	// 创建 mock controller
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	// Create a mock chat model
+	// 创建 mock chat model
 	mockChatModel := mockModel.NewMockBaseChatModel(ctrl)
 
 	// Create the PlannerConfig
+	// 创建 PlannerConfig
 	conf := &PlannerConfig{
 		ChatModelWithFormattedOutput: mockChatModel,
 	}
 
 	// Create the planner
+	// 创建 planner
 	p, err := NewPlanner(ctx, conf)
 	assert.NoError(t, err)
 	assert.NotNil(t, p)
 
 	// Verify the planner's name and description
+	// 验证 planner 的名称和描述
 	assert.Equal(t, "planner", p.Name(ctx))
 	assert.Equal(t, "a planner agent", p.Description(ctx))
 }
 
 // TestNewPlannerWithToolCalling tests the NewPlanner function with ToolCallingChatModel
+// TestNewPlannerWithToolCalling 测试使用 ToolCallingChatModel 的 NewPlanner 函数
 func TestNewPlannerWithToolCalling(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a mock controller
+	// 创建 mock controller
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	// Create a mock tool calling chat model
+	// 创建 mock tool calling chat model
 	mockToolCallingModel := mockModel.NewMockToolCallingChatModel(ctrl)
 	mockToolCallingModel.EXPECT().WithTools(gomock.Any()).Return(mockToolCallingModel, nil).Times(1)
 
 	// Create the PlannerConfig
+	// 创建 PlannerConfig
 	conf := &PlannerConfig{
 		ToolCallingChatModel: mockToolCallingModel,
 		// Use default instruction and tool info
+		// 使用默认 instruction 和 tool info
 	}
 
 	// Create the planner
+	// 创建 planner
 	p, err := NewPlanner(ctx, conf)
 	assert.NoError(t, err)
 	assert.NotNil(t, p)
 
 	// Verify the planner's name and description
+	// 验证 planner 的名称和描述
 	assert.Equal(t, "planner", p.Name(ctx))
 	assert.Equal(t, "a planner agent", p.Description(ctx))
 }
 
 // TestPlannerRunWithFormattedOutput tests the Run method of a planner created with ChatModelWithFormattedOutput
+// TestPlannerRunWithFormattedOutput 测试使用 ChatModelWithFormattedOutput 创建的 planner 的 Run 方法
 func TestPlannerRunWithFormattedOutput(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a mock controller
+	// 创建 mock controller
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	// Create a mock chat model
+	// 创建 mock chat model
 	mockChatModel := mockModel.NewMockBaseChatModel(ctrl)
 
 	// Create a plan response
+	// 创建 plan response
 	planJSON := `{"steps":["Step 1", "Step 2", "Step 3"]}`
 	planMsg := schema.AssistantMessage(planJSON, nil)
 	sr, sw := schema.Pipe[*schema.Message](1)
@@ -111,22 +128,27 @@ func TestPlannerRunWithFormattedOutput(t *testing.T) {
 	sw.Close()
 
 	// Mock the Generate method
+	// Mock Generate 方法
 	mockChatModel.EXPECT().Stream(gomock.Any(), gomock.Any(), gomock.Any()).Return(sr, nil).Times(1)
 
 	// Create the PlannerConfig
+	// 创建 PlannerConfig
 	conf := &PlannerConfig{
 		ChatModelWithFormattedOutput: mockChatModel,
 	}
 
 	// Create the planner
+	// 创建 planner
 	p, err := NewPlanner(ctx, conf)
 	assert.NoError(t, err)
 
 	// Run the planner
+	// 运行 planner
 	runner := adk.NewRunner(ctx, adk.RunnerConfig{Agent: p})
 	iterator := runner.Run(ctx, []adk.Message{schema.UserMessage("Plan this task")})
 
 	// Get the event from the iterator
+	// 从 iterator 获取 event
 	event, ok := iterator.Next()
 	assert.True(t, ok)
 	assert.Nil(t, event.Err)
@@ -148,23 +170,28 @@ func TestPlannerRunWithFormattedOutput(t *testing.T) {
 }
 
 // TestPlannerRunWithToolCalling tests the Run method of a planner created with ToolCallingChatModel
+// TestPlannerRunWithToolCalling 测试使用 ToolCallingChatModel 创建的 planner 的 Run 方法
 func TestPlannerRunWithToolCalling(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a mock controller
+	// 创建 mock controller
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	// Create a mock tool calling chat model
+	// 创建 mock tool calling chat model
 	mockToolCallingModel := mockModel.NewMockToolCallingChatModel(ctrl)
 
 	// Create a tool call response with a plan
+	// 创建带 plan 的 tool call response
 	planArgs := `{"steps":["Step 1", "Step 2", "Step 3"]}`
 	toolCall := schema.ToolCall{
 		ID:   "tool_call_id",
 		Type: "function",
 		Function: schema.FunctionCall{
-			Name:      "plan", // This should match PlanToolInfo.Name
+			Name: "plan", // This should match PlanToolInfo.Name
+			// 这应与 PlanToolInfo.Name 匹配
 			Arguments: planArgs,
 		},
 	}
@@ -176,26 +203,33 @@ func TestPlannerRunWithToolCalling(t *testing.T) {
 	sw.Close()
 
 	// Mock the WithTools method to return a model that will be used for Generate
+	// Mock WithTools 方法，使其返回将用于 Generate 的 model
 	mockToolCallingModel.EXPECT().WithTools(gomock.Any()).Return(mockToolCallingModel, nil).Times(1)
 
 	// Mock the Generate method to return the tool call message
+	// Mock Generate 方法，使其返回 tool call message
 	mockToolCallingModel.EXPECT().Stream(gomock.Any(), gomock.Any(), gomock.Any()).Return(sr, nil).Times(1)
 
 	// Create the PlannerConfig with ToolCallingChatModel
+	// 使用 ToolCallingChatModel 创建 PlannerConfig
 	conf := &PlannerConfig{
 		ToolCallingChatModel: mockToolCallingModel,
 		// Use default instruction and tool info
+		// 使用默认 instruction 和 tool info
 	}
 
 	// Create the planner
+	// 创建 planner
 	p, err := NewPlanner(ctx, conf)
 	assert.NoError(t, err)
 
 	// Run the planner
+	// 运行 planner
 	runner := adk.NewRunner(ctx, adk.RunnerConfig{Agent: p})
 	iterator := runner.Run(ctx, []adk.Message{schema.UserMessage("no input")})
 
 	// Get the event from the iterator
+	// 从 iterator 获取 event
 	event, ok := iterator.Next()
 	assert.True(t, ok)
 	assert.Nil(t, event.Err)
@@ -219,52 +253,66 @@ func TestPlannerRunWithToolCalling(t *testing.T) {
 }
 
 // TestNewExecutor tests the NewExecutor function
+// TestNewExecutor 测试 NewExecutor 函数
 func TestNewExecutor(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a mock controller
+	// 创建 mock controller
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	// Create a mock tool calling chat model
+	// 创建 mock 工具调用 chat model
 	mockToolCallingModel := mockModel.NewMockToolCallingChatModel(ctrl)
 
 	// Create the ExecutorConfig
+	// 创建 ExecutorConfig
 	conf := &ExecutorConfig{
 		Model:         mockToolCallingModel,
 		MaxIterations: 3,
 	}
 
 	// Create the executor
+	// 创建 executor
 	executor, err := NewExecutor(ctx, conf)
 	assert.NoError(t, err)
 	assert.NotNil(t, executor)
 
 	// Verify the executor's name and description
+	// 验证 executor 的名称和描述
 	assert.Equal(t, "executor", executor.Name(ctx))
 	assert.Equal(t, "an executor agent", executor.Description(ctx))
 }
 
 // TestExecutorRun tests the Run method of the executor
+// TestExecutorRun 测试 executor 的 Run 方法
 func TestExecutorRun(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a mock controller
+	// 创建 mock controller
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	// Create a mock tool calling chat model
+	// 创建 mock 工具调用 chat model
 	mockToolCallingModel := mockModel.NewMockToolCallingChatModel(ctrl)
 
 	// Store a plan in the session
+	// 在 session 中存储 plan
 	plan := &defaultPlan{Steps: []string{"Step 1", "Step 2", "Step 3"}}
 	adk.AddSessionValue(ctx, PlanSessionKey, plan)
 
 	// Set up expectations for the mock model
 	// The model should return the last user message as its response
+	//
+	// 设置 mock model 的预期
+	// model 应返回最后一条 user message 作为响应
 	mockToolCallingModel.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(func(ctx context.Context, messages []*schema.Message, opts ...model.Option) (*schema.Message, error) {
 			// Find the last user message
+			// 查找最后一条 user message
 			var lastUserMessage string
 			for _, msg := range messages {
 				if msg.Role == schema.User {
@@ -272,20 +320,24 @@ func TestExecutorRun(t *testing.T) {
 				}
 			}
 			// Return the last user message as the model's response
+			// 将最后一条 user message 作为 model 的响应返回
 			return schema.AssistantMessage(lastUserMessage, nil), nil
 		}).Times(1)
 
 	// Create the ExecutorConfig
+	// 创建 ExecutorConfig
 	conf := &ExecutorConfig{
 		Model:         mockToolCallingModel,
 		MaxIterations: 3,
 	}
 
 	// Create the executor
+	// 创建 executor
 	executor, err := NewExecutor(ctx, conf)
 	assert.NoError(t, err)
 
 	// Run the executor
+	// 运行 executor
 	runner := adk.NewRunner(ctx, adk.RunnerConfig{Agent: executor})
 	iterator := runner.Run(ctx, []adk.Message{schema.UserMessage("no input")},
 		adk.WithSessionValues(map[string]any{
@@ -295,6 +347,7 @@ func TestExecutorRun(t *testing.T) {
 	)
 
 	// Get the event from the iterator
+	// 从 iterator 获取 event
 	event, ok := iterator.Next()
 	assert.True(t, ok)
 	assert.Nil(t, event.Err)
@@ -309,19 +362,24 @@ func TestExecutorRun(t *testing.T) {
 }
 
 // TestNewReplanner tests the NewReplanner function
+// TestNewReplanner 测试 NewReplanner 函数
 func TestNewReplanner(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a mock controller
+	// 创建 mock controller
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	// Create a mock tool calling chat model
+	// 创建 mock 工具调用 chat model
 	mockToolCallingModel := mockModel.NewMockToolCallingChatModel(ctrl)
 	// Mock the WithTools method
+	// Mock WithTools 方法
 	mockToolCallingModel.EXPECT().WithTools(gomock.Any()).Return(mockToolCallingModel, nil).Times(1)
 
 	// Create plan and respond tools
+	// 创建 plan 和 respond 工具
 	planTool := &schema.ToolInfo{
 		Name: "Plan",
 		Desc: "Plan tool",
@@ -333,6 +391,7 @@ func TestNewReplanner(t *testing.T) {
 	}
 
 	// Create the ReplannerConfig
+	// 创建 ReplannerConfig
 	conf := &ReplannerConfig{
 		ChatModel:   mockToolCallingModel,
 		PlanTool:    planTool,
@@ -340,27 +399,33 @@ func TestNewReplanner(t *testing.T) {
 	}
 
 	// Create the replanner
+	// 创建 replanner
 	rp, err := NewReplanner(ctx, conf)
 	assert.NoError(t, err)
 	assert.NotNil(t, rp)
 
 	// Verify the replanner's name and description
+	// 验证 replanner 的名称和描述
 	assert.Equal(t, "replanner", rp.Name(ctx))
 	assert.Equal(t, "a replanner agent", rp.Description(ctx))
 }
 
 // TestReplannerRunWithPlan tests the Replanner's ability to use the plan_tool
+// TestReplannerRunWithPlan 测试 Replanner 使用 plan_tool 的能力
 func TestReplannerRunWithPlan(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a mock controller
+	// 创建 mock controller
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	// Create a mock tool calling chat model
+	// 创建 mock 工具调用聊天模型
 	mockToolCallingModel := mockModel.NewMockToolCallingChatModel(ctrl)
 
 	// Create plan and respond tools
+	// 创建 plan 和 respond 工具
 	planTool := &schema.ToolInfo{
 		Name: "Plan",
 		Desc: "Plan tool",
@@ -372,6 +437,7 @@ func TestReplannerRunWithPlan(t *testing.T) {
 	}
 
 	// Create a tool call response for the Plan tool
+	// 为 Plan 工具创建工具调用响应
 	planArgs := `{"steps":["Updated Step 1", "Updated Step 2"]}`
 	toolCall := schema.ToolCall{
 		ID:   "tool_call_id",
@@ -389,10 +455,12 @@ func TestReplannerRunWithPlan(t *testing.T) {
 	sw.Close()
 
 	// Mock the Generate method
+	// Mock Generate 方法
 	mockToolCallingModel.EXPECT().WithTools(gomock.Any()).Return(mockToolCallingModel, nil).Times(1)
 	mockToolCallingModel.EXPECT().Stream(gomock.Any(), gomock.Any(), gomock.Any()).Return(sr, nil).Times(1)
 
 	// Create the ReplannerConfig
+	// 创建 ReplannerConfig
 	conf := &ReplannerConfig{
 		ChatModel:   mockToolCallingModel,
 		PlanTool:    planTool,
@@ -400,16 +468,19 @@ func TestReplannerRunWithPlan(t *testing.T) {
 	}
 
 	// Create the replanner
+	// 创建 replanner
 	rp, err := NewReplanner(ctx, conf)
 	assert.NoError(t, err)
 
 	// Store necessary values in the session
+	// 在 session 中存储必要的值
 	plan := &defaultPlan{Steps: []string{"Step 1", "Step 2", "Step 3"}}
 
 	rp, err = agentOutputSessionKVs(ctx, rp)
 	assert.NoError(t, err)
 
 	// Run the replanner
+	// 运行 replanner
 	runner := adk.NewRunner(ctx, adk.RunnerConfig{Agent: rp})
 	iterator := runner.Run(ctx, []adk.Message{schema.UserMessage("no input")},
 		adk.WithSessionValues(map[string]any{
@@ -420,6 +491,7 @@ func TestReplannerRunWithPlan(t *testing.T) {
 	)
 
 	// Get the event from the iterator
+	// 从迭代器获取 event
 	event, ok := iterator.Next()
 	assert.True(t, ok)
 	assert.Nil(t, event.Err)
@@ -430,6 +502,7 @@ func TestReplannerRunWithPlan(t *testing.T) {
 	assert.Greater(t, len(kvs), 0)
 
 	// Verify the updated plan was stored in the session
+	// 验证更新后的 plan 已存储在 session 中
 	planValue, ok := kvs[PlanSessionKey]
 	assert.True(t, ok)
 	updatedPlan, ok := planValue.(*defaultPlan)
@@ -439,6 +512,7 @@ func TestReplannerRunWithPlan(t *testing.T) {
 	assert.Equal(t, "Updated Step 2", updatedPlan.Steps[1])
 
 	// Verify the execute results were updated
+	// 验证 execute results 已更新
 	executeResultsValue, ok := kvs[ExecutedStepsSessionKey]
 	assert.True(t, ok)
 	executeResults, ok := executeResultsValue.([]ExecutedStep)
@@ -452,17 +526,21 @@ func TestReplannerRunWithPlan(t *testing.T) {
 }
 
 // TestReplannerRunWithRespond tests the Replanner's ability to use the respond_tool
+// TestReplannerRunWithRespond 测试 Replanner 使用 respond_tool 的能力
 func TestReplannerRunWithRespond(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a mock controller
+	// 创建 mock controller
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	// Create a mock tool calling chat model
+	// 创建一个模拟工具调用聊天模型
 	mockToolCallingModel := mockModel.NewMockToolCallingChatModel(ctrl)
 
 	// Create plan and respond tools
+	// 创建 plan 和 respond 工具
 	planTool := &schema.ToolInfo{
 		Name: "Plan",
 		Desc: "Plan tool",
@@ -474,6 +552,7 @@ func TestReplannerRunWithRespond(t *testing.T) {
 	}
 
 	// Create a tool call response for the Respond tool
+	// 为 Respond 工具创建工具调用响应
 	responseArgs := `{"response":"This is the final response to the user"}`
 	toolCall := schema.ToolCall{
 		ID:   "tool_call_id",
@@ -491,10 +570,12 @@ func TestReplannerRunWithRespond(t *testing.T) {
 	sw.Close()
 
 	// Mock the Generate method
+	// 模拟 Generate 方法
 	mockToolCallingModel.EXPECT().WithTools(gomock.Any()).Return(mockToolCallingModel, nil).Times(1)
 	mockToolCallingModel.EXPECT().Stream(gomock.Any(), gomock.Any(), gomock.Any()).Return(sr, nil).Times(1)
 
 	// Create the ReplannerConfig
+	// 创建 ReplannerConfig
 	conf := &ReplannerConfig{
 		ChatModel:   mockToolCallingModel,
 		PlanTool:    planTool,
@@ -502,13 +583,16 @@ func TestReplannerRunWithRespond(t *testing.T) {
 	}
 
 	// Create the replanner
+	// 创建 replanner
 	rp, err := NewReplanner(ctx, conf)
 	assert.NoError(t, err)
 
 	// Store necessary values in the session
+	// 在 session 中存储必要的值
 	plan := &defaultPlan{Steps: []string{"Step 1", "Step 2", "Step 3"}}
 
 	// Run the replanner
+	// 运行 replanner
 	runner := adk.NewRunner(ctx, adk.RunnerConfig{Agent: rp})
 	iterator := runner.Run(ctx, []adk.Message{schema.UserMessage("no input")},
 		adk.WithSessionValues(map[string]any{
@@ -519,6 +603,7 @@ func TestReplannerRunWithRespond(t *testing.T) {
 	)
 
 	// Get the event from the iterator
+	// 从 iterator 获取 event
 	event, ok := iterator.Next()
 	assert.True(t, ok)
 	assert.Nil(t, event.Err)
@@ -527,6 +612,7 @@ func TestReplannerRunWithRespond(t *testing.T) {
 	assert.Equal(t, responseArgs, msg.Content)
 
 	// Verify that an exit action was generated
+	// 验证已生成 exit action
 	event, ok = iterator.Next()
 	assert.True(t, ok)
 	assert.NotNil(t, event.Action)
@@ -538,19 +624,23 @@ func TestReplannerRunWithRespond(t *testing.T) {
 }
 
 // TestNewPlanExecuteAgent tests the New function
+// TestNewPlanExecuteAgent 测试 New 函数
 func TestNewPlanExecuteAgent(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a mock controller
+	// 创建模拟 controller
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	// Create mock agents
+	// 创建模拟智能体
 	mockPlanner := mockAdk.NewMockAgent(ctrl)
 	mockExecutor := mockAdk.NewMockAgent(ctrl)
 	mockReplanner := mockAdk.NewMockAgent(ctrl)
 
 	// Set up expectations for the mock agents
+	// 为模拟智能体设置预期
 	mockPlanner.EXPECT().Name(gomock.Any()).Return("planner").AnyTimes()
 	mockPlanner.EXPECT().Description(gomock.Any()).Return("a planner agent").AnyTimes()
 
@@ -567,6 +657,7 @@ func TestNewPlanExecuteAgent(t *testing.T) {
 	}
 
 	// Create the plan execute agent
+	// 创建 plan execute 智能体
 	agent, err := New(ctx, conf)
 	assert.NoError(t, err)
 	assert.NotNil(t, agent)
@@ -576,15 +667,18 @@ func TestPlanExecuteAgentWithReplan(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a mock controller
+	// 创建模拟 controller
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	// Create mock agents
+	// 创建模拟智能体
 	mockPlanner := mockAdk.NewMockAgent(ctrl)
 	mockExecutor := mockAdk.NewMockAgent(ctrl)
 	mockReplanner := mockAdk.NewMockAgent(ctrl)
 
 	// Set up expectations for the mock agents
+	// 为模拟智能体设置预期
 	mockPlanner.EXPECT().Name(gomock.Any()).Return("planner").AnyTimes()
 	mockPlanner.EXPECT().Description(gomock.Any()).Return("a planner agent").AnyTimes()
 
@@ -595,28 +689,35 @@ func TestPlanExecuteAgentWithReplan(t *testing.T) {
 	mockReplanner.EXPECT().Description(gomock.Any()).Return("a replanner agent").AnyTimes()
 
 	// Create a plan
+	// 创建 plan
 	originalPlan := &defaultPlan{Steps: []string{"Step 1", "Step 2", "Step 3"}}
 	// Create an updated plan with fewer steps (after replanning)
+	// 创建步骤更少的更新后 plan（重新规划后）
 	updatedPlan := &defaultPlan{Steps: []string{"Updated Step 2", "Updated Step 3"}}
 	// Create execute result
+	// 创建执行结果
 	originalExecuteResult := "Execution result for Step 1"
 	updatedExecuteResult := "Execution result for Updated Step 2"
 
 	// Create user input
+	// 创建用户输入
 	userInput := []adk.Message{schema.UserMessage("User task input")}
 
 	finalResponse := &Response{Response: "Final response to user after executing all steps"}
 
 	// Mock the planner Run method to set the original plan
+	// Mock planner 的 Run 方法以设置原始计划
 	mockPlanner.EXPECT().Run(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 		func(ctx context.Context, input *adk.AgentInput, opts ...adk.AgentRunOption) *adk.AsyncIterator[*adk.AgentEvent] {
 			iterator, generator := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
 
 			// Set the plan in the session
+			// 在 session 中设置计划
 			adk.AddSessionValue(ctx, PlanSessionKey, originalPlan)
 			adk.AddSessionValue(ctx, UserInputSessionKey, userInput)
 
 			// Send a message event
+			// 发送消息事件
 			planJSON, _ := sonic.MarshalString(originalPlan)
 			msg := schema.AssistantMessage(planJSON, nil)
 			event := adk.EventFromMessage(msg, nil, schema.Assistant, "")
@@ -628,6 +729,7 @@ func TestPlanExecuteAgentWithReplan(t *testing.T) {
 	).Times(1)
 
 	// Mock the executor Run method to set the execute result
+	// Mock executor 的 Run 方法以设置执行结果
 	mockExecutor.EXPECT().Run(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 		func(ctx context.Context, input *adk.AgentInput, opts ...adk.AgentRunOption) *adk.AsyncIterator[*adk.AgentEvent] {
 			iterator, generator := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
@@ -636,6 +738,7 @@ func TestPlanExecuteAgentWithReplan(t *testing.T) {
 			currentPlan := plan.(*defaultPlan)
 			var msg adk.Message
 			// Check if this is the first replanning (original plan has 3 steps)
+			// 检查这是否是第一次重新规划（原始计划有 3 个步骤）
 			if len(currentPlan.Steps) == 3 {
 				msg = schema.AssistantMessage(originalExecuteResult, nil)
 				adk.AddSessionValue(ctx, ExecutedStepSessionKey, originalExecuteResult)
@@ -652,24 +755,31 @@ func TestPlanExecuteAgentWithReplan(t *testing.T) {
 	).Times(2)
 
 	// Mock the replanner Run method to first update the plan, then respond to user
+	// Mock replanner 的 Run 方法，先更新计划，再回复用户
 	mockReplanner.EXPECT().Run(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 		func(ctx context.Context, input *adk.AgentInput, opts ...adk.AgentRunOption) *adk.AsyncIterator[*adk.AgentEvent] {
 			iterator, generator := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
 
 			// First call: Update the plan
 			// Get the current plan from the session
+			//
+			// 第一次调用：更新计划
+			// 从 session 获取当前计划
 			plan, _ := adk.GetSessionValue(ctx, PlanSessionKey)
 			currentPlan := plan.(*defaultPlan)
 
 			// Check if this is the first replanning (original plan has 3 steps)
+			// 检查这是否是第一次重新规划（原始计划有 3 个步骤）
 			if len(currentPlan.Steps) == 3 {
 				// Send a message event with the updated plan
+				// 发送带有更新后计划的消息事件
 				planJSON, _ := sonic.MarshalString(updatedPlan)
 				msg := schema.AssistantMessage(planJSON, nil)
 				event := adk.EventFromMessage(msg, nil, schema.Assistant, "")
 				generator.Send(event)
 
 				// Set the updated plan & execute result in the session
+				// 在 session 中设置更新后的计划和执行结果
 				adk.AddSessionValue(ctx, PlanSessionKey, updatedPlan)
 				adk.AddSessionValue(ctx, ExecutedStepsSessionKey, []ExecutedStep{{
 					Step:   currentPlan.Steps[0],
@@ -677,6 +787,7 @@ func TestPlanExecuteAgentWithReplan(t *testing.T) {
 				}})
 			} else {
 				// Second call: Respond to user
+				// 第二次调用：回复用户
 				responseJSON, err := sonic.MarshalString(finalResponse)
 				assert.NoError(t, err)
 				msg := schema.AssistantMessage(responseJSON, nil)
@@ -684,6 +795,7 @@ func TestPlanExecuteAgentWithReplan(t *testing.T) {
 				generator.Send(event)
 
 				// Send exit action
+				// 发送退出动作
 				action := adk.NewExitAction()
 				generator.Send(&adk.AgentEvent{Action: action})
 			}
@@ -700,15 +812,18 @@ func TestPlanExecuteAgentWithReplan(t *testing.T) {
 	}
 
 	// Create the plan execute agent
+	// 创建 plan execute agent
 	agent, err := New(ctx, conf)
 	assert.NoError(t, err)
 	assert.NotNil(t, agent)
 
 	// Run the agent
+	// 运行智能体
 	runner := adk.NewRunner(ctx, adk.RunnerConfig{Agent: agent})
 	iterator := runner.Run(ctx, userInput)
 
 	// Collect all events
+	// 收集所有事件
 	var events []*adk.AgentEvent
 	for {
 		event, ok := iterator.Next()
@@ -719,6 +834,7 @@ func TestPlanExecuteAgentWithReplan(t *testing.T) {
 	}
 
 	// Verify the events
+	// 验证事件
 	assert.Greater(t, len(events), 0)
 
 	for i, event := range events {
@@ -972,6 +1088,7 @@ func TestPlanExecuteAgentInterruptResume(t *testing.T) {
 }
 
 // slowChatModel is a ChatModel that blocks for a configurable duration.
+// slowChatModel 是一个会阻塞可配置时长的 ChatModel。
 type slowChatModel struct {
 	delay       time.Duration
 	response    *schema.Message
@@ -1010,6 +1127,8 @@ func (m *slowChatModel) WithTools(tools []*schema.ToolInfo) (model.ToolCallingCh
 
 // TestWithCancel_PlanExecute_DuringExecution verifies that cancel works
 // during the executor (ChatModelAgent) phase of the PlanExecute agent.
+//
+// TestWithCancel_PlanExecute_DuringExecution 验证取消在 PlanExecute agent 的 executor（ChatModelAgent）阶段有效。
 func TestWithCancel_PlanExecute_DuringExecution(t *testing.T) {
 	ctx := context.Background()
 
@@ -1017,6 +1136,7 @@ func TestWithCancel_PlanExecute_DuringExecution(t *testing.T) {
 	defer ctrl.Finish()
 
 	// Planner: returns a plan quickly
+	// Planner：快速返回一个计划
 	mockPlanner := mockAdk.NewMockAgent(ctrl)
 	mockPlanner.EXPECT().Name(gomock.Any()).Return("planner").AnyTimes()
 	mockPlanner.EXPECT().Description(gomock.Any()).Return("a planner agent").AnyTimes()
@@ -1038,6 +1158,7 @@ func TestWithCancel_PlanExecute_DuringExecution(t *testing.T) {
 	).Times(1)
 
 	// Executor: uses a slow model that we can cancel
+	// Executor：使用一个可取消的慢模型
 	executorStarted := make(chan struct{})
 	slowModel := &slowChatModel{
 		delay:       5 * time.Second,
@@ -1052,6 +1173,7 @@ func TestWithCancel_PlanExecute_DuringExecution(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Replanner: should not be reached since we cancel during executor
+	// Replanner：由于在 executor 期间取消，不应执行到这里
 	mockReplanner := mockAdk.NewMockAgent(ctrl)
 	mockReplanner.EXPECT().Name(gomock.Any()).Return("replanner").AnyTimes()
 	mockReplanner.EXPECT().Description(gomock.Any()).Return("a replanner agent").AnyTimes()
@@ -1070,6 +1192,7 @@ func TestWithCancel_PlanExecute_DuringExecution(t *testing.T) {
 	iter := runner.Run(ctx, userInput, cancelOpt)
 
 	// Wait for the executor's model to start
+	// 等待 executor 的模型启动
 	select {
 	case <-executorStarted:
 	case <-time.After(10 * time.Second):
@@ -1079,6 +1202,7 @@ func TestWithCancel_PlanExecute_DuringExecution(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	// Cancel should NOT return ErrExecutionEnded
+	// Cancel 不应返回 ErrExecutionEnded
 	handle, _ := cancelFn()
 	err = handle.Wait()
 	assert.NoError(t, err, "Cancel during executor should succeed")
@@ -1100,6 +1224,9 @@ func TestWithCancel_PlanExecute_DuringExecution(t *testing.T) {
 
 // TestWithCancel_PlanExecute_BetweenTransitions verifies that cancel works
 // when fired between agent transitions (e.g., after planner, before executor starts).
+//
+// TestWithCancel_PlanExecute_BetweenTransitions 验证在智能体转换之间触发取消时可正常工作
+// （例如 planner 之后、executor 启动之前）。
 func TestWithCancel_PlanExecute_BetweenTransitions(t *testing.T) {
 	ctx := context.Background()
 
@@ -1109,6 +1236,7 @@ func TestWithCancel_PlanExecute_BetweenTransitions(t *testing.T) {
 	plannerDone := make(chan struct{})
 
 	// Planner: signals when done
+	// Planner：完成时发出信号
 	mockPlanner := mockAdk.NewMockAgent(ctrl)
 	mockPlanner.EXPECT().Name(gomock.Any()).Return("planner").AnyTimes()
 	mockPlanner.EXPECT().Description(gomock.Any()).Return("a planner agent").AnyTimes()
@@ -1133,6 +1261,7 @@ func TestWithCancel_PlanExecute_BetweenTransitions(t *testing.T) {
 	).Times(1)
 
 	// Executor: slow model to give time to observe cancel
+	// Executor：使用慢模型，以便有时间观察取消
 	executorModelStarted := make(chan struct{})
 	slowExecModel := &slowChatModel{
 		delay:       5 * time.Second,
@@ -1164,6 +1293,7 @@ func TestWithCancel_PlanExecute_BetweenTransitions(t *testing.T) {
 	iter := runner.Run(ctx, userInput, cancelOpt)
 
 	// Wait for planner to finish, then cancel before executor has a chance to produce output
+	// 等待 planner 完成，然后在 executor 有机会产生输出前取消
 	select {
 	case <-plannerDone:
 	case <-time.After(10 * time.Second):
@@ -1172,6 +1302,9 @@ func TestWithCancel_PlanExecute_BetweenTransitions(t *testing.T) {
 
 	// Cancel after planner, during executor phase
 	// The executor is a ChatModelAgent which will handle the cancel
+	//
+	// planner 之后、executor 阶段期间取消
+	// executor 是 ChatModelAgent，会处理该取消
 	select {
 	case <-executorModelStarted:
 	case <-time.After(10 * time.Second):

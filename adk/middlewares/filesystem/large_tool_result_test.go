@@ -29,6 +29,7 @@ import (
 )
 
 // mockBackend is a simple in-memory backend for testing
+// mockBackend 是用于测试的简单内存后端
 type mockBackend struct {
 	files map[string]string
 }
@@ -75,17 +76,20 @@ func TestToolResultOffloading_SmallResult(t *testing.T) {
 	config := &toolResultOffloadingConfig{
 		Backend:    backend,
 		TokenLimit: 100, // Small limit for testing
+		// 用于测试的小 limit
 	}
 
 	middleware := newToolResultOffloading(ctx, config)
 
 	// Create a mock endpoint that returns a small result
+	// 创建返回小结果的模拟 endpoint
 	smallResult := "This is a small result"
 	mockEndpoint := func(ctx context.Context, input *compose.ToolInput) (*compose.ToolOutput, error) {
 		return &compose.ToolOutput{Result: smallResult}, nil
 	}
 
 	// Wrap the endpoint with the middleware
+	// 用 middleware 包装 endpoint
 	wrappedEndpoint := middleware.Invokable(mockEndpoint)
 
 	// Execute
@@ -100,11 +104,13 @@ func TestToolResultOffloading_SmallResult(t *testing.T) {
 	}
 
 	// Small result should pass through unchanged
+	// 小结果应原样透传
 	if output.Result != smallResult {
 		t.Errorf("expected result %q, got %q", smallResult, output.Result)
 	}
 
 	// No file should be written
+	// 不应写入文件
 	if len(backend.files) != 0 {
 		t.Errorf("expected no files to be written, got %d files", len(backend.files))
 	}
@@ -117,11 +123,13 @@ func TestToolResultOffloading_LargeResult(t *testing.T) {
 	config := &toolResultOffloadingConfig{
 		Backend:    backend,
 		TokenLimit: 10, // Very small limit to trigger offloading
+		// 使用很小的 limit 以触发卸载
 	}
 
 	middleware := newToolResultOffloading(ctx, config)
 
 	// Create a large result (more than 10 * 4 = 40 bytes)
+	// 创建大结果（超过 10 * 4 = 40 字节）
 	largeResult := strings.Repeat("This is a long line of text that will exceed the token limit.\n", 10)
 	mockEndpoint := func(ctx context.Context, input *compose.ToolInput) (*compose.ToolOutput, error) {
 		return &compose.ToolOutput{Result: largeResult}, nil
@@ -140,6 +148,7 @@ func TestToolResultOffloading_LargeResult(t *testing.T) {
 	}
 
 	// Result should be replaced with a message
+	// 结果应替换为一条消息
 	if !strings.Contains(output.Result, "Tool result too large") {
 		t.Errorf("expected result to contain 'Tool result too large', got %q", output.Result)
 	}
@@ -153,6 +162,7 @@ func TestToolResultOffloading_LargeResult(t *testing.T) {
 	}
 
 	// File should be written
+	// 应写入文件
 	if len(backend.files) != 1 {
 		t.Fatalf("expected 1 file to be written, got %d files", len(backend.files))
 	}
@@ -200,11 +210,13 @@ func TestToolResultOffloading_CustomPathGenerator(t *testing.T) {
 	}
 
 	// Check custom path is used
+	// 检查是否使用了自定义路径
 	if !strings.Contains(output.Result, customPath) {
 		t.Errorf("expected result to contain custom path %q, got %q", customPath, output.Result)
 	}
 
 	// File should be written to custom path
+	// 文件应写入自定义路径
 	savedContent, ok := backend.files[customPath]
 	if !ok {
 		t.Fatalf("expected file at %q, got files: %v", customPath, backend.files)
@@ -292,11 +304,13 @@ func TestToolResultOffloading_DefaultTokenLimit(t *testing.T) {
 	config := &toolResultOffloadingConfig{
 		Backend:    backend,
 		TokenLimit: 0, // Should default to 20000
+		// 应默认为 20000
 	}
 
 	middleware := newToolResultOffloading(ctx, config)
 
 	// Create a result smaller than 20000 * 4 = 80000 bytes
+	// 创建一个小于 20000 * 4 = 80000 字节的结果
 	smallResult := strings.Repeat("x", 1000)
 	mockEndpoint := func(ctx context.Context, input *compose.ToolInput) (*compose.ToolOutput, error) {
 		return &compose.ToolOutput{Result: smallResult}, nil
@@ -315,11 +329,13 @@ func TestToolResultOffloading_DefaultTokenLimit(t *testing.T) {
 	}
 
 	// Should pass through unchanged
+	// 应原样透传
 	if output.Result != smallResult {
 		t.Errorf("expected result to pass through unchanged")
 	}
 
 	// No file should be written
+	// 不应写入文件
 	if len(backend.files) != 0 {
 		t.Errorf("expected no files to be written, got %d files", len(backend.files))
 	}
@@ -337,9 +353,11 @@ func TestToolResultOffloading_Stream(t *testing.T) {
 	middleware := newToolResultOffloading(ctx, config)
 
 	// Create a streaming endpoint that returns large content
+	// 创建一个返回大内容的流式端点
 	largeResult := strings.Repeat("Large streaming content ", 100)
 	mockStreamEndpoint := func(ctx context.Context, input *compose.ToolInput) (*compose.StreamToolOutput, error) {
 		// Split the result into chunks
+		// 将结果拆分为块
 		chunks := []string{largeResult[:len(largeResult)/2], largeResult[len(largeResult)/2:]}
 		return &compose.StreamToolOutput{
 			Result: schema.StreamReaderFromArray(chunks),
@@ -359,6 +377,7 @@ func TestToolResultOffloading_Stream(t *testing.T) {
 	}
 
 	// Read the stream
+	// 读取流
 	var result strings.Builder
 	for {
 		chunk, err := output.Result.Recv()
@@ -374,6 +393,7 @@ func TestToolResultOffloading_Stream(t *testing.T) {
 	resultStr := result.String()
 
 	// Result should be replaced with a message
+	// 结果应替换为一条消息
 	if !strings.Contains(resultStr, "Tool result too large") {
 		t.Errorf("expected result to contain 'Tool result too large', got %q", resultStr)
 	}
@@ -383,6 +403,7 @@ func TestToolResultOffloading_Stream(t *testing.T) {
 	}
 
 	// File should be written
+	// 文件应被写入
 	if len(backend.files) != 1 {
 		t.Fatalf("expected 1 file to be written, got %d files", len(backend.files))
 	}
@@ -530,6 +551,7 @@ func TestConcatString(t *testing.T) {
 	}
 
 	// Test nil stream
+	// 测试 nil 流
 	t.Run("nil stream", func(t *testing.T) {
 		_, err := concatString(nil)
 		if err == nil {
@@ -545,6 +567,7 @@ func TestToolResultOffloading_BackendWriteError(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a backend that fails on write
+	// 创建一个写入时失败的 backend
 	backend := &failingBackend{
 		writeErr: errors.New("write failed"),
 	}
@@ -579,6 +602,7 @@ func TestToolResultOffloading_BackendWriteError(t *testing.T) {
 }
 
 // failingBackend is a mock backend that can be configured to fail
+// failingBackend 是一个可配置为失败的 mock backend
 type failingBackend struct {
 	writeErr error
 }

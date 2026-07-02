@@ -35,21 +35,26 @@ import (
 )
 
 // TestChatModelAgentRun tests the Run method of ChatModelAgent
+// TestChatModelAgentRun 测试 ChatModelAgent 的 Run 方法
 func TestChatModelAgentRun(t *testing.T) {
 	// Basic test for Run method
+	// Run 方法的基础测试
 	t.Run("BasicFunctionality", func(t *testing.T) {
 		ctx := context.Background()
 
 		// Create a mock chat model
+		// 创建一个 mock chat model
 		ctrl := gomock.NewController(t)
 		cm := mockModel.NewMockToolCallingChatModel(ctrl)
 
 		// Set up expectations for the mock model
+		// 为 mock model 设置预期
 		cm.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(schema.AssistantMessage("Hello, I am an AI assistant.", nil), nil).
 			Times(1)
 
 		// Create a ChatModelAgent
+		// 创建一个 ChatModelAgent
 		agent, err := NewChatModelAgent(ctx, &ChatModelAgentConfig{
 			Name:        "TestAgent",
 			Description: "Test agent for unit testing",
@@ -60,6 +65,7 @@ func TestChatModelAgentRun(t *testing.T) {
 		assert.NotNil(t, agent)
 
 		// Run the agent
+		// 运行智能体
 		input := &AgentInput{
 			Messages: []Message{
 				schema.UserMessage("Hello, who are you?"),
@@ -69,6 +75,7 @@ func TestChatModelAgentRun(t *testing.T) {
 		assert.NotNil(t, iterator)
 
 		// Get the event from the iterator
+		// 从 iterator 获取事件
 		event, ok := iterator.Next()
 		assert.True(t, ok)
 		assert.NotNil(t, event)
@@ -77,11 +84,13 @@ func TestChatModelAgentRun(t *testing.T) {
 		assert.NotNil(t, event.Output.MessageOutput)
 
 		// Verify the message content
+		// 验证消息内容
 		msg := event.Output.MessageOutput.Message
 		assert.NotNil(t, msg)
 		assert.Equal(t, "Hello, I am an AI assistant.", msg.Content)
 
 		// No more events
+		// 没有更多事件
 		_, ok = iterator.Next()
 		assert.False(t, ok)
 	})
@@ -90,10 +99,12 @@ func TestChatModelAgentRun(t *testing.T) {
 		ctx := context.Background()
 
 		// Create a mock chat model
+		// 创建一个 mock chat model
 		ctrl := gomock.NewController(t)
 		cm := mockModel.NewMockToolCallingChatModel(ctrl)
 
 		// Set up expectations for the mock model
+		// 为 mock model 设置预期
 		cm.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(schema.AssistantMessage("Hello, I am an AI assistant.", nil), nil).
 			Times(1)
@@ -101,6 +112,7 @@ func TestChatModelAgentRun(t *testing.T) {
 		afterChatModelExecuted := false
 
 		// Create a ChatModelAgent
+		// 创建一个 ChatModelAgent
 		agent, err := NewChatModelAgent(ctx, &ChatModelAgentConfig{
 			Name:        "TestAgent",
 			Description: "Test agent for unit testing",
@@ -124,6 +136,7 @@ func TestChatModelAgentRun(t *testing.T) {
 		assert.NotNil(t, agent)
 
 		// Run the agent
+		// 运行智能体
 		input := &AgentInput{
 			Messages: []Message{
 				schema.UserMessage("Hello, who are you?"),
@@ -133,6 +146,7 @@ func TestChatModelAgentRun(t *testing.T) {
 		assert.NotNil(t, iterator)
 
 		// Get the event from the iterator
+		// 从 iterator 获取事件
 		event, ok := iterator.Next()
 		assert.True(t, ok)
 		assert.NotNil(t, event)
@@ -141,11 +155,13 @@ func TestChatModelAgentRun(t *testing.T) {
 		assert.NotNil(t, event.Output.MessageOutput)
 
 		// Verify the message content
+		// 验证消息内容
 		msg := event.Output.MessageOutput.Message
 		assert.NotNil(t, msg)
 		assert.Equal(t, "Hello, I am an AI assistant.", msg.Content)
 
 		// No more events
+		// 没有更多事件
 		_, ok = iterator.Next()
 		assert.False(t, ok)
 
@@ -351,14 +367,17 @@ func TestChatModelAgentRun(t *testing.T) {
 	})
 
 	// Test with streaming output
+	// 测试流式输出
 	t.Run("StreamOutput", func(t *testing.T) {
 		ctx := context.Background()
 
 		// Create a mock chat model
+		// 创建 mock chat model
 		ctrl := gomock.NewController(t)
 		cm := mockModel.NewMockToolCallingChatModel(ctrl)
 
 		// Create a stream reader for the mock response
+		// 为 mock 响应创建流读取器
 		sr := schema.StreamReaderFromArray([]*schema.Message{
 			schema.AssistantMessage("Hello", nil),
 			schema.AssistantMessage(", I am", nil),
@@ -366,11 +385,13 @@ func TestChatModelAgentRun(t *testing.T) {
 		})
 
 		// Set up expectations for the mock model
+		// 设置 mock model 的预期
 		cm.EXPECT().Stream(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(sr, nil).
 			Times(1)
 
 		// Create a ChatModelAgent
+		// 创建 ChatModelAgent
 		agent, err := NewChatModelAgent(ctx, &ChatModelAgentConfig{
 			Name:        "TestAgent",
 			Description: "Test agent for unit testing",
@@ -381,6 +402,7 @@ func TestChatModelAgentRun(t *testing.T) {
 		assert.NotNil(t, agent)
 
 		// Run the agent with streaming enabled
+		// 启用流式并运行智能体
 		input := &AgentInput{
 			Messages:        []Message{schema.UserMessage("Hello, who are you?")},
 			EnableStreaming: true,
@@ -389,6 +411,7 @@ func TestChatModelAgentRun(t *testing.T) {
 		assert.NotNil(t, iterator)
 
 		// Get the event from the iterator
+		// 从迭代器获取事件
 		event, ok := iterator.Next()
 		assert.True(t, ok)
 		assert.NotNil(t, event)
@@ -398,24 +421,29 @@ func TestChatModelAgentRun(t *testing.T) {
 		assert.True(t, event.Output.MessageOutput.IsStreaming)
 
 		// No more events
+		// 没有更多事件
 		_, ok = iterator.Next()
 		assert.False(t, ok)
 	})
 
 	// Test error handling
+	// 测试错误处理
 	t.Run("ErrorHandling", func(t *testing.T) {
 		ctx := context.Background()
 
 		// Create a mock chat model
+		// 创建 mock chat model
 		ctrl := gomock.NewController(t)
 		cm := mockModel.NewMockToolCallingChatModel(ctrl)
 
 		// Set up expectations for the mock model to return an error
+		// 设置 mock model 返回错误的预期
 		cm.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(nil, errors.New("model error")).
 			Times(1)
 
 		// Create a ChatModelAgent
+		// 创建 ChatModelAgent
 		agent, err := NewChatModelAgent(ctx, &ChatModelAgentConfig{
 			Name:        "TestAgent",
 			Description: "Test agent for unit testing",
@@ -426,6 +454,7 @@ func TestChatModelAgentRun(t *testing.T) {
 		assert.NotNil(t, agent)
 
 		// Run the agent
+		// 运行智能体
 		input := &AgentInput{
 			Messages: []Message{schema.UserMessage("Hello, who are you?")},
 		}
@@ -433,6 +462,7 @@ func TestChatModelAgentRun(t *testing.T) {
 		assert.NotNil(t, iterator)
 
 		// Get the event from the iterator, should contain an error
+		// 从迭代器获取事件，应包含错误
 		event, ok := iterator.Next()
 		assert.True(t, ok)
 		assert.NotNil(t, event)
@@ -440,15 +470,18 @@ func TestChatModelAgentRun(t *testing.T) {
 		assert.Contains(t, event.Err.Error(), "model error")
 
 		// No more events
+		// 没有更多事件
 		_, ok = iterator.Next()
 		assert.False(t, ok)
 	})
 
 	// Test with tools
+	// 测试工具
 	t.Run("WithTools", func(t *testing.T) {
 		ctx := context.Background()
 
 		// Create a fake tool for testing
+		// 创建用于测试的 fake tool
 		fakeTool := &fakeToolForTest{
 			tarCount: 1,
 		}
@@ -457,10 +490,12 @@ func TestChatModelAgentRun(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Create a mock chat model
+		// 创建 mock chat model
 		ctrl := gomock.NewController(t)
 		cm := mockModel.NewMockToolCallingChatModel(ctrl)
 
 		// Set up expectations for the mock model
+		// 设置 mock model 的预期
 		cm.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(schema.AssistantMessage("Using tool",
 				[]schema.ToolCall{
@@ -478,6 +513,7 @@ func TestChatModelAgentRun(t *testing.T) {
 		cm.EXPECT().WithTools(gomock.Any()).Return(cm, nil).AnyTimes()
 
 		// Create a ChatModelAgent with tools
+		// 创建带工具的 ChatModelAgent
 		agent, err := NewChatModelAgent(ctx, &ChatModelAgentConfig{
 			Name:        "TestAgent",
 			Description: "Test agent for unit testing",
@@ -493,6 +529,7 @@ func TestChatModelAgentRun(t *testing.T) {
 		assert.NotNil(t, agent)
 
 		// Run the agent
+		// 运行智能体
 		input := &AgentInput{
 			Messages: []Message{schema.UserMessage("Use the test tool")},
 		}
@@ -501,6 +538,9 @@ func TestChatModelAgentRun(t *testing.T) {
 
 		// Get events from the iterator
 		// First event should be the model output with tool call
+		//
+		// 从迭代器获取事件
+		// 第一个事件应为带工具调用的 model 输出
 		event1, ok := iterator.Next()
 		assert.True(t, ok)
 		assert.NotNil(t, event1)
@@ -510,6 +550,7 @@ func TestChatModelAgentRun(t *testing.T) {
 		assert.Equal(t, schema.Assistant, event1.Output.MessageOutput.Role)
 
 		// Second event should be the tool output
+		// 第二个事件应为工具输出
 		event2, ok := iterator.Next()
 		assert.True(t, ok)
 		assert.NotNil(t, event2)
@@ -519,6 +560,7 @@ func TestChatModelAgentRun(t *testing.T) {
 		assert.Equal(t, schema.Tool, event2.Output.MessageOutput.Role)
 
 		// Third event should be the final model output
+		// 第三个事件应为最终 model 输出
 		event3, ok := iterator.Next()
 		assert.True(t, ok)
 		assert.NotNil(t, event3)
@@ -528,6 +570,7 @@ func TestChatModelAgentRun(t *testing.T) {
 		assert.Equal(t, schema.Assistant, event3.Output.MessageOutput.Role)
 
 		// No more events
+		// 没有更多事件
 		_, ok = iterator.Next()
 		assert.False(t, ok)
 	})
@@ -687,6 +730,7 @@ func TestChatModelAgentRun(t *testing.T) {
 		}
 
 		// First registered middleware is outermost
+		// 最先注册的 middleware 位于最外层
 		assert.Equal(t, []string{"mw1_before", "mw2_before", "mw2_after", "mw1_after"}, order)
 	})
 
@@ -758,6 +802,7 @@ func TestChatModelAgentRun(t *testing.T) {
 
 		assert.Equal(t, 3, len(events))
 		// Tool result event should have the modified content
+		// 工具结果事件应包含修改后的内容
 		toolEvent := events[1]
 		assert.Equal(t, schema.Tool, toolEvent.Output.MessageOutput.Role)
 		assert.Contains(t, toolEvent.Output.MessageOutput.Message.Content, "modified:")
@@ -975,18 +1020,24 @@ func TestChatModelAgentRun(t *testing.T) {
 }
 
 // TestExitTool tests the Exit tool functionality
+// TestExitTool 测试 Exit 工具功能
 func TestExitTool(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a mock controller
+	// 创建 mock controller
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	// Create a mock chat model
+	// 创建 mock chat model
 	cm := mockModel.NewMockToolCallingChatModel(ctrl)
 
 	// Set up expectations for the mock model
 	// First call: model generates a message with Exit tool call
+	//
+	// 设置 mock model 的预期
+	// 第一次调用：model 生成一条带 Exit 工具调用的消息
 	cm.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(schema.AssistantMessage("I'll exit with a final result",
 			[]schema.ToolCall{
@@ -1000,9 +1051,11 @@ func TestExitTool(t *testing.T) {
 		Times(1)
 
 	// Model should implement WithTools
+	// model 应实现 WithTools
 	cm.EXPECT().WithTools(gomock.Any()).Return(cm, nil).AnyTimes()
 
 	// Create an agent with the Exit tool
+	// 创建带 Exit 工具的智能体
 	agent, err := NewChatModelAgent(ctx, &ChatModelAgentConfig{
 		Name:        "TestAgent",
 		Description: "Test agent with Exit tool",
@@ -1014,6 +1067,7 @@ func TestExitTool(t *testing.T) {
 	assert.NotNil(t, agent)
 
 	// Run the agent
+	// 运行智能体
 	input := &AgentInput{
 		Messages: []Message{
 			schema.UserMessage("Please exit with a final result"),
@@ -1023,6 +1077,7 @@ func TestExitTool(t *testing.T) {
 	assert.NotNil(t, iterator)
 
 	// First event: model output with tool call
+	// 第一个事件：带工具调用的 model 输出
 	event1, ok := iterator.Next()
 	assert.True(t, ok)
 	assert.NotNil(t, event1)
@@ -1032,6 +1087,7 @@ func TestExitTool(t *testing.T) {
 	assert.Equal(t, schema.Assistant, event1.Output.MessageOutput.Role)
 
 	// Second event: tool output (Exit)
+	// 第二个事件：工具输出（Exit）
 	event2, ok := iterator.Next()
 	assert.True(t, ok)
 	assert.NotNil(t, event2)
@@ -1041,13 +1097,16 @@ func TestExitTool(t *testing.T) {
 	assert.Equal(t, schema.Tool, event2.Output.MessageOutput.Role)
 
 	// Verify the action is Exit
+	// 验证 action 为 Exit
 	assert.NotNil(t, event2.Action)
 	assert.True(t, event2.Action.Exit)
 
 	// Verify the final result
+	// 验证最终结果
 	assert.Equal(t, "This is the final result", event2.Output.MessageOutput.Message.Content)
 
 	// No more events
+	// 没有更多事件
 	_, ok = iterator.Next()
 	assert.False(t, ok)
 }
@@ -1055,14 +1114,19 @@ func TestExitTool(t *testing.T) {
 func TestParallelReturnDirectlyToolCall(t *testing.T) {
 	ctx := context.Background()
 	// Create a mock controller
+	// 创建 mock 控制器
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	// Create a mock chat model
+	// 创建 mock 聊天模型
 	cm := mockModel.NewMockToolCallingChatModel(ctrl)
 
 	// Set up expectations for the mock model
 	// First call: model generates a message with Exit tool call
+	//
+	// 设置 mock 模型的预期行为
+	// 第一次调用：模型生成一条带有 Exit 工具调用的消息
 	cm.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(schema.AssistantMessage("I'll exit with a final result",
 			[]schema.ToolCall{
@@ -1082,9 +1146,11 @@ func TestParallelReturnDirectlyToolCall(t *testing.T) {
 		Times(1)
 
 	// Model should implement WithTools
+	// 模型应实现 WithTools
 	cm.EXPECT().WithTools(gomock.Any()).Return(cm, nil).AnyTimes()
 
 	// Create an agent with the Exit tool
+	// 创建带有 Exit 工具的智能体
 	agent, err := NewChatModelAgent(ctx, &ChatModelAgentConfig{
 		Name:        "TestAgent",
 		Description: "Test agent with Exit tool",
@@ -1239,8 +1305,10 @@ func (s legacyStreamActionTool) StreamableRun(ctx context.Context, argumentsInJS
 }
 
 // TestChatModelAgentOutputKey tests the outputKey configuration and setOutputToSession function
+// TestChatModelAgentOutputKey 测试 outputKey 配置和 setOutputToSession 函数
 func TestChatModelAgentOutputKey(t *testing.T) {
 	// Test outputKey configuration - stores output in session
+	// 测试 outputKey 配置 - 将输出存入 session
 	t.Run("OutputKeyStoresInSession", func(t *testing.T) {
 		for i := 0; i < 1000; i++ {
 
@@ -1248,26 +1316,31 @@ func TestChatModelAgentOutputKey(t *testing.T) {
 		ctx := context.Background()
 
 		// Create a mock chat model
+		// 创建 mock 聊天模型
 		ctrl := gomock.NewController(t)
 		cm := mockModel.NewMockToolCallingChatModel(ctrl)
 
 		// Set up expectations for the mock model
+		// 设置 mock 模型的预期行为
 		cm.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(schema.AssistantMessage("Hello, I am an AI assistant.", nil), nil).
 			Times(1)
 
 		// Create a ChatModelAgent with outputKey configured
+		// 创建配置了 outputKey 的 ChatModelAgent
 		agent, err := NewChatModelAgent(ctx, &ChatModelAgentConfig{
 			Name:        "TestAgent",
 			Description: "Test agent for unit testing",
 			Instruction: "You are a helpful assistant.",
 			Model:       cm,
 			OutputKey:   "agent_output", // This should store output in session
+			// 这应将输出存入 session
 		})
 		assert.NoError(t, err)
 		assert.NotNil(t, agent)
 
 		// Initialize a run context to enable session storage
+		// 初始化运行上下文以启用 session 存储
 		input := &AgentInput{
 			Messages: []Message{
 				schema.UserMessage("Hello, who are you?"),
@@ -1278,20 +1351,24 @@ func TestChatModelAgentOutputKey(t *testing.T) {
 		assert.NotNil(t, runCtx.Session)
 
 		// Run the agent
+		// 运行智能体
 		iterator := agent.Run(ctx, input)
 		assert.NotNil(t, iterator)
 
 		// Get the event from the iterator
+		// 从迭代器获取事件
 		event, ok := iterator.Next()
 		assert.True(t, ok)
 		assert.NotNil(t, event)
 		assert.Nil(t, event.Err)
 
 		// Verify the message content
+		// 验证消息内容
 		msg := event.Output.MessageOutput.Message
 		assert.Equal(t, "Hello, I am an AI assistant.", msg.Content)
 
 		// Verify that the output was stored in the session
+		// 验证输出已存入 session
 		time.AfterFunc(100*time.Millisecond, func() {
 			sessionValues := GetSessionValues(ctx)
 			assert.Contains(t, sessionValues, "agent_output")
@@ -1299,19 +1376,23 @@ func TestChatModelAgentOutputKey(t *testing.T) {
 		})
 
 		// No more events
+		// 没有更多事件
 		_, ok = iterator.Next()
 		assert.False(t, ok)
 	})
 
 	// Test outputKey configuration with streaming - stores concatenated output in session
+	// 测试流式场景下的 outputKey 配置 - 将拼接后的输出存入 session
 	t.Run("OutputKeyWithStreamingStoresInSession", func(t *testing.T) {
 		ctx := context.Background()
 
 		// Create a mock chat model
+		// 创建 mock 聊天模型
 		ctrl := gomock.NewController(t)
 		cm := mockModel.NewMockToolCallingChatModel(ctrl)
 
 		// Create a stream reader for the mock response
+		// 为 mock 响应创建流读取器
 		sr := schema.StreamReaderFromArray([]*schema.Message{
 			schema.AssistantMessage("Hello", nil),
 			schema.AssistantMessage(", I am", nil),
@@ -1319,22 +1400,26 @@ func TestChatModelAgentOutputKey(t *testing.T) {
 		})
 
 		// Set up expectations for the mock model
+		// 设置 mock model 的预期
 		cm.EXPECT().Stream(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(sr, nil).
 			Times(1)
 
 		// Create a ChatModelAgent with outputKey configured
+		// 创建配置了 outputKey 的 ChatModelAgent
 		agent, err := NewChatModelAgent(ctx, &ChatModelAgentConfig{
 			Name:        "TestAgent",
 			Description: "Test agent for unit testing",
 			Instruction: "You are a helpful assistant.",
 			Model:       cm,
 			OutputKey:   "agent_output", // This should store concatenated stream in session
+			// 这应将拼接后的流存入 session
 		})
 		assert.NoError(t, err)
 		assert.NotNil(t, agent)
 
 		// Initialize a run context to enable session storage
+		// 初始化 run context 以启用 session 存储
 		input := &AgentInput{
 			Messages:        []Message{schema.UserMessage("Hello, who are you?")},
 			EnableStreaming: true,
@@ -1344,10 +1429,12 @@ func TestChatModelAgentOutputKey(t *testing.T) {
 		assert.NotNil(t, runCtx.Session)
 
 		// Run the agent
+		// 运行智能体
 		iterator := agent.Run(ctx, input)
 		assert.NotNil(t, iterator)
 
 		// Get the event from the iterator
+		// 从迭代器获取事件
 		event, ok := iterator.Next()
 		assert.True(t, ok)
 		assert.NotNil(t, event)
@@ -1356,21 +1443,25 @@ func TestChatModelAgentOutputKey(t *testing.T) {
 
 		time.AfterFunc(100*time.Millisecond, func() {
 			// Verify that the concatenated output was stored in the session
+			// 验证拼接后的输出已存入 session
 			sessionValues := GetSessionValues(ctx)
 			assert.Contains(t, sessionValues, "agent_output")
 			assert.Equal(t, "Hello, I am an AI assistant.", sessionValues["agent_output"])
 		})
 
 		// No more events
+		// 没有更多事件
 		_, ok = iterator.Next()
 		assert.False(t, ok)
 	})
 
 	// Test setOutputToSession function directly - regular message
+	// 直接测试 setOutputToSession 函数 - 普通消息
 	t.Run("SetOutputToSessionRegularMessage", func(t *testing.T) {
 		ctx := context.Background()
 
 		// Initialize a run context to enable session storage
+		// 初始化 run context 以启用 session 存储
 		input := &AgentInput{
 			Messages: []Message{schema.UserMessage("test")},
 		}
@@ -1379,21 +1470,25 @@ func TestChatModelAgentOutputKey(t *testing.T) {
 		assert.NotNil(t, runCtx.Session)
 
 		// Test with a regular message
+		// 使用普通消息测试
 		msg := schema.AssistantMessage("Test response", nil)
 		err := setOutputToSession(ctx, msg, nil, "test_output")
 		assert.NoError(t, err)
 
 		// Verify the message content was stored
+		// 验证消息内容已存入
 		sessionValues := GetSessionValues(ctx)
 		assert.Contains(t, sessionValues, "test_output")
 		assert.Equal(t, "Test response", sessionValues["test_output"])
 	})
 
 	// Test setOutputToSession function directly - streaming message
+	// 直接测试 setOutputToSession 函数 - 流式消息
 	t.Run("SetOutputToSessionStreamingMessage", func(t *testing.T) {
 		ctx := context.Background()
 
 		// Initialize a run context to enable session storage
+		// 初始化 run context 以启用 session 存储
 		input := &AgentInput{
 			Messages: []Message{schema.UserMessage("test")},
 		}
@@ -1402,6 +1497,7 @@ func TestChatModelAgentOutputKey(t *testing.T) {
 		assert.NotNil(t, runCtx.Session)
 
 		// Test with a streaming message
+		// 使用流式消息测试
 		sr := schema.StreamReaderFromArray([]*schema.Message{
 			schema.AssistantMessage("Stream", nil),
 			schema.AssistantMessage(" response", nil),
@@ -1411,16 +1507,19 @@ func TestChatModelAgentOutputKey(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Verify the concatenated stream content was stored
+		// 验证拼接后的流内容已存入
 		sessionValues := GetSessionValues(ctx)
 		assert.Contains(t, sessionValues, "test_output")
 		assert.Equal(t, "Stream response content", sessionValues["test_output"])
 	})
 
 	// Test setOutputToSession function directly - error case
+	// 直接测试 setOutputToSession 函数 - 错误情况
 	t.Run("SetOutputToSessionErrorCase", func(t *testing.T) {
 		ctx := context.Background()
 
 		// Initialize a run context to enable session storage
+		// 初始化 run context 以启用 session 存储
 		input := &AgentInput{
 			Messages: []Message{schema.UserMessage("test")},
 		}
@@ -1430,22 +1529,32 @@ func TestChatModelAgentOutputKey(t *testing.T) {
 
 		// Test with an invalid stream (simulate error)
 		// Create a stream that will fail when concatenated
+		//
+		// 使用无效流测试（模拟错误）
+		// 创建一个拼接时会失败的流
 		sr := schema.StreamReaderFromArray([]*schema.Message{
 			schema.AssistantMessage("test", nil),
 		})
 		// Close the stream to simulate an error condition
+		// 关闭流以模拟错误条件
 		sr.Close()
 
 		// This should return an error because the stream is closed
+		// 这应返回错误，因为流已关闭
 		err := setOutputToSession(ctx, nil, sr, "test_output")
 		// Note: The actual behavior may vary depending on the stream implementation
 		// Some streams may not error when closed, so we'll accept either outcome
+		//
+		// 注意：实际行为可能因流实现而异
+		// 有些流关闭后可能不会报错，因此两种结果都接受
 		if err != nil {
 			// If there's an error, verify nothing was stored
+			// 如果有错误，验证没有存储任何内容
 			sessionValues := GetSessionValues(ctx)
 			assert.NotContains(t, sessionValues, "test_output")
 		} else {
 			// If no error, verify the content was stored
+			// 如果没有错误，验证内容已存储
 			sessionValues := GetSessionValues(ctx)
 			assert.Contains(t, sessionValues, "test_output")
 			assert.Equal(t, "test", sessionValues["test_output"])
@@ -1453,26 +1562,32 @@ func TestChatModelAgentOutputKey(t *testing.T) {
 	})
 
 	// Test outputKey with React workflow (tools enabled)
+	// 使用 React 工作流（启用工具）测试 outputKey
 	t.Run("OutputKeyWithReactWorkflow", func(t *testing.T) {
 		ctx := context.Background()
 
 		// Create a mock chat model
+		// 创建 mock chat model
 		ctrl := gomock.NewController(t)
 		cm := mockModel.NewMockToolCallingChatModel(ctrl)
 
 		// Create a simple tool for testing
+		// 创建一个用于测试的简单工具
 		fakeTool := &fakeToolForTest{
 			tarCount: 1,
 		}
 
 		// Set up expectations for the mock model - it will generate a final response
+		// 设置 mock model 的预期行为——它将生成最终响应
 		cm.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(schema.AssistantMessage("Final response from React workflow", nil), nil).
 			Times(1)
 		// Model should implement WithTools
+		// Model 应实现 WithTools
 		cm.EXPECT().WithTools(gomock.Any()).Return(cm, nil).AnyTimes()
 
 		// Create a ChatModelAgent with outputKey and tools configured
+		// 创建配置了 outputKey 和工具的 ChatModelAgent
 		agent, err := NewChatModelAgent(ctx, &ChatModelAgentConfig{
 			Name:        "TestAgent",
 			Description: "Test agent with tools",
@@ -1489,6 +1604,7 @@ func TestChatModelAgentOutputKey(t *testing.T) {
 		assert.NotNil(t, agent)
 
 		// Initialize a run context to enable session storage
+		// 初始化运行上下文以启用会话存储
 		input := &AgentInput{
 			Messages: []Message{schema.UserMessage("Use the tool")},
 		}
@@ -1497,20 +1613,24 @@ func TestChatModelAgentOutputKey(t *testing.T) {
 		assert.NotNil(t, runCtx.Session)
 
 		// Run the agent
+		// 运行智能体
 		iterator := agent.Run(ctx, input)
 		assert.NotNil(t, iterator)
 
 		// Get the event from the iterator
+		// 从迭代器获取事件
 		event, ok := iterator.Next()
 		assert.True(t, ok)
 		assert.NotNil(t, event)
 		assert.Nil(t, event.Err)
 
 		// Verify the message content
+		// 验证消息内容
 		msg := event.Output.MessageOutput.Message
 		assert.Equal(t, "Final response from React workflow", msg.Content)
 
 		// Verify that the output was stored in the session
+		// 验证输出已存储到会话中
 		time.AfterFunc(time.Millisecond*10, func() {
 			sessionValues := GetSessionValues(ctx)
 			assert.Contains(t, sessionValues, "agent_output")
@@ -1518,6 +1638,7 @@ func TestChatModelAgentOutputKey(t *testing.T) {
 		})
 
 		// No more events
+		// 没有更多事件
 		_, ok = iterator.Next()
 		assert.False(t, ok)
 	})
@@ -2020,6 +2141,7 @@ func TestChatModelAgent_PrepareExecContextError(t *testing.T) {
 }
 
 // fakeEnhancedInvokableToolForTest implements tool.EnhancedInvokableTool for testing.
+// fakeEnhancedInvokableToolForTest 实现 tool.EnhancedInvokableTool，用于测试。
 type fakeEnhancedInvokableToolForTest struct{}
 
 func (t *fakeEnhancedInvokableToolForTest) Info(_ context.Context) (*schema.ToolInfo, error) {
@@ -2038,6 +2160,7 @@ func (t *fakeEnhancedInvokableToolForTest) InvokableRun(_ context.Context, _ *sc
 }
 
 // fakeEnhancedStreamableToolForTest implements tool.EnhancedStreamableTool for testing.
+// fakeEnhancedStreamableToolForTest 实现 tool.EnhancedStreamableTool，用于测试。
 type fakeEnhancedStreamableToolForTest struct{}
 
 func (t *fakeEnhancedStreamableToolForTest) Info(_ context.Context) (*schema.ToolInfo, error) {
@@ -2102,6 +2225,7 @@ func TestNewChatModelAgent_FailoverConfigValidation(t *testing.T) {
 }
 
 // aliasCaptureTool captures the raw arguments JSON received by the tool.
+// aliasCaptureTool 捕获工具收到的原始参数 JSON。
 type aliasCaptureTool struct {
 	name         string
 	params       map[string]*schema.ParameterInfo

@@ -32,8 +32,13 @@ import (
 // ---------------------------------------------------------------------------
 // Generic table-driven tests covering both *schema.Message and *schema.AgenticMessage
 // ---------------------------------------------------------------------------
+//
+// ---------------------------------------------------------------------------
+// 覆盖 *schema.Message 和 *schema.AgenticMessage 的泛型表驱动测试
+// ---------------------------------------------------------------------------
 
 // --- Generic message construction helpers ---
+// --- 泛型消息构造辅助函数 ---
 
 func makeUserMsg[M adk.MessageType](content string) M {
 	var zero M
@@ -203,6 +208,7 @@ func countRemindersGeneric[M adk.MessageType](msgs []M) int {
 }
 
 // --- Generic test functions ---
+// --- 泛型测试函数 ---
 
 func testEnsureReminderGeneric[M adk.MessageType](t *testing.T) {
 	dynamicA := &simpleTool{name: "dynamic_tool_a", desc: "Dynamic tool A"}
@@ -217,6 +223,7 @@ func testEnsureReminderGeneric[M adk.MessageType](t *testing.T) {
 		require.Len(t, got, 3)
 		assert.Equal(t, "system", getMsgRole(got[0]))
 		// Reminder inserted after system
+		// Reminder 插入在 system 之后
 		extra := getMsgExtra(got[1])
 		require.NotNil(t, extra)
 		assert.Equal(t, true, extra[toolSearchReminderExtraKey])
@@ -233,6 +240,7 @@ func testEnsureReminderGeneric[M adk.MessageType](t *testing.T) {
 		assert.Equal(t, "system", getMsgRole(got[0]))
 		assert.Equal(t, "system", getMsgRole(got[1]))
 		// Reminder appended at end
+		// 提醒追加到末尾
 		extra := getMsgExtra(got[2])
 		require.NotNil(t, extra)
 		assert.Equal(t, true, extra[toolSearchReminderExtraKey])
@@ -253,6 +261,7 @@ func testEnsureReminderGeneric[M adk.MessageType](t *testing.T) {
 		got := m.ensureReminder(input)
 		require.Len(t, got, 2)
 		// Reminder inserted at position 0
+		// 提醒插入到位置 0
 		extra := getMsgExtra(got[0])
 		require.NotNil(t, extra)
 		assert.Equal(t, true, extra[toolSearchReminderExtraKey])
@@ -294,6 +303,7 @@ func testMode1InitializationGeneric[M adk.MessageType](t *testing.T) {
 	}
 
 	// Initialization strips dynamic tools, keeps tool_search and static tools.
+	// 初始化会移除动态工具，保留 tool_search 和静态工具。
 	_, state, err := m.BeforeModelRewriteState(ctx, state, nil)
 	require.NoError(t, err)
 
@@ -302,6 +312,7 @@ func testMode1InitializationGeneric[M adk.MessageType](t *testing.T) {
 	assert.Nil(t, state.DeferredToolInfos, "Mode 1 should not populate DeferredToolInfos")
 
 	// Verify reminder was inserted.
+	// 验证提醒已插入。
 	assert.Equal(t, 1, countRemindersGeneric(state.Messages), "reminder should be inserted")
 }
 
@@ -315,9 +326,13 @@ func testMode1ForwardSelectionGeneric[M adk.MessageType](t *testing.T) {
 
 	// Simulate state AFTER initialization (dynamic tools already stripped).
 	// Include a tool_search result message that selected dynamic_tool_a.
+	//
+	// 模拟初始化后的状态（动态工具已被移除）。
+	// 包含一条 tool_search 结果消息，其中选择了 dynamic_tool_a。
 	toolSearchResultJSON, _ := json.Marshal(toolSearchResult{Matches: []string{"dynamic_tool_a"}})
 
 	// Build the reminder message with the extra marker
+	// 使用额外标记构建提醒消息
 	reminderMsg := makeUserMsg[M]("hello")
 	setMsgExtra(reminderMsg, toolSearchReminderExtraKey, true)
 
@@ -337,6 +352,7 @@ func testMode1ForwardSelectionGeneric[M adk.MessageType](t *testing.T) {
 	}
 
 	// Forward selection should add dynamic_tool_a from the tool_search result.
+	// 前向选择应从 tool_search 结果中添加 dynamic_tool_a。
 	_, state, err := m.BeforeModelRewriteState(ctx, state, nil)
 	require.NoError(t, err)
 
@@ -344,6 +360,7 @@ func testMode1ForwardSelectionGeneric[M adk.MessageType](t *testing.T) {
 	assert.Equal(t, []string{"dynamic_tool_a", "static_tool", "tool_search"}, names)
 
 	// Call again: forward selection should be idempotent (dynamic_tool_a already present).
+	// 再次调用：前向选择应保持幂等（dynamic_tool_a 已存在）。
 	_, state, err = m.BeforeModelRewriteState(ctx, state, nil)
 	require.NoError(t, err)
 
@@ -359,6 +376,7 @@ func testMalformedJSONGeneric[M adk.MessageType](t *testing.T) {
 	ctx := context.Background()
 
 	// Build the reminder message with the extra marker
+	// 使用额外标记构建提醒消息
 	reminderMsg := makeUserMsg[M]("reminder")
 	setMsgExtra(reminderMsg, toolSearchReminderExtraKey, true)
 
@@ -387,6 +405,7 @@ func testMalformedJSONGeneric[M adk.MessageType](t *testing.T) {
 }
 
 // --- Top-level generic test runner ---
+// --- 顶层泛型测试运行器 ---
 
 func TestToolSearchGeneric(t *testing.T) {
 	t.Run("Message", func(t *testing.T) {

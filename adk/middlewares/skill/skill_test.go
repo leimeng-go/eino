@@ -166,6 +166,7 @@ func TestSkillToolName(t *testing.T) {
 	// instruction
 	assert.Contains(t, m.AdditionalInstruction, "'skill'")
 	// tool name
+	// 工具名称
 	info, err := m.AdditionalTools[0].Info(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, "skill", info.Name)
@@ -247,6 +248,7 @@ func TestBuildParamsOneOf_CustomParamsNilFallsBackToDefault(t *testing.T) {
 }
 
 // --- Mock types for NewMiddleware tests ---
+// --- NewMiddleware 测试的 mock 类型 ---
 
 type mockModel struct {
 	model.BaseModel[*schema.Message]
@@ -361,6 +363,7 @@ func (b *errorBackend) Get(_ context.Context, _ string) (Skill, error) {
 }
 
 // --- NewMiddleware tests ---
+// --- NewMiddleware 测试 ---
 
 func TestNewMiddleware(t *testing.T) {
 	ctx := context.Background()
@@ -467,6 +470,7 @@ func TestBeforeAgent(t *testing.T) {
 	assert.Len(t, newRunCtx.Tools, 1)
 
 	// verify the added tool is the skill tool
+	// 验证新增的工具是 skill 工具
 	info, err := newRunCtx.Tools[0].Info(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, "skill", info.Name)
@@ -1080,6 +1084,7 @@ func TestInvokableRun_AgentMode(t *testing.T) {
 		assert.Contains(t, result, "agent response")
 		assert.Contains(t, result, "completed")
 		// verify no model was passed in opts
+		// 验证 opts 中未传入 model
 		assert.NotNil(t, hub.lastOpts)
 		assert.Nil(t, hub.lastOpts.Model)
 	})
@@ -1116,6 +1121,7 @@ func TestInvokableRun_AgentMode(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, result, "s1")
 		// verify model was passed
+		// 验证已传入 model
 		assert.NotNil(t, hub.lastOpts)
 		assert.Equal(t, m, hub.lastOpts.Model)
 	})
@@ -1131,6 +1137,7 @@ func TestInvokableRun_AgentMode(t *testing.T) {
 					},
 				},
 				{Output: nil}, // nil output should be skipped
+				// nil output 应跳过
 				{
 					Output: &adk.AgentOutput{
 						MessageOutput: &adk.MessageVariant{
@@ -1181,6 +1188,7 @@ func TestInvokableRun_AgentMode(t *testing.T) {
 		result, err := st.InvokableRun(ctx, `{"skill": "s1"}`)
 		assert.NoError(t, err)
 		// result should contain skill name but no extra content
+		// 结果应包含 skill 名称，但不包含额外内容
 		assert.Contains(t, result, "s1")
 	})
 

@@ -37,5 +37,6 @@ import (
 //go:generate  mockgen -destination ../../internal/mock/components/indexer/indexer_mock.go --package indexer -source interface.go
 type Indexer interface {
 	// Store stores the documents and returns their assigned IDs.
+	// Store 存储文档并返回分配给它们的 ID。
 	Store(ctx context.Context, docs []*schema.Document, opts ...Option) (ids []string, err error) // invoke
 }

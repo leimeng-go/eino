@@ -211,6 +211,9 @@ type unmarshalTestStruct struct {
 func init() {
 	// Register types for the serializer to work.
 	// This is necessary for the serializer to know how to handle custom struct types.
+	//
+	// 注册类型以便序列化器工作。
+	// 这是必要的，序列化器需要知道如何处理自定义 struct 类型。
 	err := GenericRegister[unmarshalTestStruct]("unmarshalTestStruct")
 	if err != nil {
 		panic(err)
@@ -222,6 +225,7 @@ func TestInternalSerializer_Unmarshal(t *testing.T) {
 
 	t.Run("success cases", func(t *testing.T) {
 		// Helper to create a pointer to a value, needed for the expected value in one test case.
+		// 用于创建值指针的辅助函数，某个测试用例的期望值需要它。
 		ptr := func(i int) *int { return &i }
 
 		testCases := []struct {
@@ -261,9 +265,10 @@ func TestInternalSerializer_Unmarshal(t *testing.T) {
 				expectedVal: &unmarshalTestStruct{Foo: "v2p", Bar: 2},
 			},
 			{
-				name:        "unmarshal nil pointer",
-				inputValue:  (*unmarshalTestStruct)(nil),
-				outputPtr:   &struct{ v *unmarshalTestStruct }{v: &unmarshalTestStruct{}}, // placeholder to be replaced
+				name:       "unmarshal nil pointer",
+				inputValue: (*unmarshalTestStruct)(nil),
+				outputPtr:  &struct{ v *unmarshalTestStruct }{v: &unmarshalTestStruct{}}, // placeholder to be replaced
+				// 待替换的占位符
 				expectedVal: (*unmarshalTestStruct)(nil),
 			},
 			{
@@ -292,6 +297,7 @@ func TestInternalSerializer_Unmarshal(t *testing.T) {
 				require.NoError(t, err)
 
 				// Special handling for the nil test case to correctly pass the pointer.
+				// 对 nil 测试用例进行特殊处理，以正确传入指针。
 				if tc.name == "unmarshal nil pointer" {
 					target := tc.outputPtr.(*struct{ v *unmarshalTestStruct })
 					err = s.Unmarshal(data, &target.v)
@@ -304,6 +310,7 @@ func TestInternalSerializer_Unmarshal(t *testing.T) {
 				require.NoError(t, err)
 
 				// Dereference the pointer to get the actual value for comparison.
+				// 解引用指针以获取实际值进行比较。
 				actualVal := reflect.ValueOf(tc.outputPtr).Elem().Interface()
 				assert.Equal(t, tc.expectedVal, actualVal)
 			})

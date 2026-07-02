@@ -63,6 +63,7 @@ func TestEnsureMessageID(t *testing.T) {
 		id := GetMessageID(extra)
 		assert.NotEmpty(t, id)
 		assert.Len(t, id, 36) // UUID v4 format: 8-4-4-4-12 = 36 chars
+		// UUID v4 格式：8-4-4-4-12 = 36 个字符
 	})
 
 	t.Run("idempotent - does not overwrite existing ID", func(t *testing.T) {

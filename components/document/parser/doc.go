@@ -45,4 +45,17 @@
 // information (URI, content type, etc.) at parse time.
 //
 // See https://www.cloudwego.io/docs/eino/core_modules/components/document_loader_guide/document_parser_interface_guide/
+//
+// Package parser 定义 Parser 接口，用于将原始字节流转换为 [schema.Document] 值。
+// # 概览
+// Parser 不是独立的流水线组件，而是在 [document.Loader] 内部用于处理特定格式解码。loader 获取原始字节；parser 将其转换为文档。
+// # 内置实现
+// - TextParser：将整个 reader 视为纯文本，每次调用生成一个文档
+// - ExtParser：按文件扩展名（来自 [Options.URI]）选择 parser，并可为未知扩展名配置 fallback
+// 当你想进行格式无关的加载时使用 ExtParser：通过 [WithURI] 传入源 URI，ExtParser 会自动选择合适的子 parser。
+// # Reader 约定
+// 传给 [Parser.Parse] 的 [io.Reader] 会在调用期间被消费，不能再次读取。Loaders 不得在多次 Parse 调用间复用同一个 reader。
+// # 元数据传递
+// 使用 [WithExtraMeta] 附加键值对，这些键值对会合并到每个文档的 MetaData 中。这是在解析时为文档标记来源信息（URI、内容类型等）的标准方式。
+// 参见 https://www.cloudwego.io/docs/eino/core_modules/components/document_loader_guide/document_parser_interface_guide/
 package parser

@@ -59,52 +59,67 @@ func TestRewriteMessage(t *testing.T) {
 	assert.Equal(t, schema.User, rewritten.Role)
 
 	// MultiContent: copied, not shared
+	// MultiContent：复制而非共享
 	assert.Equal(t, msg.MultiContent, rewritten.MultiContent)
 	rewritten.MultiContent[0].Text = "mutated"
 	assert.Equal(t, "legacy", msg.MultiContent[0].Text)
 
 	// UserInputMultiContent: pre-existing entry copied, AssistantGenMultiContent appended (reasoning dropped)
+	// UserInputMultiContent：复制已有条目，追加 AssistantGenMultiContent（丢弃 reasoning）
 	assert.Len(t, rewritten.UserInputMultiContent, 5) // 1 pre-existing + 4 converted (text/image/audio/video)
+	// 1 个已有条目 + 4 个转换结果（text/image/audio/video）
 
 	// pre-existing entry is not shared
+	// 已有条目不会共享
 	rewritten.UserInputMultiContent[0].Text = "mutated"
 	assert.Equal(t, "pre-existing", msg.UserInputMultiContent[0].Text)
 
 	// text conversion
+	// text 转换
 	assert.Equal(t, schema.ChatMessagePartTypeText, rewritten.UserInputMultiContent[1].Type)
 	assert.Equal(t, "gen-text", rewritten.UserInputMultiContent[1].Text)
 	assert.Equal(t, map[string]any{"k": "v"}, rewritten.UserInputMultiContent[1].Extra)
 
 	// image conversion
+	// image 转换
 	assert.Equal(t, schema.ChatMessagePartTypeImageURL, rewritten.UserInputMultiContent[2].Type)
 	assert.Equal(t, imageCommon, rewritten.UserInputMultiContent[2].Image.MessagePartCommon)
 
 	// audio conversion
+	// audio 转换
 	assert.Equal(t, schema.ChatMessagePartTypeAudioURL, rewritten.UserInputMultiContent[3].Type)
 	assert.Equal(t, audioCommon, rewritten.UserInputMultiContent[3].Audio.MessagePartCommon)
 
 	// video conversion
+	// video 转换
 	assert.Equal(t, schema.ChatMessagePartTypeVideoURL, rewritten.UserInputMultiContent[4].Type)
 	assert.Equal(t, videoCommon, rewritten.UserInputMultiContent[4].Video.MessagePartCommon)
 
 	// reasoning is dropped; AssistantGenMultiContent is not set on rewritten message
+	// reasoning 被丢弃；重写后的消息未设置 AssistantGenMultiContent
 	assert.Empty(t, rewritten.AssistantGenMultiContent)
 }
 
 // TestTransferToAgent tests the TransferToAgent functionality
+// TestTransferToAgent 测试 TransferToAgent 功能
 func TestTransferToAgent(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a mock controller
+	// 创建 mock controller
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	// Create mock models for parent and child agents
+	// 为父子智能体创建 mock models
 	parentModel := mockModel.NewMockToolCallingChatModel(ctrl)
 	childModel := mockModel.NewMockToolCallingChatModel(ctrl)
 
 	// Set up expectations for the parent model
 	// First call: parent model generates a message with TransferToAgent tool call
+	//
+	// 设置父模型的预期
+	// 第一次调用：父模型生成一条带有 TransferToAgent 工具调用的消息
 	parentModel.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(schema.AssistantMessage("I'll transfer this to the child agent",
 			[]schema.ToolCall{
@@ -120,15 +135,20 @@ func TestTransferToAgent(t *testing.T) {
 
 	// Set up expectations for the child model
 	// Second call: child model generates a response
+	//
+	// 设置子模型的预期
+	// 第二次调用：子模型生成响应
 	childModel.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(schema.AssistantMessage("Hello from child agent", nil), nil).
 		Times(1)
 
 	// Both models should implement WithTools
+	// 两个模型都应实现 WithTools
 	parentModel.EXPECT().WithTools(gomock.Any()).Return(parentModel, nil).AnyTimes()
 	childModel.EXPECT().WithTools(gomock.Any()).Return(childModel, nil).AnyTimes()
 
 	// Create parent agent
+	// 创建父智能体
 	parentAgent, err := NewChatModelAgent(ctx, &ChatModelAgentConfig{
 		Name:        "ParentAgent",
 		Description: "Parent agent that will transfer to child",
@@ -139,6 +159,7 @@ func TestTransferToAgent(t *testing.T) {
 	assert.NotNil(t, parentAgent)
 
 	// Create child agent
+	// 创建子智能体
 	childAgent, err := NewChatModelAgent(ctx, &ChatModelAgentConfig{
 		Name:        "ChildAgent",
 		Description: "Child agent that handles specific tasks",
@@ -149,6 +170,7 @@ func TestTransferToAgent(t *testing.T) {
 	assert.NotNil(t, childAgent)
 
 	// Set up parent-child relationship
+	// 设置父子关系
 	flowAgent, err := SetSubAgents(ctx, parentAgent, []Agent{childAgent})
 	assert.NoError(t, err)
 	assert.NotNil(t, flowAgent)
@@ -157,6 +179,7 @@ func TestTransferToAgent(t *testing.T) {
 	assert.NotNil(t, childAgent.parentAgent)
 
 	// Run the parent agent
+	// 运行父智能体
 	input := &AgentInput{
 		Messages: []Message{
 			schema.UserMessage("Please transfer this to the child agent"),
@@ -167,6 +190,7 @@ func TestTransferToAgent(t *testing.T) {
 	assert.NotNil(t, iterator)
 
 	// First event: parent model output with tool call
+	// 第一个事件：父模型输出，包含工具调用
 	event1, ok := iterator.Next()
 	assert.True(t, ok)
 	assert.NotNil(t, event1)
@@ -176,6 +200,7 @@ func TestTransferToAgent(t *testing.T) {
 	assert.Equal(t, schema.Assistant, event1.Output.MessageOutput.Role)
 
 	// Second event: tool output (TransferToAgent)
+	// 第二个事件：工具输出（TransferToAgent）
 	event2, ok := iterator.Next()
 	assert.True(t, ok)
 	assert.NotNil(t, event2)
@@ -185,11 +210,13 @@ func TestTransferToAgent(t *testing.T) {
 	assert.Equal(t, schema.Tool, event2.Output.MessageOutput.Role)
 
 	// Verify the action is TransferToAgent
+	// 验证 action 是 TransferToAgent
 	assert.NotNil(t, event2.Action)
 	assert.NotNil(t, event2.Action.TransferToAgent)
 	assert.Equal(t, "ChildAgent", event2.Action.TransferToAgent.DestAgentName)
 
 	// Third event: child model output
+	// 第三个事件：子模型输出
 	event3, ok := iterator.Next()
 	assert.True(t, ok)
 	assert.NotNil(t, event3)
@@ -199,11 +226,13 @@ func TestTransferToAgent(t *testing.T) {
 	assert.Equal(t, schema.Assistant, event3.Output.MessageOutput.Role)
 
 	// Verify the message content from child agent
+	// 验证来自子智能体的消息内容
 	msg := event3.Output.MessageOutput.Message
 	assert.NotNil(t, msg)
 	assert.Equal(t, "Hello from child agent", msg.Content)
 
 	// No more events
+	// 没有更多事件
 	_, ok = iterator.Next()
 	assert.False(t, ok)
 }

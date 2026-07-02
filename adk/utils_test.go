@@ -32,9 +32,11 @@ import (
 
 func TestAsyncIteratorPair_Basic(t *testing.T) {
 	// Create a new iterator-generator pair
+	// 创建一对新的迭代器-生成器
 	iterator, generator := NewAsyncIteratorPair[string]()
 
 	// Test sending and receiving a value
+	// 测试发送和接收一个值
 	generator.Send("test1")
 	val, ok := iterator.Next()
 	if !ok {
@@ -45,6 +47,7 @@ func TestAsyncIteratorPair_Basic(t *testing.T) {
 	}
 
 	// Test sending and receiving multiple values
+	// 测试发送和接收多个值
 	generator.Send("test2")
 	generator.Send("test3")
 
@@ -69,13 +72,16 @@ func TestAsyncIteratorPair_Close(t *testing.T) {
 	iterator, generator := NewAsyncIteratorPair[int]()
 
 	// Send some values
+	// 发送一些值
 	generator.Send(1)
 	generator.Send(2)
 
 	// Close the generator
+	// 关闭生成器
 	generator.Close()
 
 	// Should still be able to read existing values
+	// 应仍能读取已有值
 	val, ok := iterator.Next()
 	if !ok {
 		t.Error("receive should succeed")
@@ -93,6 +99,7 @@ func TestAsyncIteratorPair_Close(t *testing.T) {
 	}
 
 	// After consuming all values, Next should return false
+	// 消费完所有值后，Next 应返回 false
 	_, ok = iterator.Next()
 	if ok {
 		t.Error("receive from closed, empty channel should return ok=false")
@@ -110,17 +117,20 @@ func TestAsyncIteratorPair_Concurrency(t *testing.T) {
 	swg.Add(numSenders)
 
 	// Start senders
+	// 启动发送方
 	for i := 0; i < numSenders; i++ {
 		go func(id int) {
 			defer swg.Done()
 			for j := 0; j < messagesPerSender; j++ {
 				generator.Send(id*messagesPerSender + j)
 				time.Sleep(time.Microsecond) // Small delay to increase concurrency chance
+				// 短暂延迟以增加并发概率
 			}
 		}(i)
 	}
 
 	// Start receivers
+	// 启动接收方
 	received := make([]int, 0, numSenders*messagesPerSender)
 	var mu sync.Mutex
 
@@ -140,18 +150,22 @@ func TestAsyncIteratorPair_Concurrency(t *testing.T) {
 	}
 
 	// Wait for senders to finish
+	// 等待发送方完成
 	swg.Wait()
 	generator.Close()
 
 	// Wait for all goroutines to finish
+	// 等待所有 goroutine 完成
 	rwg.Wait()
 
 	// Verify we received all messages
+	// 确认已收到所有消息
 	if len(received) != numSenders*messagesPerSender {
 		t.Errorf("expected %d messages, got %d", numSenders*messagesPerSender, len(received))
 	}
 
 	// Create a map to check for duplicates and missing values
+	// 创建 map 以检查重复和缺失值
 	receivedMap := make(map[int]bool)
 	for _, val := range received {
 		receivedMap[val] = true
@@ -428,6 +442,7 @@ func TestConsumeStream_EdgeCases(t *testing.T) {
 		assert.Equal(t, "msg1", wrapper.concatenatedMessage.Content)
 
 		// Second call should be a no-op
+		// 第二次调用应为空操作
 		wrapper.consumeStream()
 		assert.Equal(t, "msg1", wrapper.concatenatedMessage.Content)
 	})
@@ -435,6 +450,7 @@ func TestConsumeStream_EdgeCases(t *testing.T) {
 	t.Run("empty stream sets StreamErr", func(t *testing.T) {
 		sr, sw := schema.Pipe[Message](10)
 		sw.Close() // immediately close => EOF with 0 messages
+		// 立即关闭 => EOF 且消息数为 0
 
 		wrapper := &agentEventWrapper{
 			AgentEvent: &AgentEvent{

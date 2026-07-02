@@ -16,6 +16,8 @@
 
 // Package parent provides an indexer that assigns stable IDs to sub-documents
 // and preserves relationships to their original parent document.
+//
+// Package parent 提供一个索引器，用于为子文档分配稳定 ID，并保留其与原始父文档的关系。
 package parent
 
 import (
@@ -28,9 +30,13 @@ import (
 )
 
 // Config configures the parent indexer that assigns IDs to sub-documents.
+// Config 配置用于为子文档分配 ID 的父索引器。
 type Config struct {
 	// Indexer is the underlying indexer implementation that handles the actual document indexing.
 	// For example: a vector database indexer like Milvus, or a full-text search indexer like Elasticsearch.
+	//
+	// Indexer 是底层索引器实现，负责实际的文档索引。
+	// 例如：Milvus 这样的向量数据库索引器，或 Elasticsearch 这样的全文搜索索引器。
 	Indexer indexer.Indexer
 
 	// Transformer processes documents before indexing, typically splitting them into smaller chunks.
@@ -41,10 +47,21 @@ type Config struct {
 	// Example transformations:
 	// - A text splitter that breaks down large documents into paragraphs
 	// - A code splitter that separates code files into functions
+	//
+	// Transformer 在索引前处理文档，通常会将其拆分为更小的块。
+	// Transformer 生成的每个子文档都必须保留其父文档 ID。
+	// 例如：如果 ID 为 "doc_1" 的文档被拆分为 3 个块，所有块初始都会具有 ID "doc_1"。这些 ID 后续会由 SubIDGenerator 修改。
+	// 转换示例：
+	// - 将大文档拆分为段落的文本分割器
+	// - 将代码文件拆分为函数的代码分割器
 	Transformer document.Transformer
 
 	// ParentIDKey specifies the metadata key used to store the original document's ID in each sub-document.
 	// For example: if ParentIDKey is "parent_id", each sub-document will have metadata like:
+	// {"parent_id": "original_doc_123"}
+	//
+	// ParentIDKey 指定用于在每个子文档中存储原始文档 ID 的 metadata key。
+	// 例如：如果 ParentIDKey 是 "parent_id"，每个子文档会有如下 metadata：
 	// {"parent_id": "original_doc_123"}
 	ParentIDKey string
 
@@ -59,6 +76,17 @@ type Config struct {
 	// Returns:
 	//   - []string: slice of generated sub-document IDs
 	//   - error: any error encountered during ID generation
+	//
+	// SubIDGenerator 根据父文档 ID 为子文档生成唯一 ID。
+	// 例如：如果父 ID 是 "doc_1"，且需要 3 个子文档 ID，可能会生成：
+	// ["doc_1_chunk_1", "doc_1_chunk_2", "doc_1_chunk_3"]
+	// 参数：
+	// - ctx: 操作的 context
+	// - parentID: 父文档的 ID
+	// - num: 所需子文档 ID 的数量
+	// 返回：
+	// - []string: 生成的子文档 ID 切片
+	// - error: ID 生成过程中遇到的任何错误
 	SubIDGenerator func(ctx context.Context, parentID string, num int) ([]string, error)
 }
 
@@ -86,6 +114,27 @@ type Config struct {
 // Returns:
 //   - indexer.Indexer: the created parent indexer
 //   - error: any error encountered during creation
+//
+// NewIndexer 创建一个新的父索引器，用于处理文档拆分和子文档管理。
+// 参数：
+// - ctx: 操作的 context
+// - config: 父索引器的配置
+// 使用示例：
+// indexer, err := NewIndexer(ctx, &Config{
+// Indexer: milvusIndexer,
+// Transformer: textSplitter,
+// ParentIDKey: "source_doc_id",
+// SubIDGenerator: func(ctx context.Context, parentID string, num int) ([]string, error) {
+// ids := make([]string, num)
+// for i := 0; i < num; i++ {
+// ids[i] = fmt.Sprintf("%s_chunk_%d", parentID, i+1)
+// }
+// return ids, nil
+// },
+// })
+// 返回：
+// - indexer.Indexer: 创建的父索引器
+// - error: 创建过程中遇到的任何错误
 func NewIndexer(ctx context.Context, config *Config) (indexer.Indexer, error) {
 	if config.Indexer == nil {
 		return nil, fmt.Errorf("indexer is empty")
@@ -133,6 +182,7 @@ func (p *parentIndexer) Store(ctx context.Context, docs []*schema.Document, opts
 		}
 
 		// generate new doc id
+		// 生成新的 doc id
 		subIDs, err_ := p.subIDGenerator(ctx, subDocs[startIdx].ID, i-startIdx)
 		if err_ != nil {
 			return nil, err_
@@ -147,6 +197,7 @@ func (p *parentIndexer) Store(ctx context.Context, docs []*schema.Document, opts
 		currentID = subDoc.ID
 	}
 	// generate new doc id
+	// 生成新的 doc id
 	subIDs, err := p.subIDGenerator(ctx, subDocs[startIdx].ID, len(subDocs)-startIdx)
 	if err != nil {
 		return nil, err

@@ -38,4 +38,15 @@
 //
 // See https://www.cloudwego.io/docs/eino/core_modules/components/document_loader_guide/
 // See https://www.cloudwego.io/docs/eino/core_modules/components/document_transformer_guide/
+//
+// Package document 定义 Loader 和 Transformer 组件接口，用于在 eino pipeline 中摄取和处理文档。
+// # 组件
+// - [Loader]：从外部来源（文件、URL、S3、…）读取原始内容，并返回 [schema.Document] 值。解析通常委托给 loader 上配置的 [parser.Parser]。
+// - [Transformer]：接收一组 [schema.Document] 值并进行转换 —— 拆分、过滤、合并、重排序等。
+// 具体实现在 eino-ext 中：
+// github.com/cloudwego/eino-ext/components/document/
+// # 文档元数据
+// [schema.Document].MetaData 是在 pipeline 中携带上下文信息（source URI、scores、chunk indices、embeddings）的主要机制。Transformers 添加自己的键时，应保留已有元数据并进行合并，而不是替换。
+// 参见 https://www.cloudwego.io/docs/eino/core_modules/components/document_loader_guide/
+// 参见 https://www.cloudwego.io/docs/eino/core_modules/components/document_transformer_guide/
 package document

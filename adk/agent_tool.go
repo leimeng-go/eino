@@ -15,6 +15,7 @@
  */
 
 // Package adk provides core agent development kit utilities and types.
+// Package adk 提供核心智能体开发套件工具和类型。
 package adk
 
 import (
@@ -47,6 +48,7 @@ type AgentToolOptions struct {
 type AgentToolOption func(*AgentToolOptions)
 
 // WithFullChatHistoryAsInput enables using the full chat history as input.
+// WithFullChatHistoryAsInput 启用将完整聊天历史作为输入。
 func WithFullChatHistoryAsInput() AgentToolOption {
 	return func(options *AgentToolOptions) {
 		options.fullChatHistoryAsInput = true
@@ -54,6 +56,7 @@ func WithFullChatHistoryAsInput() AgentToolOption {
 }
 
 // WithAgentInputSchema sets a custom input schema for the agent tool.
+// WithAgentInputSchema 为智能体工具设置自定义输入 schema。
 func WithAgentInputSchema(schema *schema.ParamsOneOf) AgentToolOption {
 	return func(options *AgentToolOptions) {
 		options.agentInputSchema = schema
@@ -90,6 +93,17 @@ func withAgentToolEnableStreaming(enabled bool) tool.Option {
 //
 // This scoping ensures that nested agents cannot unexpectedly terminate or transfer control
 // of their parent agent's execution flow.
+//
+// NewAgentTool 创建一个包装智能体以供调用的工具。
+// 智能体必须具有非空的 Name 和 Description，因为它们会分别用作工具的名称和描述。此项会在工具设置期间调用 Info() 时校验。
+// 事件流：
+// 当 ToolsConfig 中启用 EmitInternalEvents 时，智能体工具会将内部智能体的 AgentEvent 发送到父智能体的 AsyncGenerator，从而允许通过 Runner 将内部智能体的输出实时流式传输给最终用户。
+// 注意，这些转发的事件不会记录在父智能体的 runSession 中。它们只会发送给最终用户，不会影响父智能体的状态或 checkpoint。唯一例外是 Interrupted action，它会通过 CompositeInterrupt 传播，以便跨智能体边界正确中断/恢复。
+// Action 作用域：
+// 内部智能体发出的 action 仅限于智能体工具边界内：
+// - Interrupted: 通过 CompositeInterrupt 传播，以便跨边界正确中断/恢复
+// - Exit, TransferToAgent, BreakLoop: 在智能体工具外被忽略；这些 action 只影响内部智能体的执行，不会传播到父智能体
+// 此作用域确保嵌套智能体不会意外终止或转移其父智能体执行流的控制权。
 func NewAgentTool(_ context.Context, agent Agent, options ...AgentToolOption) tool.BaseTool {
 	opts := &AgentToolOptions{}
 	for _, opt := range options {
@@ -104,6 +118,7 @@ func NewAgentTool(_ context.Context, agent Agent, options ...AgentToolOption) to
 }
 
 // NewTypedAgentTool creates a new agent tool that wraps a TypedAgent as a tool.BaseTool.
+// NewTypedAgentTool 创建一个新的智能体工具，将 TypedAgent 包装为 tool.BaseTool。
 func NewTypedAgentTool[M MessageType](_ context.Context, agent TypedAgent[M], options ...AgentToolOption) tool.BaseTool {
 	opts := &AgentToolOptions{}
 	for _, opt := range options {
@@ -174,6 +189,8 @@ func (at *typedAgentTool[M]) InvokableRun(ctx context.Context, argumentsInJSON s
 				// differ fundamentally between Message and AgenticMessage, and the history rewriting
 				// logic (role attribution, system message filtering, transfer messages) is specific
 				// to the Message model.
+				//
+				// fullChatHistoryAsInput 仅支持 *schema.Message 智能体，不会扩展到 *schema.AgenticMessage。Message 和 AgenticMessage 的聊天历史格式与角色语义有根本差异，且历史重写逻辑（角色归属、system 消息过滤、transfer 消息）是 Message 模型特有的。
 				return "", fmt.Errorf("fullChatHistoryAsInput is only supported for *schema.Message agents")
 			}
 			msgInput, histErr := getReactChatHistory(ctx, at.agent.Name(ctx))
@@ -281,6 +298,9 @@ func (at *typedAgentTool[M]) InvokableRun(ctx context.Context, argumentsInJSON s
 
 // agentToolOptions is a wrapper structure used to convert AgentRunOption slices to tool.Option.
 // It stores the agent name and corresponding run options for tool-specific processing.
+//
+// agentToolOptions 是用于将 AgentRunOption 切片转换为 tool.Option 的包装结构。
+// 它保存智能体名称及对应的运行选项，以便进行工具特定处理。
 type agentToolOptions struct {
 	agentName       string
 	opts            []AgentRunOption
@@ -290,6 +310,9 @@ type agentToolOptions struct {
 // typedAgentToolEventOptions carries the parent runner's event generator for a
 // specific message type. This keeps forwarded internal events type-compatible
 // with the parent event stream.
+//
+// typedAgentToolEventOptions 携带父 runner 针对特定消息类型的事件生成器。
+// 这能确保转发的内部事件与父事件流类型兼容。
 type typedAgentToolEventOptions[M MessageType] struct {
 	generator *AsyncGenerator[*TypedAgentEvent[M]]
 }

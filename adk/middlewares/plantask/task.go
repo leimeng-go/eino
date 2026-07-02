@@ -61,14 +61,21 @@ type DeleteRequest struct {
 
 // Backend defines the storage interface for task persistence.
 // Implementations can use local filesystem, remote storage, or any other storage backend.
+//
+// Backend 定义任务持久化的存储接口。
+// 实现可以使用本地文件系统、远程存储或任何其他存储后端。
 type Backend interface {
 	// LsInfo lists file information in the specified directory.
+	// LsInfo 列出指定目录中的文件信息。
 	LsInfo(ctx context.Context, req *LsInfoRequest) ([]FileInfo, error)
 	// Read reads the content of a file.
+	// Read 读取文件内容。
 	Read(ctx context.Context, req *ReadRequest) (*filesystem.FileContent, error)
 	// Write writes content to a file, creating it if it doesn't exist.
+	// Write 将内容写入文件；如果文件不存在则创建。
 	Write(ctx context.Context, req *WriteRequest) error
 	// Delete removes a file from storage.
+	// Delete 从存储中移除文件。
 	Delete(ctx context.Context, req *DeleteRequest) error
 }
 

@@ -15,6 +15,7 @@
  */
 
 // Package react provides helpers to build callback handlers for React agents.
+// Package react 提供用于为 React 智能体构建回调处理器的辅助函数。
 package react
 
 import (
@@ -28,6 +29,12 @@ import (
 //	callback := BuildAgentCallback(modelHandler, toolHandler)
 //	agent, err := react.NewAgent(ctx, &AgentConfig{})
 //	agent.Generate(ctx, input, agent.WithComposeOptions(compose.WithCallbacks(callback)))
+//
+// BuildAgentCallback 为智能体构建回调处理器。
+// 例如：
+// callback := BuildAgentCallback(modelHandler, toolHandler)
+// agent, err := react.NewAgent(ctx, &AgentConfig{})
+// agent.Generate(ctx, input, agent.WithComposeOptions(compose.WithCallbacks(callback)))
 func BuildAgentCallback(modelHandler *template.ModelCallbackHandler, toolHandler *template.ToolCallbackHandler) callbacks.Handler {
 	return template.NewHandlerHelper().ChatModel(modelHandler).Tool(toolHandler).Handler()
 }

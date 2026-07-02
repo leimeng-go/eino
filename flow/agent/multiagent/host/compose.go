@@ -27,7 +27,8 @@ import (
 )
 
 const (
-	defaultHostNodeKey                 = "host" // the key of the host node in the graph
+	defaultHostNodeKey = "host" // the key of the host node in the graph
+	// 图中 host 节点的 key
 	defaultHostPrompt                  = "decide which tool is best for the task and call only the best tool."
 	specialistsAnswersCollectorNodeKey = "specialist_answers_collect"
 	singleIntentAnswerNodeKey          = "single_intent_answer"
@@ -46,6 +47,10 @@ type state struct {
 // IMPORTANT!! For models that don't output tool calls in the first streaming chunk (e.g. Claude)
 // the default StreamToolCallChecker may not work properly since it only checks the first chunk for tool calls.
 // In such cases, you need to implement a custom StreamToolCallChecker that can properly detect tool calls.
+//
+// NewMultiAgent 创建一个新的 host 多智能体系统。
+// 重要！！对于不会在第一个流式 chunk 中输出工具调用的模型（例如 Claude），默认的 StreamToolCallChecker 可能无法正常工作，因为它只检查第一个 chunk 中是否有工具调用。
+// 这种情况下，你需要实现自定义 StreamToolCallChecker，以便正确检测工具调用。
 func NewMultiAgent(ctx context.Context, config *MultiAgentConfig) (*MultiAgent, error) {
 	if err := config.validate(); err != nil {
 		return nil, err
@@ -159,6 +164,7 @@ func addSpecialistAgent(specialist *Specialist, g *compose.Graph[[]*schema.Messa
 		}
 		preHandler := func(_ context.Context, input []*schema.Message, state *state) ([]*schema.Message, error) {
 			return state.msgs, nil // replace the tool call message with input msgs stored in state
+			// 将工具调用消息替换为 state 中保存的输入 msgs
 		}
 		if err := g.AddLambdaNode(specialist.Name, lambda, compose.WithStatePreHandler(preHandler),
 			compose.WithNodeName(specialist.Name), compose.WithOutputKey(specialist.Name)); err != nil {
@@ -174,6 +180,7 @@ func addSpecialistAgent(specialist *Specialist, g *compose.Graph[[]*schema.Messa
 			}
 
 			return state.msgs, nil // replace the tool call message with input msgs stored in state
+			// 将工具调用消息替换为 state 中保存的输入 msgs
 		}
 
 		if err := g.AddChatModelNode(specialist.Name, specialist.ChatModel, compose.WithStatePreHandler(preHandler), compose.WithNodeName(specialist.Name), compose.WithOutputKey(specialist.Name)); err != nil {
@@ -205,6 +212,7 @@ func addHostAgent(model model.BaseChatModel, prompt string, g *compose.Graph[[]*
 func addDirectAnswerBranch(convertorName string, g *compose.Graph[[]*schema.Message, *schema.Message],
 	toolCallChecker func(ctx context.Context, modelOutput *schema.StreamReader[*schema.Message]) (bool, error)) error {
 	// handles the case where the host agent returns a direct answer, instead of handling off to any specialist
+	// 处理 host 智能体直接返回答案，而不是交给任何专家处理的情况
 	branch := compose.NewStreamGraphBranch(func(ctx context.Context, sr *schema.StreamReader[*schema.Message]) (endNode string, err error) {
 		isToolCall, err := toolCallChecker(ctx, sr)
 		if err != nil {

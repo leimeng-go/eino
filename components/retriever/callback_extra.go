@@ -22,30 +22,40 @@ import (
 )
 
 // CallbackInput is the input for the retriever callback.
+// CallbackInput 是检索器回调的输入。
 type CallbackInput struct {
 	// Query is the query for the retriever.
+	// Query 是检索器的查询。
 	Query string
 
 	// TopK is the top k for the retriever, which means the top number of documents to retrieve.
+	// TopK 是检索器的 top k，表示要检索的文档数量上限。
 	TopK int
 	// Filter is the filter for the retriever.
+	// Filter 是检索器的过滤条件。
 	Filter string
 	// ScoreThreshold is the score threshold for the retriever, eg 0.5 means the score of the document must be greater than 0.5.
+	// ScoreThreshold 是检索器的分数阈值，例如 0.5 表示文档分数必须大于 0.5。
 	ScoreThreshold *float64
 
 	// Extra is the extra information for the retriever.
+	// Extra 是检索器的额外信息。
 	Extra map[string]any
 }
 
 // CallbackOutput is the output for the retriever callback.
+// CallbackOutput 是检索器回调的输出。
 type CallbackOutput struct {
 	// Docs is the documents for the retriever.
+	// Docs 是检索器的文档。
 	Docs []*schema.Document
 	// Extra is the extra information for the retriever.
+	// Extra 是检索器的额外信息。
 	Extra map[string]any
 }
 
 // ConvCallbackInput converts the callback input to the retriever callback input.
+// ConvCallbackInput 将回调输入转换为检索器回调输入。
 func ConvCallbackInput(src callbacks.CallbackInput) *CallbackInput {
 	switch t := src.(type) {
 	case *CallbackInput:
@@ -60,6 +70,7 @@ func ConvCallbackInput(src callbacks.CallbackInput) *CallbackInput {
 }
 
 // ConvCallbackOutput converts the callback output to the retriever callback output.
+// ConvCallbackOutput 将回调输出转换为检索器回调输出。
 func ConvCallbackOutput(src callbacks.CallbackOutput) *CallbackOutput {
 	switch t := src.(type) {
 	case *CallbackOutput:

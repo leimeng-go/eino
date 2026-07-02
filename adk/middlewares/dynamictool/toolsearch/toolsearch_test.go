@@ -38,6 +38,10 @@ import (
 // ---------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------
+//
+// ---------------------------------------------------------------------------
+// 辅助函数
+// ---------------------------------------------------------------------------
 
 func makeToolMap(tools ...*schema.ToolInfo) map[string]*schema.ToolInfo {
 	m := make(map[string]*schema.ToolInfo, len(tools))
@@ -71,6 +75,10 @@ func intPtr(v int) *int { return &v }
 // ---------------------------------------------------------------------------
 // TestSearch — unit tests for the search() function
 // ---------------------------------------------------------------------------
+//
+// ---------------------------------------------------------------------------
+// TestSearch — search() 函数的单元测试
+// ---------------------------------------------------------------------------
 
 func TestSearch(t *testing.T) {
 	tools := makeToolMap(
@@ -86,7 +94,8 @@ func TestSearch(t *testing.T) {
 		name      string
 		json      string
 		wantNames []string // sorted; nil means expect empty
-		wantErr   bool
+		// 已排序；nil 表示期望为空
+		wantErr bool
 	}{
 		{
 			name:      "keyword exact name part match",
@@ -102,6 +111,7 @@ func TestSearch(t *testing.T) {
 			name:      "multi-word ranking - send_message ranked first",
 			json:      searchJSON("send message", nil),
 			wantNames: []string{"mcp__slack__send_message"}, // check first element only
+			// 只检查第一个元素
 		},
 		{
 			name:      "required keyword filters to slack only",
@@ -132,6 +142,7 @@ func TestSearch(t *testing.T) {
 			name:      "max_results limits output",
 			json:      searchJSON("slack", intPtr(1)),
 			wantNames: []string{"mcp__slack__read_channel"}, // just check length below
+			// 下面只检查长度
 		},
 		{
 			name:      "camelCase split matches notebook",
@@ -160,12 +171,14 @@ func TestSearch(t *testing.T) {
 			require.NoError(t, err)
 
 			// special case: max_results limit
+			// 特殊情况：max_results 限制
 			if tt.name == "max_results limits output" {
 				assert.Len(t, got, 1)
 				return
 			}
 
 			// special case: ranking — just check first element
+			// 特殊情况：排序 — 只检查第一个元素
 			if tt.name == "multi-word ranking - send_message ranked first" {
 				require.NotEmpty(t, got)
 				assert.Equal(t, "mcp__slack__send_message", got[0].Name)
@@ -185,8 +198,13 @@ func TestSearch(t *testing.T) {
 // ---------------------------------------------------------------------------
 // TestMiddlewareFlow — integration test for UseModelToolSearch=false
 // ---------------------------------------------------------------------------
+//
+// ---------------------------------------------------------------------------
+// TestMiddlewareFlow — UseModelToolSearch=false 的集成测试
+// ---------------------------------------------------------------------------
 
 // simpleTool is a minimal InvokableTool for testing.
+// simpleTool 是用于测试的最小 InvokableTool。
 type simpleTool struct {
 	name   string
 	desc   string
@@ -223,10 +241,17 @@ func (s *simpleTool) wasCalled() bool {
 //	Turn 1: call tool_search with select:dynamic_tool_a
 //	Turn 2: call dynamic_tool_a
 //	Turn 3: return final text
+//
+// mockChatModel 实现 model.ToolCallingChatModel。
+// 它驱动一个 3 轮对话：
+// 第 1 轮：调用 tool_search，参数为 select:dynamic_tool_a
+// 第 2 轮：调用 dynamic_tool_a
+// 第 3 轮：返回最终文本
 type mockChatModel struct {
 	mu           sync.Mutex
 	generateCall int
 	// toolsPerCall records the tool names passed via model.WithTools for each Generate call.
+	// toolsPerCall 记录每次 Generate 调用中通过 model.WithTools 传入的工具名称。
 	toolsPerCall [][]string
 }
 
@@ -247,6 +272,7 @@ func (m *mockChatModel) Generate(_ context.Context, _ []*schema.Message, opts ..
 	switch call {
 	case 1:
 		// Ask tool_search to select dynamic_tool_a
+		// 让 tool_search 选择 dynamic_tool_a
 		return schema.AssistantMessage("", []schema.ToolCall{
 			{
 				ID: "tc1",
@@ -258,6 +284,7 @@ func (m *mockChatModel) Generate(_ context.Context, _ []*schema.Message, opts ..
 		}), nil
 	case 2:
 		// Call dynamic_tool_a
+		// 调用 dynamic_tool_a
 		return schema.AssistantMessage("", []schema.ToolCall{
 			{
 				ID: "tc2",
@@ -269,6 +296,7 @@ func (m *mockChatModel) Generate(_ context.Context, _ []*schema.Message, opts ..
 		}), nil
 	default:
 		// Final response
+		// 最终响应
 		return schema.AssistantMessage("done", nil), nil
 	}
 }
@@ -333,6 +361,7 @@ func TestMiddlewareFlow(t *testing.T) {
 	}
 
 	// Verify no error event.
+	// 验证没有 error 事件。
 	for _, ev := range events {
 		if ev.Err != nil {
 			t.Fatalf("unexpected error event: %v", ev.Err)
@@ -340,30 +369,36 @@ func TestMiddlewareFlow(t *testing.T) {
 	}
 
 	// Verify final output is "done".
+	// 验证最终输出为 "done"。
 	lastEvent := events[len(events)-1]
 	require.NotNil(t, lastEvent.Output)
 	require.NotNil(t, lastEvent.Output.MessageOutput)
 	assert.Equal(t, "done", lastEvent.Output.MessageOutput.Message.Content)
 
 	// Verify dynamic_tool_a was actually called.
+	// 验证 dynamic_tool_a 确实被调用。
 	assert.True(t, dynamicA.wasCalled(), "dynamic_tool_a should have been called")
 	assert.False(t, dynamicB.wasCalled(), "dynamic_tool_b should not have been called")
 
 	// Verify tool lists per Generate call.
+	// 验证每次 Generate 调用的工具列表。
 	toolsPerCall := cm.getToolsPerCall()
 	require.Len(t, toolsPerCall, 3, "expected 3 Generate calls")
 
 	// Call 1: static_tool visible; dynamic tools are hidden.
+	// 调用 1：static_tool 可见；dynamic tools 被隐藏。
 	assert.Contains(t, toolsPerCall[0], "static_tool")
 	assert.NotContains(t, toolsPerCall[0], "dynamic_tool_a")
 	assert.NotContains(t, toolsPerCall[0], "dynamic_tool_b")
 
 	// Call 2: after selecting dynamic_tool_a, it becomes visible.
+	// 调用 2：选择 dynamic_tool_a 后，它变为可见。
 	assert.Contains(t, toolsPerCall[1], "static_tool")
 	assert.Contains(t, toolsPerCall[1], "dynamic_tool_a")
 	assert.NotContains(t, toolsPerCall[1], "dynamic_tool_b")
 
 	// Call 3: same as call 2.
+	// 调用 3：与调用 2 相同。
 	assert.Contains(t, toolsPerCall[2], "static_tool")
 	assert.Contains(t, toolsPerCall[2], "dynamic_tool_a")
 	assert.NotContains(t, toolsPerCall[2], "dynamic_tool_b")
@@ -372,8 +407,14 @@ func TestMiddlewareFlow(t *testing.T) {
 	// The model received messages, and the reminder contains "<available-deferred-tools>".
 	// We indirectly verify this by checking that the middleware ran without error and the
 	// 3-turn flow completed successfully, which requires the tool_search tool to work.
+	//
+	// 验证 reminder 存在于消息中（通过工具列表检查——wrapper 会插入它）。
+	// 模型收到了消息，且 reminder 包含 "<available-deferred-tools>"。
+	// 我们通过检查 middleware 无错误运行且
+	// 3-turn 流程成功完成来间接验证，这需要 tool_search 工具正常工作。
 
 	// Additional: verify that the reminder contains the dynamic tool names.
+	// 补充：验证 reminder 包含动态工具名称。
 	mwImpl := mw.(*typedMiddleware[*schema.Message])
 	assert.True(t, strings.Contains(mwImpl.sr, "dynamic_tool_a"))
 	assert.True(t, strings.Contains(mwImpl.sr, "dynamic_tool_b"))
@@ -382,6 +423,10 @@ func TestMiddlewareFlow(t *testing.T) {
 
 // ---------------------------------------------------------------------------
 // TestNew — error paths for New()
+// ---------------------------------------------------------------------------
+//
+// ---------------------------------------------------------------------------
+// TestNew — New() 的错误路径
 // ---------------------------------------------------------------------------
 
 func TestNew(t *testing.T) {
@@ -410,6 +455,10 @@ func TestNew(t *testing.T) {
 // ---------------------------------------------------------------------------
 // TestSplitCamelCase
 // ---------------------------------------------------------------------------
+//
+// ---------------------------------------------------------------------------
+// TestSplitCamelCase
+// ---------------------------------------------------------------------------
 
 func TestSplitCamelCase(t *testing.T) {
 	tests := []struct {
@@ -434,6 +483,10 @@ func TestSplitCamelCase(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// TestEnsureReminder
+// ---------------------------------------------------------------------------
+//
 // ---------------------------------------------------------------------------
 // TestEnsureReminder
 // ---------------------------------------------------------------------------
@@ -501,6 +554,10 @@ func TestEnsureReminder(t *testing.T) {
 // ---------------------------------------------------------------------------
 // TestHelperFunctions
 // ---------------------------------------------------------------------------
+//
+// ---------------------------------------------------------------------------
+// TestHelperFunctions
+// ---------------------------------------------------------------------------
 
 func TestHelperFunctions(t *testing.T) {
 	t.Run("extractDynamicTools", func(t *testing.T) {
@@ -549,11 +606,20 @@ func TestHelperFunctions(t *testing.T) {
 // ---------------------------------------------------------------------------
 // TestBeforeModelRewriteState — direct unit tests for BeforeModelRewriteState
 // ---------------------------------------------------------------------------
+//
+// ---------------------------------------------------------------------------
+// TestBeforeModelRewriteState — BeforeModelRewriteState 的直接单元测试
+// ---------------------------------------------------------------------------
 
 // Note: these tests call BeforeModelRewriteState without a full compose context,
 // so RunLocalValue (used by isInitialized/markInitialized) always returns error.
 // This means every call re-runs the initialization block. Tests are designed
 // accordingly: they test single-call behavior or provide pre-initialized state.
+//
+// 注意：这些测试在没有完整 compose context 的情况下调用 BeforeModelRewriteState，
+// 因此 RunLocalValue（由 isInitialized/markInitialized 使用）总是返回错误。
+// 这意味着每次调用都会重新运行初始化块。测试已据此设计：
+// 它们测试单次调用行为，或提供已预初始化的状态。
 
 func TestBeforeModelRewriteState_Mode1_Initialization(t *testing.T) {
 	ctx := context.Background()
@@ -570,6 +636,7 @@ func TestBeforeModelRewriteState_Mode1_Initialization(t *testing.T) {
 	m := mw.(*typedMiddleware[*schema.Message])
 
 	// Simulate state: static_tool + tool_search + dynamic tools (as would come from backfill).
+	// 模拟状态：static_tool + tool_search + dynamic tools（如同来自 backfill）。
 	state := &adk.ChatModelAgentState{
 		Messages: []*schema.Message{
 			{Role: schema.System, Content: "sys"},
@@ -584,6 +651,7 @@ func TestBeforeModelRewriteState_Mode1_Initialization(t *testing.T) {
 	}
 
 	// Initialization strips dynamic tools, keeps tool_search and static tools.
+	// 初始化会移除动态工具，保留 tool_search 和静态工具。
 	_, state, err = m.BeforeModelRewriteState(ctx, state, nil)
 	require.NoError(t, err)
 
@@ -592,6 +660,7 @@ func TestBeforeModelRewriteState_Mode1_Initialization(t *testing.T) {
 	assert.Nil(t, state.DeferredToolInfos, "Mode 1 should not populate DeferredToolInfos")
 
 	// Verify reminder was inserted.
+	// 验证已插入提醒。
 	assert.Equal(t, 1, countReminders(state.Messages), "reminder should be inserted")
 }
 
@@ -611,6 +680,9 @@ func TestBeforeModelRewriteState_Mode1_ForwardSelection(t *testing.T) {
 
 	// Simulate state AFTER initialization (dynamic tools already stripped).
 	// Include a tool_search result message that selected dynamic_tool_a.
+	//
+	// 模拟初始化后的状态（动态工具已被移除）。
+	// 包含一条选择了 dynamic_tool_a 的 tool_search 结果消息。
 	toolSearchResultJSON, _ := json.Marshal(toolSearchResult{Matches: []string{"dynamic_tool_a"}})
 	state := &adk.ChatModelAgentState{
 		Messages: []*schema.Message{
@@ -629,6 +701,9 @@ func TestBeforeModelRewriteState_Mode1_ForwardSelection(t *testing.T) {
 
 	// Forward selection should add dynamic_tool_a from the tool_search result.
 	// Note: init block runs (no compose ctx) but ToolInfos has no dynamic tools to strip.
+	//
+	// 转发选择应从 tool_search 结果中添加 dynamic_tool_a。
+	// 注意：初始化块会运行（无 compose ctx），但 ToolInfos 中没有可移除的动态工具。
 	_, state, err = m.BeforeModelRewriteState(ctx, state, nil)
 	require.NoError(t, err)
 
@@ -636,6 +711,7 @@ func TestBeforeModelRewriteState_Mode1_ForwardSelection(t *testing.T) {
 	assert.Equal(t, []string{"dynamic_tool_a", "static_tool", "tool_search"}, names)
 
 	// Call again: forward selection should be idempotent (dynamic_tool_a already present).
+	// 再次调用：转发选择应保持幂等（dynamic_tool_a 已存在）。
 	_, state, err = m.BeforeModelRewriteState(ctx, state, nil)
 	require.NoError(t, err)
 
@@ -673,6 +749,7 @@ func TestBeforeModelRewriteState_Mode2_DeferredToolInfos(t *testing.T) {
 	require.NoError(t, err)
 
 	// Mode 2: static tools in ToolInfos (tool_search removed), dynamic in DeferredToolInfos.
+	// Mode 2：静态工具在 ToolInfos 中（tool_search 已移除），动态工具在 DeferredToolInfos 中。
 	names := toolNames(state.ToolInfos)
 	assert.Equal(t, []string{"static_tool"}, names, "ToolInfos should only have static tools")
 
@@ -705,6 +782,7 @@ func TestBeforeModelRewriteState_ReminderReinsertAfterRemoval(t *testing.T) {
 	}
 
 	// First call: reminder inserted.
+	// 第一次调用：插入提醒。
 	_, state, err = m.BeforeModelRewriteState(ctx, state, nil)
 	require.NoError(t, err)
 
@@ -712,6 +790,7 @@ func TestBeforeModelRewriteState_ReminderReinsertAfterRemoval(t *testing.T) {
 	assert.Equal(t, 1, reminderCount)
 
 	// Simulate summarization removing the reminder message.
+	// 模拟摘要移除了提醒消息。
 	var msgsWithoutReminder []*schema.Message
 	for _, msg := range state.Messages {
 		isReminder := false
@@ -728,6 +807,7 @@ func TestBeforeModelRewriteState_ReminderReinsertAfterRemoval(t *testing.T) {
 	assert.Equal(t, 0, countReminders(state.Messages), "reminder should be gone")
 
 	// Next call: reminder should be re-inserted.
+	// 下一次调用：应重新插入提醒。
 	_, state, err = m.BeforeModelRewriteState(ctx, state, nil)
 	require.NoError(t, err)
 
@@ -750,6 +830,10 @@ func countReminders(msgs []*schema.Message) int {
 // ---------------------------------------------------------------------------
 // Edge-case tests for BeforeModelRewriteState
 // ---------------------------------------------------------------------------
+//
+// ---------------------------------------------------------------------------
+// BeforeModelRewriteState 的边界用例测试
+// ---------------------------------------------------------------------------
 
 func TestBeforeModelRewriteState_Mode1_MultipleToolSearchResultsAcrossTurns(t *testing.T) {
 	ctx := context.Background()
@@ -767,6 +851,7 @@ func TestBeforeModelRewriteState_Mode1_MultipleToolSearchResultsAcrossTurns(t *t
 	m := mw.(*typedMiddleware[*schema.Message])
 
 	// Build two separate tool_search result messages, each selecting a different tool.
+	// 构造两条独立的 tool_search 结果消息，每条选择不同的工具。
 	resultA, _ := json.Marshal(toolSearchResult{Matches: []string{"dynamic_tool_a"}})
 	resultB, _ := json.Marshal(toolSearchResult{Matches: []string{"dynamic_tool_b"}})
 
@@ -892,6 +977,7 @@ func TestBeforeModelRewriteState_Mode2_EmptyToolInfos(t *testing.T) {
 			{Role: schema.User, Content: "hello"},
 		},
 		ToolInfos: []*schema.ToolInfo{}, // empty, not nil
+		// 空，但不是 nil
 	}
 
 	_, state, err = m.BeforeModelRewriteState(ctx, state, nil)
@@ -933,6 +1019,7 @@ func TestBeforeModelRewriteState_Mode1_DoubleInitWithoutComposeContext(t *testin
 	}
 
 	// First call: init runs (strips dynamic_tool_a), then forward selection re-adds it.
+	// 第一次调用：初始化运行（移除 dynamic_tool_a），随后转发选择又将其加回。
 	_, state, err = m.BeforeModelRewriteState(ctx, state, nil)
 	require.NoError(t, err)
 
@@ -943,6 +1030,7 @@ func TestBeforeModelRewriteState_Mode1_DoubleInitWithoutComposeContext(t *testin
 	assert.Contains(t, names, "tool_search")
 
 	// Second call: init runs AGAIN (no compose ctx), verify behavior is stable.
+	// 第二次调用：初始化再次运行（无 compose ctx），验证行为稳定。
 	_, state2, err := m.BeforeModelRewriteState(ctx, state, nil)
 	require.NoError(t, err)
 
@@ -965,6 +1053,7 @@ func TestBeforeModelRewriteState_ToolInfosSliceMutation(t *testing.T) {
 	m := mw.(*typedMiddleware[*schema.Message])
 
 	// Create ToolInfos with excess capacity so append could mutate in place.
+	// 创建具有额外容量的 ToolInfos，使 append 可能原地修改。
 	originalToolInfos := make([]*schema.ToolInfo, 2, 10)
 	originalToolInfos[0] = ti("static_tool", "Static tool")
 	originalToolInfos[1] = getToolSearchToolInfo()
@@ -996,6 +1085,10 @@ func TestBeforeModelRewriteState_ToolInfosSliceMutation(t *testing.T) {
 // ---------------------------------------------------------------------------
 // modelToolSearchTool (Mode 2) tests
 // ---------------------------------------------------------------------------
+//
+// ---------------------------------------------------------------------------
+// modelToolSearchTool（Mode 2）测试
+// ---------------------------------------------------------------------------
 
 func TestModelToolSearchTool(t *testing.T) {
 	ctx := context.Background()
@@ -1007,11 +1100,13 @@ func TestModelToolSearchTool(t *testing.T) {
 	mts := &modelToolSearchTool{tools: tools}
 
 	// Info should return the standard tool_search tool info.
+	// Info 应返回标准的 tool_search 工具信息。
 	info, err := mts.Info(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, toolSearchToolName, info.Name)
 
 	// InvokableRun with a valid query selecting "alpha".
+	// 使用选择 "alpha" 的有效 query 调用 InvokableRun。
 	arg := &schema.ToolArgument{Text: searchJSON("select:alpha", nil)}
 	result, err := mts.InvokableRun(ctx, arg)
 	require.NoError(t, err)
@@ -1022,6 +1117,7 @@ func TestModelToolSearchTool(t *testing.T) {
 	assert.Equal(t, "alpha", result.Parts[0].ToolSearchResult.Tools[0].Name)
 
 	// InvokableRun with an empty query should return error.
+	// 使用空 query 调用 InvokableRun 应返回错误。
 	argEmpty := &schema.ToolArgument{Text: `{"query":""}`}
 	_, err = mts.InvokableRun(ctx, argEmpty)
 	assert.Error(t, err)
@@ -1032,6 +1128,9 @@ func TestNewTypedAgenticMessage(t *testing.T) {
 
 	// Verify that NewTyped compiles with *schema.AgenticMessage.
 	// DynamicTools is required, so we expect an error with an empty config.
+	//
+	// 验证 NewTyped 可用 *schema.AgenticMessage 编译。
+	// DynamicTools 是必需的，因此空配置应返回错误。
 	mw, err := NewTyped[*schema.AgenticMessage](ctx, &Config{
 		DynamicTools: []tool.BaseTool{&simpleTool{name: "t1", desc: "desc1"}},
 	})

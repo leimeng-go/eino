@@ -22,24 +22,31 @@ import (
 )
 
 // TransformerCallbackInput is the input for the transformer callback.
+// TransformerCallbackInput 是 transformer 回调的输入。
 type TransformerCallbackInput struct {
 	// Input is the input documents.
+	// Input 是输入文档。
 	Input []*schema.Document
 
 	// Extra is the extra information for the callback.
+	// Extra 是回调用的额外信息。
 	Extra map[string]any
 }
 
 // TransformerCallbackOutput is the output for the transformer callback.
+// TransformerCallbackOutput 是 transformer 回调的输出。
 type TransformerCallbackOutput struct {
 	// Output is the output documents.
+	// Output 是输出文档。
 	Output []*schema.Document
 
 	// Extra is the extra information for the callback.
+	// Extra 是回调用的额外信息。
 	Extra map[string]any
 }
 
 // ConvTransformerCallbackInput converts the callback input to the transformer callback input.
+// ConvTransformerCallbackInput 将回调输入转换为 transformer 回调输入。
 func ConvTransformerCallbackInput(src callbacks.CallbackInput) *TransformerCallbackInput {
 	switch t := src.(type) {
 	case *TransformerCallbackInput:
@@ -54,6 +61,7 @@ func ConvTransformerCallbackInput(src callbacks.CallbackInput) *TransformerCallb
 }
 
 // ConvTransformerCallbackOutput converts the callback output to the transformer callback output.
+// ConvTransformerCallbackOutput 将回调输出转换为 transformer 回调输出。
 func ConvTransformerCallbackOutput(src callbacks.CallbackOutput) *TransformerCallbackOutput {
 	switch t := src.(type) {
 	case *TransformerCallbackOutput:

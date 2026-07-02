@@ -242,6 +242,7 @@ func TestToolsNode(t *testing.T) {
 
 	t.Run("order_consistency", func(t *testing.T) {
 		// Create a ToolsNode with multiple tools
+		// 创建包含多个工具的 ToolsNode
 		ui := newTool(userCompanyToolInfo, queryUserCompany)
 		us := newTool(userSalaryToolInfo, queryUserSalary)
 
@@ -251,6 +252,7 @@ func TestToolsNode(t *testing.T) {
 		assert.NoError(t, err_)
 
 		// Create an input message with multiple tool calls in a specific order
+		// 创建一条按特定顺序包含多个工具调用的输入消息
 		input := &schema.Message{
 			Role: schema.Assistant,
 			ToolCalls: []schema.ToolCall{
@@ -272,20 +274,24 @@ func TestToolsNode(t *testing.T) {
 		}
 
 		// Invoke the ToolsNode
+		// 调用 ToolsNode
 		output, err_ := toolsNode.Invoke(context.Background(), input)
 		assert.NoError(t, err_)
 
 		// Verify the order of output messages matches the order of input tool calls
+		// 验证输出消息的顺序与输入工具调用的顺序一致
 		assert.Equal(t, 2, len(output))
 		assert.Equal(t, toolIDOfUserSalary, output[0].ToolCallID)
 		assert.Equal(t, toolIDOfUserCompany, output[1].ToolCallID)
 
 		// Test with Stream method as well
+		// 同时测试 Stream 方法
 		streamer, err_ := toolsNode.Stream(context.Background(), input)
 		assert.NoError(t, err_)
 		defer streamer.Close()
 
 		// Collect all stream outputs
+		// 收集所有流输出
 		var streamOutputs [][]*schema.Message
 		for {
 			chunk, err__ := streamer.Recv()
@@ -297,6 +303,7 @@ func TestToolsNode(t *testing.T) {
 		}
 
 		// Verify each chunk maintains the correct order
+		// 验证每个 chunk 保持正确顺序
 		for _, chunk := range streamOutputs {
 			if chunk[0] != nil {
 				assert.Equal(t, toolIDOfUserSalary, chunk[0].ToolCallID)
@@ -307,6 +314,7 @@ func TestToolsNode(t *testing.T) {
 		}
 
 		// Concatenate all stream outputs and verify final result
+		// 拼接所有流输出并验证最终结果
 		concatenated, err_ := schema.ConcatMessageArray(streamOutputs)
 		assert.NoError(t, err_)
 		assert.Equal(t, 2, len(concatenated))
@@ -880,6 +888,7 @@ func TestToolMiddleware(t *testing.T) {
 	assert.Equal(t, "middleware2", messages[1].Content)
 
 	t3.times, t4.times = 0, 0 // reset t3 t4
+	// 重置 t3 t4
 	messageStreams, err := tn.Stream(ctx, schema.AssistantMessage("", []schema.ToolCall{
 		{ID: "1", Function: schema.FunctionCall{Name: "tool3", Arguments: ""}},
 		{ID: "2", Function: schema.FunctionCall{Name: "tool4", Arguments: ""}},

@@ -98,6 +98,7 @@ func TestSingleGraph(t *testing.T) {
 	assert.NoError(t, err)
 
 	// error test
+	// 错误测试
 	in = map[string]any{"wrong key": 1}
 	_, err = r.Invoke(ctx, in)
 	assert.Errorf(t, err, "could not find key: location")
@@ -345,6 +346,7 @@ func (c *chatModel) Stream(ctx context.Context, input []*schema.Message, opts ..
 
 func TestValidate(t *testing.T) {
 	// test unmatched nodes
+	// 测试不匹配的节点
 	g := NewGraph[string, string]()
 	err := g.AddLambdaNode("1", InvokableLambda(func(ctx context.Context, input string) (output string, err error) { return "", nil }))
 	assert.NoError(t, err)
@@ -356,6 +358,7 @@ func TestValidate(t *testing.T) {
 	assert.ErrorContains(t, err, "graph edge[1]-[2]: start node's output type[string] and end node's input type[int] mismatch")
 
 	// test unmatched passthrough node
+	// 测试不匹配的 passthrough 节点
 	g = NewGraph[string, string]()
 	err = g.AddLambdaNode("1", InvokableLambda(func(ctx context.Context, input string) (output string, err error) { return "", nil }))
 	assert.NoError(t, err)
@@ -373,6 +376,7 @@ func TestValidate(t *testing.T) {
 	assert.ErrorContains(t, err, "graph edge[2]-[3]: start node's output type[string] and end node's input type[int] mismatch")
 
 	// test may matched passthrough
+	// 测试可能匹配的 passthrough
 	g2 := NewGraph[any, string]()
 	err = g2.AddLambdaNode("1", InvokableLambda(func(ctx context.Context, input any) (output any, err error) { return input, nil }))
 	assert.NoError(t, err)
@@ -399,6 +403,7 @@ func TestValidate(t *testing.T) {
 	assert.ErrorContains(t, err, "runtime type check")
 
 	// test unmatched graph type
+	// 测试不匹配的 graph 类型
 	g = NewGraph[string, string]()
 	err = g.AddLambdaNode("1", InvokableLambda(func(ctx context.Context, input int) (output string, err error) { return "", nil }))
 	assert.NoError(t, err)
@@ -413,6 +418,7 @@ func TestValidate(t *testing.T) {
 	assert.ErrorContains(t, err, "graph edge[start]-[1]: start node's output type[string] and end node's input type[int] mismatch")
 
 	// sub graph implement
+	// 子图实现
 	type A interface {
 		A()
 	}
@@ -434,12 +440,14 @@ func TestValidate(t *testing.T) {
 	assert.NoError(t, err)
 
 	// error usage
+	// 错误用法
 	p = NewParallel().AddLambda("1", lA).AddLambda("2", lAB)
 	c = NewChain[string, map[string]any]().AppendParallel(p)
 	_, err = c.Compile(context.Background())
 	assert.ErrorContains(t, err, "add parallel edge failed, from=start, to=node_0_parallel_0, err: graph edge[start]-[node_0_parallel_0]: start node's output type[string] and end node's input type[compose.A] mismatch")
 
 	// test graph output type check
+	// 测试 graph 输出类型检查
 	gg := NewGraph[string, A]()
 	err = gg.AddLambdaNode("nodeA", InvokableLambda(func(ctx context.Context, input string) (output A, err error) { return nil, nil }))
 	assert.NoError(t, err)
@@ -460,6 +468,7 @@ func TestValidate(t *testing.T) {
 	assert.ErrorContains(t, err, "graph edge[nodeB]-[end]: start node's output type[compose.B] and end node's input type[compose.A] mismatch")
 
 	// test any type
+	// 测试 any 类型
 	anyG := NewGraph[any, string]()
 	err = anyG.AddLambdaNode("node1", InvokableLambda(func(ctx context.Context, input string) (output any, err error) { return input + "node1", nil }))
 	assert.NoError(t, err)
@@ -502,6 +511,7 @@ func TestValidate(t *testing.T) {
 	assert.Equal(t, "startnode1node2", result)
 
 	// test any type runtime error
+	// 测试 any 类型运行时错误
 	anyG = NewGraph[any, string]()
 	err = anyG.AddLambdaNode("node1", InvokableLambda(func(ctx context.Context, input string) (output any, err error) { return 123, nil }))
 	if err != nil {
@@ -538,6 +548,9 @@ func TestValidate(t *testing.T) {
 
 	// test branch any type
 	// success
+	//
+	// 测试 branch any 类型
+	// 成功
 	g = NewGraph[string, string]()
 	err = g.AddLambdaNode("node1", InvokableLambda(func(ctx context.Context, input string) (output any, err error) { return input + "node1", nil }))
 	if err != nil {
@@ -1622,50 +1635,59 @@ func TestHandlerTypeValidate(t *testing.T) {
 		return ""
 	}))
 	// passthrough pre fail
+	// passthrough 前置失败
 	err := g.AddPassthroughNode("1", WithStatePreHandler(func(ctx context.Context, in string, state string) (string, error) {
 		return "", nil
 	}))
 	assert.ErrorContains(t, err, "passthrough node[1]'s pre handler type isn't any")
 	g.buildError = nil
 	// passthrough pre fail with input key
+	// 带 input key 的 passthrough 前置失败
 	err = g.AddPassthroughNode("1", WithStatePreHandler(func(ctx context.Context, in string, state string) (string, error) {
 		return "", nil
 	}), WithInputKey("input"))
 	assert.ErrorContains(t, err, "node[1]'s pre handler type[string] is different from its input type[map[string]interface {}]")
 	g.buildError = nil
 	// passthrough post fail
+	// passthrough 后置失败
 	err = g.AddPassthroughNode("1", WithStatePostHandler(func(ctx context.Context, in string, state string) (string, error) {
 		return "", nil
 	}))
 	assert.ErrorContains(t, err, "passthrough node[1]'s post handler type isn't any")
 	g.buildError = nil
 	// passthrough post fail with input key
+	// 带 input key 的 passthrough 后置失败
 	err = g.AddPassthroughNode("1", WithStatePostHandler(func(ctx context.Context, in string, state string) (string, error) {
 		return "", nil
 	}), WithInputKey("input"))
 	assert.ErrorContains(t, err, "passthrough node[1]'s post handler type isn't any")
 	g.buildError = nil
 	// passthrough pre success
+	// passthrough 前置成功
 	err = g.AddPassthroughNode("1", WithStatePreHandler(func(ctx context.Context, in any, state string) (any, error) {
 		return "", nil
 	}))
 	assert.NoError(t, err)
 	// passthrough pre success with input key
+	// 带 input key 的 passthrough 前置成功
 	err = g.AddPassthroughNode("2", WithStatePreHandler(func(ctx context.Context, in map[string]any, state string) (map[string]any, error) {
 		return nil, nil
 	}), WithInputKey("input"))
 	assert.NoError(t, err)
 	// passthrough post success
+	// passthrough 后置成功
 	err = g.AddPassthroughNode("3", WithStatePostHandler(func(ctx context.Context, in any, state string) (any, error) {
 		return "", nil
 	}))
 	assert.NoError(t, err)
 	// passthrough post success with output key
+	// 带 output key 的 passthrough 后置成功
 	err = g.AddPassthroughNode("4", WithStatePostHandler(func(ctx context.Context, in map[string]any, state string) (map[string]any, error) {
 		return nil, nil
 	}), WithOutputKey("output"))
 	assert.NoError(t, err)
 	// common node pre fail
+	// 普通节点前置失败
 	err = g.AddLambdaNode("5", InvokableLambda(func(ctx context.Context, input int) (output int, err error) {
 		return 0, nil
 	}), WithStatePreHandler(func(ctx context.Context, in string, state string) (string, error) {
@@ -1674,6 +1696,7 @@ func TestHandlerTypeValidate(t *testing.T) {
 	assert.ErrorContains(t, err, "node[5]'s pre handler type[string] is different from its input type[int]")
 	g.buildError = nil
 	// common node post fail
+	// 普通节点后置失败
 	err = g.AddLambdaNode("5", InvokableLambda(func(ctx context.Context, input int) (output int, err error) {
 		return 0, nil
 	}), WithStatePostHandler(func(ctx context.Context, in string, state string) (string, error) {
@@ -1682,6 +1705,7 @@ func TestHandlerTypeValidate(t *testing.T) {
 	assert.ErrorContains(t, err, "node[5]'s post handler type[string] is different from its output type[int]")
 	g.buildError = nil
 	// common node pre success
+	// 普通节点前置成功
 	err = g.AddLambdaNode("5", InvokableLambda(func(ctx context.Context, input string) (output string, err error) {
 		return "", nil
 	}), WithStatePreHandler(func(ctx context.Context, in string, state string) (string, error) {
@@ -1689,6 +1713,7 @@ func TestHandlerTypeValidate(t *testing.T) {
 	}))
 	assert.NoError(t, err)
 	// common node post success
+	// 普通节点后置成功
 	err = g.AddLambdaNode("6", InvokableLambda(func(ctx context.Context, input string) (output string, err error) {
 		return "", nil
 	}), WithStatePostHandler(func(ctx context.Context, in string, state string) (string, error) {
@@ -1696,6 +1721,7 @@ func TestHandlerTypeValidate(t *testing.T) {
 	}))
 	assert.NoError(t, err)
 	// pre state fail
+	// 前置 state 失败
 	err = g.AddLambdaNode("7", InvokableLambda(func(ctx context.Context, input string) (output string, err error) {
 		return "", nil
 	}), WithStatePreHandler(func(ctx context.Context, in string, state int) (string, error) {
@@ -1704,6 +1730,7 @@ func TestHandlerTypeValidate(t *testing.T) {
 	assert.ErrorContains(t, err, "node[7]'s pre handler state type[int] is different from graph[string]")
 	g.buildError = nil
 	// post state fail
+	// 后置 state 失败
 	err = g.AddLambdaNode("7", InvokableLambda(func(ctx context.Context, input string) (output string, err error) {
 		return "", nil
 	}), WithStatePostHandler(func(ctx context.Context, in string, state int) (string, error) {
@@ -1712,6 +1739,7 @@ func TestHandlerTypeValidate(t *testing.T) {
 	assert.ErrorContains(t, err, "node[7]'s post handler state type[int] is different from graph[string]")
 	g.buildError = nil
 	// common pre success with input key
+	// 带 input key 的普通前置成功
 	err = g.AddLambdaNode("7", InvokableLambda(func(ctx context.Context, input string) (output string, err error) {
 		return "", nil
 	}), WithStatePreHandler(func(ctx context.Context, in map[string]any, state string) (map[string]any, error) {
@@ -1719,6 +1747,7 @@ func TestHandlerTypeValidate(t *testing.T) {
 	}), WithInputKey("input"))
 	assert.NoError(t, err)
 	// common post success with output key
+	// 带 output key 的普通后置成功
 	err = g.AddLambdaNode("8", InvokableLambda(func(ctx context.Context, input string) (output string, err error) {
 		return "", nil
 	}), WithStatePostHandler(func(ctx context.Context, in map[string]any, state string) (map[string]any, error) {
@@ -1733,6 +1762,7 @@ func TestSetFanInMergeConfig_RealStreamNode(t *testing.T) {
 			g := NewGraph[int, map[string]any]()
 
 			// Add two stream nodes that output streams of int slices
+			// 添加两个 stream 节点，输出 int 切片流
 			err := g.AddLambdaNode("s1", StreamableLambda(func(ctx context.Context, input int) (*schema.StreamReader[int], error) {
 				sr, sw := schema.Pipe[int](2)
 				sw.Send(input+1, nil)
@@ -1751,6 +1781,7 @@ func TestSetFanInMergeConfig_RealStreamNode(t *testing.T) {
 			assert.NoError(t, err)
 
 			// Connect edges: START -> s1, START -> s2, s1 -> END, s2 -> END
+			// 连接边：START -> s1, START -> s2, s1 -> END, s2 -> END
 			err = g.AddEdge(START, "s1")
 			assert.NoError(t, err)
 			err = g.AddEdge(START, "s2")
@@ -1765,6 +1796,7 @@ func TestSetFanInMergeConfig_RealStreamNode(t *testing.T) {
 			assert.NoError(t, err)
 
 			// Run the graph in stream mode and check for SourceEOF events
+			// 以 stream 模式运行图并检查 SourceEOF 事件
 			sr, err := r.Stream(context.Background(), 1)
 			assert.NoError(t, err)
 
@@ -1795,6 +1827,7 @@ func TestSetFanInMergeConfig_RealStreamNode(t *testing.T) {
 			}
 
 			// The merged map should contain both results
+			// 合并后的 map 应包含两个结果
 			assert.Equal(t, map[string]map[int]bool{"s1": {2: true, 3: true}, "s2": {11: true, 21: true}}, merged)
 			assert.Equal(t, 2, sourceEOFCount, "should receive SourceEOF for each input stream when StreamMergeWithSourceEOF is true")
 			assert.True(t, sourceNames["s1"], "should receive SourceEOF from s1")

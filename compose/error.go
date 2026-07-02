@@ -24,6 +24,7 @@ import (
 )
 
 // ErrExceedMaxSteps graph will throw this error when the number of steps exceeds the maximum number of steps.
+// 当步数超过最大步数时，Graph 会抛出 ErrExceedMaxSteps 错误。
 var ErrExceedMaxSteps = errors.New("exceeds max steps")
 
 func newUnexpectedInputTypeErr(expected reflect.Type, got reflect.Type) error {

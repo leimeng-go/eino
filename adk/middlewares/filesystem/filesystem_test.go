@@ -34,11 +34,13 @@ import (
 )
 
 // setupTestBackend creates a test backend with some initial files
+// setupTestBackend 创建带有一些初始文件的测试后端
 func setupTestBackend() *filesystem.InMemoryBackend {
 	backend := filesystem.NewInMemoryBackend()
 	ctx := context.Background()
 
 	// Create test files
+	// 创建测试文件
 	backend.Write(ctx, &filesystem.WriteRequest{
 		FilePath: "/file1.txt",
 		Content:  "line1\nline2\nline3\nline4\nline5",
@@ -64,6 +66,7 @@ func setupTestBackend() *filesystem.InMemoryBackend {
 }
 
 // invokeTool is a helper to invoke a tool with JSON input
+// invokeTool 是使用 JSON 输入调用工具的辅助函数
 func invokeTool(_ *testing.T, bt tool.BaseTool, input string) (string, error) {
 	ctx := context.Background()
 	result, err := bt.(tool.InvokableTool).InvokableRun(ctx, input)
@@ -84,6 +87,7 @@ func TestLsTool(t *testing.T) {
 		name     string
 		input    string
 		expected []string // expected paths in output
+		// 输出中的预期路径
 	}{
 		{
 			name:     "list root",
@@ -179,6 +183,7 @@ func TestReadFileTool(t *testing.T) {
 
 func TestReadFileTool_DefaultLimit(t *testing.T) {
 	// Build a file with more than 2000 lines to verify the tool layer applies the default limit
+	// 构建一个超过 2000 行的文件，以验证工具层会应用默认限制
 	backend := filesystem.NewInMemoryBackend()
 	var b strings.Builder
 	totalLines := 2500
@@ -280,6 +285,7 @@ func TestWriteFileTool(t *testing.T) {
 	}
 
 	// Verify the file was actually written
+	// 验证文件确实已写入
 	ctx := context.Background()
 	content, err := backend.Read(ctx, &filesystem.ReadRequest{
 		FilePath: "/newfile.txt",
@@ -343,6 +349,7 @@ func TestEditFileTool(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup file if needed
+			// 必要时设置文件
 			if tt.setupFile != "" {
 				backend.Write(ctx, &filesystem.WriteRequest{
 					FilePath: tt.setupFile,
@@ -454,6 +461,7 @@ func TestGrepTool(t *testing.T) {
 			name:     "grep with count mode",
 			input:    `{"pattern": "hello", "output_mode": "count"}`,
 			expected: "/dir1/file3.txt:2\n/dir1/file4.py:1\n/file2.go:1\n\nFound 4 total occurrences across 3 files.", // 2 in file3.txt, 1 in file4.py, 1 in file2.go
+			// file3.txt 中 2 个，file4.py 中 1 个，file2.go 中 1 个
 		},
 		{
 			name:     "grep with content mode",
@@ -469,11 +477,13 @@ func TestGrepTool(t *testing.T) {
 			name:     "grep with glob filter",
 			input:    `{"pattern": "hello", "glob": "*.txt", "output_mode": "count"}`,
 			expected: "/dir1/file3.txt:2\n\nFound 2 total occurrences across 1 file.", // only in file3.txt
+			// 仅在 file3.txt 中
 		},
 		{
 			name:     "grep  withpath filter",
 			input:    `{"pattern": "package", "path": "/dir2", "output_mode": "count"}`,
 			expected: "/dir2/file5.go:1\n\nFound 1 total occurrence across 1 file.", // only in dir2/file5.go
+			// 仅在 dir2/file5.go 中
 		},
 	}
 
@@ -600,6 +610,7 @@ func TestGetFilesystemTools(t *testing.T) {
 		assert.Len(t, tools, 6)
 
 		// Verify tool names
+		// 验证工具名称
 		toolNames := make([]string, 0, len(tools))
 		for _, to := range tools {
 			info, _ := to.Info(ctx)
@@ -623,6 +634,7 @@ func TestGetFilesystemTools(t *testing.T) {
 		assert.Len(t, tools, 7)
 
 		// Verify execute tool is included
+		// 验证包含 execute 工具
 		toolNames := make([]string, 0, len(tools))
 		for _, to := range tools {
 			info, _ := to.Info(ctx)
@@ -644,6 +656,7 @@ func TestGetFilesystemTools(t *testing.T) {
 		assert.Len(t, tools, 6)
 
 		// Verify custom descriptions are applied
+		// 验证已应用自定义描述
 		for _, to := range tools {
 			info, _ := to.Info(ctx)
 			if info.Name == "ls" {
@@ -789,6 +802,7 @@ func TestGrepToolWithSortingAndPagination(t *testing.T) {
 		assert.NoError(t, err)
 		lines := strings.Split(strings.TrimSpace(result), "\n")
 		assert.Equal(t, 4, len(lines)) // 1 summary + 3 files
+		// 1 个摘要 + 3 个文件
 		assert.Contains(t, lines[0], "Found 3 files")
 		assert.Contains(t, lines[1], "apple.txt")
 		assert.Contains(t, lines[2], "banana.txt")
@@ -799,8 +813,10 @@ func TestGrepToolWithSortingAndPagination(t *testing.T) {
 		result, err := invokeTool(t, grepTool, `{"pattern": "match", "output_mode": "files_with_matches", "offset": 1}`)
 		assert.NoError(t, err)
 		lines := strings.Split(strings.TrimSpace(result), "\n")
-		assert.Equal(t, 3, len(lines))                // 1 summary + 2 files (pagination applied)
+		assert.Equal(t, 3, len(lines)) // 1 summary + 2 files (pagination applied)
+		// 1 个摘要 + 2 个文件（已应用分页）
 		assert.Contains(t, lines[0], "Found 3 files") // total count before pagination
+		// 分页前的总数
 		assert.Contains(t, lines[1], "banana.txt")
 		assert.Contains(t, lines[2], "zebra.txt")
 	})
@@ -809,8 +825,10 @@ func TestGrepToolWithSortingAndPagination(t *testing.T) {
 		result, err := invokeTool(t, grepTool, `{"pattern": "match", "output_mode": "files_with_matches", "head_limit": 2}`)
 		assert.NoError(t, err)
 		lines := strings.Split(strings.TrimSpace(result), "\n")
-		assert.Equal(t, 3, len(lines))                // 1 summary + 2 files (pagination applied)
+		assert.Equal(t, 3, len(lines)) // 1 summary + 2 files (pagination applied)
+		// 1 个摘要 + 2 个文件（已应用分页）
 		assert.Contains(t, lines[0], "Found 3 files") // total count before pagination
+		// 分页前的总数
 		assert.Contains(t, lines[1], "apple.txt")
 		assert.Contains(t, lines[2], "banana.txt")
 	})
@@ -819,8 +837,10 @@ func TestGrepToolWithSortingAndPagination(t *testing.T) {
 		result, err := invokeTool(t, grepTool, `{"pattern": "match", "output_mode": "files_with_matches", "offset": 1, "head_limit": 1}`)
 		assert.NoError(t, err)
 		lines := strings.Split(strings.TrimSpace(result), "\n")
-		assert.Equal(t, 2, len(lines))                // 1 summary + 1 file (pagination applied)
+		assert.Equal(t, 2, len(lines)) // 1 summary + 1 file (pagination applied)
+		// 1 个摘要 + 1 个文件（已应用分页）
 		assert.Contains(t, lines[0], "Found 3 files") // total count before pagination
+		// 分页前的总数
 		assert.Contains(t, lines[1], "banana.txt")
 	})
 
@@ -844,6 +864,7 @@ func TestGrepToolWithSortingAndPagination(t *testing.T) {
 		assert.NoError(t, err)
 		lines := strings.Split(strings.TrimSpace(result), "\n")
 		assert.Equal(t, 5, len(lines)) // 3 file counts + 1 empty line + 1 summary line
+		// 3 个文件计数 + 1 个空行 + 1 个摘要行
 		assert.Contains(t, lines[0], "apple.txt:2")
 		assert.Contains(t, lines[1], "banana.txt:3")
 		assert.Contains(t, lines[2], "zebra.txt:3")
@@ -855,14 +876,17 @@ func TestGrepToolWithSortingAndPagination(t *testing.T) {
 		assert.NoError(t, err)
 		lines := strings.Split(strings.TrimSpace(result), "\n")
 		assert.Equal(t, 3, len(lines)) // 1 file count + 1 empty line + 1 summary line
+		// 1 个文件计数 + 1 个空行 + 1 个摘要行
 		assert.Contains(t, lines[0], "banana.txt:3")
 		assert.Contains(t, lines[2], "Found 8 total occurrences across 3 files.") // summary shows total before pagination
+		// 摘要显示分页前的总数
 	})
 
 	t.Run("offset exceeds result count", func(t *testing.T) {
 		result, err := invokeTool(t, grepTool, `{"pattern": "match", "output_mode": "files_with_matches", "offset": 100}`)
 		assert.NoError(t, err)
 		assert.Contains(t, result, "Found 3 files") // still shows total count
+		// 仍显示总数
 	})
 
 	t.Run("negative offset treated as zero", func(t *testing.T) {
@@ -870,6 +894,7 @@ func TestGrepToolWithSortingAndPagination(t *testing.T) {
 		assert.NoError(t, err)
 		lines := strings.Split(strings.TrimSpace(result), "\n")
 		assert.Equal(t, 4, len(lines)) // 1 summary + 3 files
+		// 1 个摘要 + 3 个文件
 	})
 }
 
@@ -1617,6 +1642,7 @@ func TestGetFilesystemTools_StreamingShell(t *testing.T) {
 		}
 
 		// When both are set, Validate should fail
+		// 两者都设置时，Validate 应失败
 		config := &MiddlewareConfig{
 			Backend:        backend,
 			Shell:          shellBackend,
@@ -1638,9 +1664,11 @@ func TestGetFilesystemTools_NilBackend(t *testing.T) {
 			StreamingShell: mockSS,
 		}
 		// Validate should fail, but getFilesystemTools itself handles nil backend gracefully
+		// Validate 应失败，但 getFilesystemTools 本身会优雅处理 nil backend
 		tools, err := getFilesystemTools(ctx, config)
 		assert.NoError(t, err)
 		// Only execute tool should be returned since backend is nil
+		// 由于 backend 为 nil，应只返回 execute 工具
 		assert.Len(t, tools, 1)
 
 		info, _ := tools[0].Info(ctx)
@@ -2057,6 +2085,7 @@ func TestNewStreamingExecuteTool_MultipleChunks(t *testing.T) {
 		chunks = append(chunks, chunk)
 	}
 	// Should have received multiple chunks
+	// 应已收到多个 chunk
 	assert.True(t, len(chunks) >= 3)
 	result := strings.Join(chunks, "")
 	assert.Contains(t, result, "chunk1")
@@ -2276,6 +2305,7 @@ func (m *mockShellBackendWithError) Execute(ctx context.Context, req *filesystem
 }
 
 // multiModalBackend wraps InMemoryBackend and implements MultiModalReader for testing.
+// multiModalBackend 包装 InMemoryBackend，并实现 MultiModalReader 以用于测试。
 type multiModalBackend struct {
 	*filesystem.InMemoryBackend
 	multiModalReadFunc func(ctx context.Context, req *filesystem.MultiModalReadRequest) (*filesystem.MultiFileContent, error)
@@ -2342,6 +2372,7 @@ func TestMultiModalReadFileTool_Multimodal(t *testing.T) {
 	assert.Equal(t, schema.ToolPartTypeImage, result.Parts[0].Type)
 
 	// Verify base64 encoding correctness
+	// 验证 base64 编码正确性
 	assert.NotNil(t, result.Parts[0].Image)
 	assert.Equal(t, "image/png", result.Parts[0].Image.MIMEType)
 	assert.Equal(t, base64.StdEncoding.EncodeToString(imgData), *result.Parts[0].Image.Base64Data)
@@ -2445,6 +2476,7 @@ func TestUseMultiModalRead_Routing(t *testing.T) {
 	}
 
 	// UseMultiModalRead=false should create standard tool
+	// UseMultiModalRead=false 应创建标准工具
 	tools, err := getFilesystemTools(context.Background(), &MiddlewareConfig{
 		Backend:           base,
 		UseMultiModalRead: false,
@@ -2459,6 +2491,7 @@ func TestUseMultiModalRead_Routing(t *testing.T) {
 	}
 
 	// UseMultiModalRead=true with enhanced backend should create enhanced tool
+	// UseMultiModalRead=true 且使用增强后端时应创建增强工具
 	tools2, err := getFilesystemTools(context.Background(), &MiddlewareConfig{
 		Backend:           eb,
 		UseMultiModalRead: true,
@@ -2477,6 +2510,9 @@ func TestUseMultiModalRead_Routing(t *testing.T) {
 // exposed to the LLM includes both the embedded readFileArgs fields (file_path,
 // offset, limit) and the enhanced-only "pages" field. Guards against the
 // jsonschema library failing to flatten an unexported anonymous embedded struct.
+//
+// TestMultiModalReadFileTool_SchemaContainsAllFields 验证暴露给 LLM 的 JSON schema 同时包含嵌入的 readFileArgs 字段（file_path、offset、limit）和仅增强版的 "pages" 字段。
+// 防止 jsonschema 库无法展开未导出的匿名嵌入结构体。
 func TestMultiModalReadFileTool_SchemaContainsAllFields(t *testing.T) {
 	base := setupTestBackend()
 	eb := &multiModalBackend{
@@ -2510,6 +2546,8 @@ func TestMultiModalReadFileTool_SchemaContainsAllFields(t *testing.T) {
 
 // TestMultiModalReadFileTool_CustomDescNoSuffix verifies that when a custom desc is
 // provided, the multimodal suffix is NOT appended (user's desc replaces default).
+//
+// TestMultiModalReadFileTool_CustomDescNoSuffix 验证提供自定义 desc 时，不会追加多模态后缀（用户的 desc 会替代默认值）。
 func TestMultiModalReadFileTool_CustomDescNoSuffix(t *testing.T) {
 	base := setupTestBackend()
 	eb := &multiModalBackend{
@@ -2532,6 +2570,7 @@ func TestMultiModalReadFileTool_CustomDescNoSuffix(t *testing.T) {
 	assert.Equal(t, customDesc, info.Desc, "custom desc should not be augmented with multimodal suffix")
 
 	// With empty desc (fallback to default), suffix should be appended.
+	// desc 为空时（回退到默认值），应追加后缀。
 	defaultTool, err := newMultiModalReadFileTool(eb, "", "")
 	assert.NoError(t, err)
 	defaultInfo, err := defaultTool.Info(context.Background())
@@ -2542,6 +2581,8 @@ func TestMultiModalReadFileTool_CustomDescNoSuffix(t *testing.T) {
 // TestMultiModalReadFileTool_EmptyPartDataError verifies that a FileContentPart
 // with empty Data fails explicitly rather than silently encoding to an empty
 // base64 string.
+//
+// TestMultiModalReadFileTool_EmptyPartDataError 验证 FileContentPart 的 Data 为空时会明确失败，而不是静默编码为空 base64 字符串。
 func TestMultiModalReadFileTool_EmptyPartDataError(t *testing.T) {
 	base := setupTestBackend()
 	eb := &multiModalBackend{
@@ -2565,6 +2606,7 @@ func TestMultiModalReadFileTool_EmptyPartDataError(t *testing.T) {
 }
 
 // nilReadBackend wraps InMemoryBackend but returns nil, nil from Read.
+// nilReadBackend 包装 InMemoryBackend，但 Read 返回 nil, nil。
 type nilReadBackend struct {
 	*filesystem.InMemoryBackend
 }
@@ -2575,6 +2617,8 @@ func (b *nilReadBackend) Read(_ context.Context, _ *filesystem.ReadRequest) (*fi
 
 // TestReadFileTool_NilResult verifies that newReadFileTool does not panic when
 // Backend.Read returns nil, and emits a human-readable fallback message instead.
+//
+// TestReadFileTool_NilResult 验证 Backend.Read 返回 nil 时 newReadFileTool 不会 panic，而是输出可读的回退消息。
 func TestReadFileTool_NilResult(t *testing.T) {
 	base := setupTestBackend()
 	backend := &nilReadBackend{InMemoryBackend: base}
@@ -2591,6 +2635,8 @@ func TestReadFileTool_NilResult(t *testing.T) {
 // TestMultiModalReadFileTool_NilResult verifies that newMultiModalReadFileTool
 // does not panic when MultiModalRead returns nil, and returns a text part with
 // a human-readable fallback message.
+//
+// TestMultiModalReadFileTool_NilResult 验证 MultiModalRead 返回 nil 时 newMultiModalReadFileTool 不会 panic，并返回包含可读回退消息的文本 part。
 func TestMultiModalReadFileTool_NilResult(t *testing.T) {
 	base := setupTestBackend()
 	eb := &multiModalBackend{

@@ -894,6 +894,10 @@ func TestWithCancel_Streaming(t *testing.T) {
 //
 // To avoid data races, we create new agent and runner instances for the Resume phase
 // instead of reusing and modifying the original model instance.
+//
+// TestWithCancel_Resume 测试 Cancel 后接 Resume 的工作流。
+// 为避免数据竞态，Resume 阶段会创建新的 agent 和 runner 实例，
+// 而不是复用并修改原始 model 实例。
 func TestWithCancel_Resume(t *testing.T) {
 	ctx := context.Background()
 
@@ -1151,6 +1155,7 @@ func TestCancelMonitoredToolHandler_StreamableToolCall(t *testing.T) {
 		handler := &cancelMonitoredToolHandler{}
 
 		// Create a stream with some data
+		// 创建一个包含一些数据的流
 		r, w := schema.Pipe[string](1)
 		go func() {
 			w.Send("chunk1", nil)
@@ -1164,10 +1169,12 @@ func TestCancelMonitoredToolHandler_StreamableToolCall(t *testing.T) {
 
 		wrapped := handler.WrapStreamableToolCall(next)
 		// No cancelContext in the Go context
+		// Go context 中没有 cancelContext
 		output, err := wrapped(context.Background(), &compose.ToolInput{Name: "test"})
 		assert.NoError(t, err)
 
 		// Should get the original stream unchanged
+		// 应原样得到原始流
 		chunk1, err := output.Result.Recv()
 		assert.NoError(t, err)
 		assert.Equal(t, "chunk1", chunk1)
@@ -1217,6 +1224,7 @@ func TestCancelMonitoredToolHandler_StreamableToolCall(t *testing.T) {
 		cc := newCancelContext()
 
 		// Create a slow stream that we'll cancel mid-way
+		// 创建一个慢速流，以便中途取消
 		r, w := schema.Pipe[string](1)
 		go func() {
 			defer w.Close()
@@ -1235,14 +1243,17 @@ func TestCancelMonitoredToolHandler_StreamableToolCall(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Read first chunk
+		// 读取第一个 chunk
 		chunk1, err := output.Result.Recv()
 		assert.NoError(t, err)
 		assert.Equal(t, "chunk1", chunk1)
 
 		// Fire immediate cancel
+		// 立即触发取消
 		close(cc.immediateChan)
 
 		// Next recv should get ErrStreamCanceled
+		// 下一次 recv 应得到 ErrStreamCanceled
 		_, err = output.Result.Recv()
 		assert.ErrorIs(t, err, ErrStreamCanceled)
 	})
@@ -1251,6 +1262,7 @@ func TestCancelMonitoredToolHandler_StreamableToolCall(t *testing.T) {
 		handler := &cancelMonitoredToolHandler{}
 		cc := newCancelContext()
 		close(cc.immediateChan) // Already canceled
+		// 已取消
 
 		r, w := schema.Pipe[string](1)
 		go func() {
@@ -1384,9 +1396,13 @@ func TestCancelContextKey(t *testing.T) {
 }
 
 // -- Tests for cancel support across all agent types --
+// -- 所有智能体类型的取消支持测试 --
 
 // cancelTestAgent is a ChatModelAgent-based agent where the model blocks until
 // signalled, allowing tests to control exactly when to issue a cancel.
+//
+// cancelTestAgent 是基于 ChatModelAgent 的智能体，其模型会阻塞直到收到信号，
+// 这样测试可以精确控制何时发出取消。
 func newCancelTestAgent(t *testing.T, name string, modelDelay time.Duration, modelStarted chan struct{}) *ChatModelAgent {
 	t.Helper()
 	slowModel := &cancelTestChatModel{
@@ -1481,6 +1497,9 @@ func TestWithCancel_SequentialAgent(t *testing.T) {
 	t.Run("CancelImmediate_DuringSecondAgent", func(t *testing.T) {
 		// The first agent completes quickly. The second agent takes a long time.
 		// Cancel during the second agent's model call.
+		//
+		// 第一个智能体会很快完成。第二个智能体耗时很长。
+		// 在第二个智能体的模型调用期间取消。
 		agent1Started := make(chan struct{}, 1)
 		agent2Started := make(chan struct{}, 1)
 
@@ -1503,6 +1522,7 @@ func TestWithCancel_SequentialAgent(t *testing.T) {
 		iter := runner.Run(ctx, []Message{schema.UserMessage("test")}, cancelOpt)
 
 		// Wait for second agent to start
+		// 等待第二个智能体启动
 		select {
 		case <-agent2Started:
 		case <-time.After(10 * time.Second):
@@ -1512,6 +1532,7 @@ func TestWithCancel_SequentialAgent(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 
 		// Cancel should NOT return ErrExecutionEnded (the bug before the fix)
+		// 取消不应返回 ErrExecutionEnded（修复前的 bug）
 		handle, _ := cancelFn()
 		err = handle.Wait()
 		assert.NoError(t, err, "Cancel during second agent should succeed, not return ErrExecutionEnded")
@@ -1525,6 +1546,7 @@ func TestWithCancel_LoopAgent(t *testing.T) {
 
 	t.Run("CancelImmediate_DuringIteration", func(t *testing.T) {
 		// Agent in a loop. Cancel during second iteration's model call.
+		// 循环中的智能体。在第二次迭代的模型调用期间取消。
 		modelStarted := make(chan struct{}, 10)
 
 		slowModel := &cancelTestChatModel{
@@ -1562,6 +1584,7 @@ func TestWithCancel_LoopAgent(t *testing.T) {
 		iter := runner.Run(ctx, []Message{schema.UserMessage("test")}, cancelOpt)
 
 		// Wait for first iteration's model call to start
+		// 等待第一次迭代的模型调用启动
 		select {
 		case <-modelStarted:
 		case <-time.After(10 * time.Second):
@@ -1571,6 +1594,7 @@ func TestWithCancel_LoopAgent(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 
 		// Cancel should succeed
+		// 取消应成功
 		handle, _ := cancelFn()
 		err = handle.Wait()
 		assert.NoError(t, err, "Cancel during loop iteration should succeed")
@@ -1587,6 +1611,7 @@ func TestWithCancel_ParallelAgent(t *testing.T) {
 		agent2Started := make(chan struct{}, 1)
 
 		// Both agents have long delays, so cancel should interrupt both.
+		// 两个智能体都有较长延迟，因此取消应中断两者。
 		agent1 := newCancelTestAgent(t, "par_agent1", 5*time.Second, agent1Started)
 		agent2 := newCancelTestAgent(t, "par_agent2", 5*time.Second, agent2Started)
 
@@ -1606,6 +1631,7 @@ func TestWithCancel_ParallelAgent(t *testing.T) {
 		iter := runner.Run(ctx, []Message{schema.UserMessage("test")}, cancelOpt)
 
 		// Wait for both agents to start
+		// 等待两个智能体启动
 		for i := 0; i < 2; i++ {
 			select {
 			case <-agent1Started:
@@ -1636,10 +1662,14 @@ func TestWithCancel_SupervisorAgent(t *testing.T) {
 	t.Run("CancelImmediate_DuringSubAgent", func(t *testing.T) {
 		// Supervisor delegates to a slow sub-agent via transfer.
 		// Cancel during the sub-agent's model call.
+		//
+		// Supervisor 通过 transfer 委派给一个慢速子智能体。
+		// 在子智能体的模型调用期间取消。
 		supervisorModelStarted := make(chan struct{}, 1)
 		subAgentModelStarted := make(chan struct{}, 1)
 
 		// The supervisor model returns a transfer_to_agent tool call
+		// Supervisor 模型返回一个 transfer_to_agent 工具调用
 		supervisorModel := &simpleChatModel{
 			response: &schema.Message{
 				Role:    schema.Assistant,
@@ -1680,6 +1710,9 @@ func TestWithCancel_SupervisorAgent(t *testing.T) {
 
 		// Ignore the supervisor model start, wait for the sub-agent model
 		// The supervisor model is fast (simpleChatModel), so it will start and finish quickly
+		//
+		// 忽略 Supervisor 模型启动，等待子智能体模型
+		// Supervisor 模型很快（simpleChatModel），所以会快速启动并完成
 		_ = supervisorModelStarted
 		select {
 		case <-subAgentModelStarted:
@@ -1711,6 +1744,7 @@ func TestFilterCancelOption(t *testing.T) {
 		assert.Len(t, filtered, 1, "Should have removed the cancel option")
 
 		// Verify the remaining option is the session option
+		// 验证剩余选项是 session 选项
 		testOpt := &options{}
 		filtered[0].implSpecificOptFn.(func(*options))(testOpt)
 		assert.NotNil(t, testOpt.sessionValues)
@@ -1771,6 +1805,7 @@ func TestWrapIterWithMarkDone(t *testing.T) {
 		assert.False(t, ok)
 
 		// markDone should have been called, so doneChan should be closed
+		// markDone 应已被调用，因此 doneChan 应已关闭
 		select {
 		case <-cc.doneChan:
 			// good
@@ -1804,6 +1839,7 @@ func TestGraphInterruptFuncs_Parallel(t *testing.T) {
 		})
 
 		// Simulate immediate cancel
+		// 模拟立即取消
 		cc.setMode(CancelImmediate)
 		atomic.CompareAndSwapInt32(&cc.state, stateRunning, stateCancelling)
 		close(cc.cancelChan)
@@ -1817,6 +1853,7 @@ func TestGraphInterruptFuncs_Parallel(t *testing.T) {
 		cc := newCancelContext()
 
 		// First set up cancel state with immediate interrupt
+		// 先设置带立即中断的取消状态
 		cc.setMode(CancelImmediate)
 		atomic.CompareAndSwapInt32(&cc.state, stateRunning, stateCancelling)
 		close(cc.cancelChan)
@@ -1824,6 +1861,7 @@ func TestGraphInterruptFuncs_Parallel(t *testing.T) {
 		atomic.StoreInt32(&cc.interruptSent, interruptImmediate)
 
 		// Now register a new function - it should be retroactively fired
+		// 现在注册一个新函数——它应当被追溯触发
 		var called int32
 		cc.setGraphInterruptFunc(func(opts ...compose.GraphInterruptOption) {
 			atomic.AddInt32(&called, 1)
@@ -1834,15 +1872,23 @@ func TestGraphInterruptFuncs_Parallel(t *testing.T) {
 }
 
 // -- Tests for transition-point cancel (cancel between sub-agents) --
+// -- 子智能体之间过渡点取消的测试 --
 
 // gatedChatModel is a model that:
 // - Signals doneChan when Generate completes
 // - Optionally blocks on gateChan before returning (nil gateChan = no blocking)
 // - Tracks call count via callCount
+//
+// gatedChatModel 是一个模型：
+// - Generate 完成时通知 doneChan
+// - 返回前可选择在 gateChan 上阻塞（nil gateChan = 不阻塞）
+// - 通过 callCount 跟踪调用次数
 type gatedChatModel struct {
-	response  *schema.Message
-	gateChan  chan struct{} // if non-nil, blocks until closed before returning
-	doneChan  chan struct{} // signalled after Generate completes
+	response *schema.Message
+	gateChan chan struct{} // if non-nil, blocks until closed before returning
+	// 若非 nil，则返回前阻塞直到关闭
+	doneChan chan struct{} // signalled after Generate completes
+	// Generate 完成后发出信号
 	callCount int32
 }
 
@@ -1881,6 +1927,11 @@ func TestCheckCancel_Sequential_BetweenSubAgents(t *testing.T) {
 	// At a transition boundary, the completed sub-agent's entire execution
 	// (including any tool calls) is done, satisfying the CancelAfterToolCalls
 	// contract — even if this particular sub-agent had no tools.
+	//
+	// CancelAfterToolCalls 会在子智能体之间的过渡边界触发。
+	// 在过渡边界处，已完成子智能体的整个执行
+	// （包括任何工具调用）都已结束，满足 CancelAfterToolCalls
+	// 契约——即使这个特定子智能体没有工具。
 	model1 := &gatedChatModel{
 		response: &schema.Message{Role: schema.Assistant, Content: "agent1 done"},
 		gateChan: make(chan struct{}),
@@ -1941,6 +1992,10 @@ func TestCheckCancel_Loop_BetweenIterations(t *testing.T) {
 	// CancelAfterToolCalls fires at loop iteration boundaries.
 	// After the first iteration completes, any tool calls it made are done,
 	// satisfying the CancelAfterToolCalls contract.
+	//
+	// CancelAfterToolCalls 会在循环迭代边界触发。
+	// 第一次迭代完成后，它发起的任何工具调用都已完成，
+	// 满足 CancelAfterToolCalls 契约。
 	mdl := &gatedChatModel{
 		response: &schema.Message{Role: schema.Assistant, Content: "loop iter"},
 		gateChan: make(chan struct{}),
@@ -1989,6 +2044,7 @@ func TestCheckCancel_Parallel_PreSpawn(t *testing.T) {
 	ctx := context.Background()
 
 	// Cancel fires before Run is called. Neither model should be invoked.
+	// 取消在调用 Run 之前触发。两个模型都不应被调用。
 	model1 := &gatedChatModel{
 		response: &schema.Message{Role: schema.Assistant, Content: "par1"},
 		doneChan: make(chan struct{}, 1),
@@ -2014,6 +2070,7 @@ func TestCheckCancel_Parallel_PreSpawn(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Fire cancel in goroutine (cancelFn blocks until handled)
+	// 在 goroutine 中触发取消（cancelFn 会阻塞直到被处理）
 	cancelOpt, cancelFn := WithCancel()
 	cancelDone := make(chan error, 1)
 	go func() {
@@ -2021,6 +2078,7 @@ func TestCheckCancel_Parallel_PreSpawn(t *testing.T) {
 		cancelDone <- handle.Wait()
 	}()
 	// Wait for cancelChan to be closed (happens synchronously before the blocking doneChan wait)
+	// 等待 cancelChan 关闭（这会在阻塞的 doneChan 等待之前同步发生）
 	time.Sleep(20 * time.Millisecond)
 
 	runner := NewRunner(ctx, RunnerConfig{
@@ -2042,6 +2100,7 @@ func TestCheckCancel_Parallel_PreSpawn(t *testing.T) {
 	}
 
 	// cancelFn should have completed
+	// cancelFn 应已完成
 	select {
 	case err = <-cancelDone:
 		assert.NoError(t, err)
@@ -2060,6 +2119,10 @@ func TestCheckCancel_Transfer_BeforeTarget(t *testing.T) {
 	// Supervisor CMA returns a transfer action (instantly).
 	// Cancel fires after transfer action but before target runs.
 	// Target model should never be invoked.
+	//
+	// Supervisor CMA 立即返回一个 transfer action。
+	// 取消在 transfer action 之后、目标运行之前触发。
+	// 目标模型绝不应被调用。
 	supervisorModel := &simpleChatModel{
 		response: &schema.Message{
 			Role: schema.Assistant,
@@ -2091,6 +2154,7 @@ func TestCheckCancel_Transfer_BeforeTarget(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Fire cancel in goroutine (cancelFn blocks until handled)
+	// 在 goroutine 中触发取消（cancelFn 会阻塞直到被处理）
 	cancelOpt, cancelFn := WithCancel()
 	cancelDone := make(chan error, 1)
 	go func() {
@@ -2134,6 +2198,10 @@ func TestCheckCancel_AlreadyHandled_NoDuplicate(t *testing.T) {
 	// In a sequential agent, if the first CMA handles the cancel (graph interrupt),
 	// the workflow's transition check should NOT emit a duplicate CancelError.
 	// Use a slow model so cancel fires during its execution (handled by CMA).
+	//
+	// 在 sequential agent 中，如果第一个 CMA 处理了取消（graph interrupt），
+	// workflow 的过渡检查不应再发出重复的 CancelError。
+	// 使用慢模型，使取消在其执行期间触发（由 CMA 处理）。
 	modelStarted := make(chan struct{}, 1)
 	model1 := &cancelTestChatModel{
 		delayNs:     int64(2 * time.Second),
@@ -2169,6 +2237,7 @@ func TestCheckCancel_AlreadyHandled_NoDuplicate(t *testing.T) {
 	iter := runner.Run(ctx, []Message{schema.UserMessage("test")}, cancelOpt)
 
 	// Wait for model to start, then cancel during model execution
+	// 等待模型启动，然后在模型执行期间取消
 	select {
 	case <-modelStarted:
 	case <-time.After(5 * time.Second):
@@ -2198,6 +2267,10 @@ func TestCheckCancel_AlreadyHandled_NoDuplicate(t *testing.T) {
 // Tests for CancelAfterChatModel/CancelAfterToolCalls in nested workflow structures.
 // These verify that safe-point cancel modes propagate through the entire agent hierarchy
 // and fire at whichever nested level reaches the safe-point first.
+//
+// 测试嵌套 workflow 结构中的 CancelAfterChatModel/CancelAfterToolCalls。
+// 这些测试验证 safe-point 取消模式会贯穿整个智能体层级传播，
+// 并在任一嵌套层级最先到达 safe-point 时触发。
 
 func TestCancel_SequentialWorkflow_CancelAfterChatModel(t *testing.T) {
 	ctx := context.Background()
@@ -2467,6 +2540,7 @@ func TestCancelImmediate_OrphanedToolGoroutine_NoPanic(t *testing.T) {
 }
 
 // -- Tests for CancelImmediate in nested agent structures --
+// -- 嵌套智能体结构中 CancelImmediate 的测试 --
 
 func newTestChatModel(response *schema.Message, delay time.Duration) *cancelTestChatModel {
 	m := &cancelTestChatModel{
@@ -2728,6 +2802,11 @@ func (a *cancelUnawareAgent) Run(_ context.Context, _ *AgentInput, _ ...AgentRun
 		// does not participate in the cancel protocol at all.
 		// Delay is kept short (relative to grace period) to avoid goroutine
 		// leak lasting long after the test completes.
+		//
+		// 有意忽略 ctx.Done()——模拟一个完全
+		// 不参与取消协议的自定义智能体。
+		// Delay 保持较短（相对于宽限期），以避免测试完成后
+		// goroutine 泄漏持续很久。
 		time.Sleep(a.delay)
 	}()
 	return iter
@@ -3101,6 +3180,11 @@ func TestCancelAfterToolCalls_LoopTransitionBoundary(t *testing.T) {
 	// This completes one ReAct cycle per pair of calls:
 	//   call 1 (gated): returns tool call → tool runs → call 2: returns no tools → END
 	// The gate only blocks the very first call. After that, all calls proceed instantly.
+	//
+	// 该模型在奇数次调用返回工具调用，在偶数次调用不返回工具。
+	// 每两次调用完成一个 ReAct cycle：
+	// call 1 (gated): returns tool call → tool runs → call 2: returns no tools → END
+	// gate 只阻塞第一次调用。之后所有调用都会立即继续。
 	mdl := &multiResponseGatedModel{
 		responses: []*schema.Message{
 			{Role: schema.Assistant, ToolCalls: []schema.ToolCall{{
@@ -3143,11 +3227,13 @@ func TestCancelAfterToolCalls_LoopTransitionBoundary(t *testing.T) {
 	iter := runner.Run(ctx, []Message{schema.UserMessage("test")}, cancelOpt, WithCheckPointID("toolcalls-loop-1"))
 
 	// Wait for the model to be entered (blocked on gate)
+	// 等待模型进入（阻塞在 gate 上）
 	for atomic.LoadInt32(&mdl.callCount) == 0 {
 		runtime.Gosched()
 	}
 
 	// Fire cancel, wait for it to be registered, then release the gate
+	// 触发取消，等待其注册，然后释放 gate
 	cancelCalled, result := cancelAsync(cancelFn, WithAgentCancelMode(CancelAfterToolCalls))
 	waitForChan(t, cancelCalled, "cancelFn was not called")
 	close(mdl.gateChan)
@@ -3159,6 +3245,13 @@ func TestCancelAfterToolCalls_LoopTransitionBoundary(t *testing.T) {
 	// both are semantically correct for CancelAfterToolCalls. The transition-
 	// boundary code path for CancelAfterToolCalls in loops is not definitively
 	// covered here because the ReAct safe-point may handle it first.
+	//
+	// 第 1 次迭代完整完成（model→tool→model-no-tools→END）。
+	// ReAct 内的 CancelAfterToolCalls 安全点会在工具调用后触发，
+	// 或由转换边界在第 2 次迭代前捕获。
+	// 注意：此测试不会确定性地区分是哪条路径触发——
+	// 两者对 CancelAfterToolCalls 语义上都正确。循环中 CancelAfterToolCalls 的转换边界代码路径
+	// 在这里未被确定覆盖，因为 ReAct 安全点可能会先处理。
 	assert.NoError(t, result.waitDone(t))
 
 	cancelErr := drainCancelError(t, iter)
@@ -3351,6 +3444,7 @@ func TestCancel_LoopWorkflow_CancelAfterChatModel(t *testing.T) {
 
 func TestCancel_NestedWorkflow_AgentTool_CancelAfterChatModel(t *testing.T) {
 	// Structure: Runner -> RootCMA (with tools) -> agentTool -> flowAgent -> seqWorkflow -> LeafCMA
+	// 结构：Runner -> RootCMA（带工具）-> agentTool -> flowAgent -> seqWorkflow -> LeafCMA
 	ctx := context.Background()
 	leafStarted := make(chan struct{}, 1)
 
@@ -3445,6 +3539,7 @@ func TestCancel_NestedWorkflow_AgentTool_CancelAfterChatModel(t *testing.T) {
 	assert.NotNil(t, cancelErr.interruptSignal, "CancelError should carry interrupt signal through agent tree")
 
 	// Phase 2: Resume from checkpoint — new instances to avoid data races
+	// 阶段 2：从检查点恢复——使用新实例以避免数据竞争
 	resumeLeafModel := &cancelTestChatModel{
 		response: &schema.Message{
 			Role:    schema.Assistant,
@@ -3572,6 +3667,7 @@ func TestCancel_CancelAfterToolCalls_InSequentialWorkflow(t *testing.T) {
 	}
 
 	// Cancel after tool calls — should wait for the tool to finish, then cancel
+	// 工具调用后取消——应等待工具完成，然后取消
 	handle, contributed := cancelFn(WithAgentCancelMode(CancelAfterToolCalls))
 	assert.True(t, contributed, "Cancel should contribute")
 	err = handle.Wait()
@@ -3593,6 +3689,7 @@ func TestCancel_CancelAfterToolCalls_InSequentialWorkflow(t *testing.T) {
 	assert.Equal(t, CancelAfterToolCalls, cancelErr.Info.Mode)
 
 	// Phase 2: Resume from checkpoint — new instances
+	// 阶段 2：从检查点恢复——使用新实例
 	resumeTool := &slowTool{
 		name:        "slow_tool",
 		delay:       50 * time.Millisecond,
@@ -3653,6 +3750,12 @@ func TestCancel_CancelAfterToolCalls_InSequentialWorkflow(t *testing.T) {
 // CancelAfterToolCalls on an agent with no tool calls). The cancel CAS succeeds
 // (stateRunning → stateCancelling), but the agent completes normally (markDone →
 // stateDone), so waitForCompletion returns ErrExecutionEnded.
+//
+// TestCancel_SafePointNeverFires_ErrExecutionEnded 验证 waitForCompletion 路径：
+// 智能体运行时提交安全点取消，但智能体结束时未命中请求的安全点（例如
+// 无工具调用的智能体上的 CancelAfterToolCalls）。取消 CAS 成功
+// （stateRunning → stateCancelling），但智能体正常完成（markDone →
+// stateDone），因此 waitForCompletion 返回 ErrExecutionEnded。
 func TestCancel_SafePointNeverFires_ErrExecutionEnded(t *testing.T) {
 	ctx := context.Background()
 
@@ -3684,17 +3787,24 @@ func TestCancel_SafePointNeverFires_ErrExecutionEnded(t *testing.T) {
 	iter := runner.Run(ctx, []Message{schema.UserMessage("hello")}, cancelOpt)
 
 	// Wait a moment for the agent to enter Generate and block on gateChan.
+	// 稍等片刻，让智能体进入 Generate 并阻塞在 gateChan 上。
 	runtime.Gosched()
 	time.Sleep(50 * time.Millisecond)
 
 	// Submit a safe-point cancel for tool calls. The agent has no tools,
 	// so this safe-point will never fire.
+	//
+	// 提交针对工具调用的安全点取消。该智能体没有工具，
+	// 因此这个安全点永远不会触发。
 	handle, submitted := cancelFn(WithAgentCancelMode(CancelAfterToolCalls))
 	assert.True(t, submitted)
 
 	// Let the model complete. The agent finishes without hitting the tool
 	// calls safe-point → markDone → stateDone → waitForCompletion returns
 	// ErrExecutionEnded.
+	//
+	// 让模型完成。智能体未命中工具调用安全点就结束：markDone → stateDone → waitForCompletion 返回
+	// ErrExecutionEnded。
 	close(gate)
 
 	waitErr := handle.Wait()
@@ -3711,11 +3821,16 @@ func TestCancel_SafePointNeverFires_ErrExecutionEnded(t *testing.T) {
 // TestBuildCancelFunc_StateDoneUnderLock exercises the race-condition path
 // in buildCancelFunc where the state transitions to stateDone between the
 // lockless check and the locked check (cancel.go L732-734).
+//
+// TestBuildCancelFunc_StateDoneUnderLock 覆盖 buildCancelFunc 中的竞态条件路径：
+// 状态在无锁检查和加锁检查之间转换为 stateDone
+// （cancel.go L732-734）。
 func TestBuildCancelFunc_StateDoneUnderLock(t *testing.T) {
 	cc := newCancelContext()
 	cancelFn := cc.buildCancelFunc()
 
 	// Hold cancelMu so the cancel func blocks when it tries to acquire the lock.
+	// 持有 cancelMu，使 cancel func 尝试获取锁时阻塞。
 	cc.cancelMu.Lock()
 
 	type result struct {
@@ -3730,13 +3845,16 @@ func TestBuildCancelFunc_StateDoneUnderLock(t *testing.T) {
 	}()
 
 	// Give the goroutine time to reach the Lock() call.
+	// 给 goroutine 一点时间到达 Lock() 调用。
 	runtime.Gosched()
 	time.Sleep(20 * time.Millisecond)
 
 	// Transition to stateDone while the cancel goroutine is blocked on the lock.
+	// 当取消 goroutine 阻塞在锁上时转换为 stateDone。
 	cc.markDone()
 
 	// Release the lock. The cancel func resumes and finds stateDone.
+	// 释放锁。cancel func 恢复执行并发现 stateDone。
 	cc.cancelMu.Unlock()
 
 	r := <-ch
@@ -3748,6 +3866,11 @@ func TestBuildCancelFunc_StateDoneUnderLock(t *testing.T) {
 // in buildCancelFunc where the CAS on stateRunning→stateCancelling fails
 // because markDone transitioned stateRunning→stateDone concurrently
 // (cancel.go L742-743).
+//
+// TestBuildCancelFunc_CASFailStateDone 覆盖 buildCancelFunc 中的竞态条件路径：
+// stateRunning→stateCancelling 的 CAS 失败，
+// 因为 markDone 并发地将 stateRunning→stateDone
+// （cancel.go L742-743）。
 func TestBuildCancelFunc_CASFailStateDone(t *testing.T) {
 	// Exercises cancel.go L742-743: CAS(stateRunning→stateCancelling) fails
 	// because markDone transitions stateRunning→stateDone concurrently.
@@ -3755,12 +3878,19 @@ func TestBuildCancelFunc_CASFailStateDone(t *testing.T) {
 	// The window between the state check (L738) and CAS (L739) is extremely
 	// tight. We maximize the chance by having the cancel goroutine block on
 	// cancelMu, then racing markDone with the lock release.
+	//
+	// 覆盖 cancel.go L742-743：CAS(stateRunning→stateCancelling) 失败，
+	// 因为 markDone 并发地将 stateRunning→stateDone。
+	// 状态检查（L738）和 CAS（L739）之间的窗口极窄。
+	// 我们通过让取消 goroutine 阻塞在 cancelMu 上，
+	// 再让 markDone 与锁释放并发竞争，来最大化触发概率。
 	hit := false
 	for i := 0; i < 100000 && !hit; i++ {
 		cc := newCancelContext()
 		cancelFn := cc.buildCancelFunc()
 
 		// Hold cancelMu so the cancel goroutine blocks at L725.
+		// 持有 cancelMu，使取消 goroutine 阻塞在 L725。
 		cc.cancelMu.Lock()
 
 		cancelDone := make(chan struct{})
@@ -3773,10 +3903,14 @@ func TestBuildCancelFunc_CASFailStateDone(t *testing.T) {
 		}()
 
 		// Let the cancel goroutine reach the Lock() call.
+		// 让取消 goroutine 到达 Lock() 调用。
 		runtime.Gosched()
 
 		// Release lock and fire markDone concurrently. The cancel goroutine
 		// will acquire the lock and race with markDone on the CAS.
+		//
+		// 释放锁并并发触发 markDone。取消 goroutine
+		// 将获取锁，并在 CAS 上与 markDone 竞争。
 		go cc.markDone()
 		cc.cancelMu.Unlock()
 

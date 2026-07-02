@@ -71,11 +71,13 @@ func TestClone(t *testing.T) {
 	assert.NotEqual(t, map[int]int{}, Clone(nilMap))
 
 	// Test new type.
+	// 测试新类型。
 	type I2I map[int]int
 	assert.Equal(t, I2I{1: 1, 2: 2}, Clone(I2I{1: 1, 2: 2}))
 	assert.Equal(t, "gmap.I2I", fmt.Sprintf("%T", Clone(I2I{})))
 
 	// Test shallow clone.
+	// 测试浅拷贝。
 	src := map[int]*int{1: ptr(1), 2: ptr(2)}
 	dst := Clone(src)
 	assert.Equal(t, src, dst)
@@ -84,6 +86,7 @@ func TestClone(t *testing.T) {
 }
 
 // Ptr returns a pointer to the given value.
+// Ptr 返回指向给定值的指针。
 func ptr[T any](v T) *T {
 	return &v
 }

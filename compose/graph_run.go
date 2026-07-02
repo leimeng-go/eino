@@ -34,6 +34,7 @@ type chanCall struct {
 	writeToBranches []*GraphBranch
 
 	controls []string // branch must control
+	// branch 必须控制
 
 	preProcessor, postProcessor *composableRunnable
 }
@@ -50,8 +51,9 @@ type runner struct {
 	inputChannels *chanCall
 
 	chanBuilder chanBuilder // could be nil
-	eager       bool
-	dag         bool
+	// 可以为 nil
+	eager bool
+	dag   bool
 
 	runCtx func(ctx context.Context) context.Context
 
@@ -61,6 +63,7 @@ type runner struct {
 	outputType reflect.Type
 
 	// take effect as a subgraph through toComposableRunnable
+	// 通过 toComposableRunnable 作为子图生效
 	inputStreamFilter                               streamMapFilter
 	inputConverter                                  handlerPair
 	inputFieldMappingConverter                      handlerPair
@@ -69,6 +72,7 @@ type runner struct {
 	*genericHelper
 
 	// checks need to do because cannot check at compile
+	// 这些检查需要执行，因为编译时无法检查
 	runtimeCheckEdges    map[string]map[string]bool
 	runtimeCheckBranches map[string][]bool
 
@@ -108,6 +112,7 @@ func runnableTransform(ctx context.Context, r *composableRunnable, input any, op
 
 func (r *runner) run(ctx context.Context, isStream bool, input any, opts ...Option) (result any, err error) {
 	haveOnStart := false // delay triggering onGraphStart until state initialization is complete, so that the state can be accessed within onGraphStart.
+	// 延迟触发 onGraphStart，直到 state 初始化完成，以便在 onGraphStart 中访问 state。
 	defer func() {
 		if !haveOnStart {
 			ctx, input = onGraphStart(ctx, input, isStream)
@@ -126,6 +131,7 @@ func (r *runner) run(ctx context.Context, isStream bool, input any, opts ...Opti
 	}
 
 	// Initialize channel and task managers.
+	// 初始化 channel 和 task managers。
 	cm := r.initChannelManager(isStream)
 	tm := r.initTaskManager(runWrapper, getGraphCancel(ctx), opts...)
 	maxSteps := r.options.maxRunSteps
@@ -136,25 +142,30 @@ func (r *runner) run(ctx context.Context, isStream bool, input any, opts ...Opti
 	}
 
 	// Extract and validate options for each node.
+	// 提取并验证每个节点的 options。
 	optMap, extractErr := extractOption(r.chanSubscribeTo, opts...)
 	if extractErr != nil {
 		return nil, newGraphRunError(fmt.Errorf("graph extract option fail: %w", extractErr))
 	}
 
 	// Extract CheckPointID
+	// 提取 CheckPointID
 	checkPointID, writeToCheckPointID, stateModifier, forceNewRun := getCheckPointInfo(opts...)
 	if checkPointID != nil && r.checkPointer.store == nil {
 		return nil, newGraphRunError(fmt.Errorf("receive checkpoint id but have not set checkpoint store"))
 	}
 
 	// Extract subgraph
+	// 提取 subgraph
 	path, isSubGraph := getNodePath(ctx)
 
 	// load checkpoint from ctx/store or init graph
+	// 从 ctx/store 加载 checkpoint，或初始化 graph
 	initialized := false
 	var nextTasks []*task
 	if cp := getCheckPointFromCtx(ctx); cp != nil {
 		// in subgraph, try to load checkpoint from ctx
+		// 在子图中，尝试从 ctx 加载检查点
 		initialized = true
 
 		ctx, err = r.restoreCheckPointState(ctx, *path, getStateModifier(ctx), cp, isStream, cm)
@@ -176,6 +187,7 @@ func (r *runner) run(ctx context.Context, isStream bool, input any, opts ...Opti
 		}
 		if cp != nil {
 			// load checkpoint from store
+			// 从 store 加载检查点
 			initialized = true
 
 			ctx = setStateModifier(ctx, stateModifier)
@@ -197,6 +209,7 @@ func (r *runner) run(ctx context.Context, isStream bool, input any, opts ...Opti
 	}
 	if !initialized {
 		// have not inited from checkpoint
+		// 尚未从检查点初始化
 		if r.runCtx != nil {
 			ctx = r.runCtx(ctx)
 		}
@@ -235,11 +248,14 @@ func (r *runner) run(ctx context.Context, isStream bool, input any, opts ...Opti
 	}
 
 	// used to reporting NoTask error
+	// 用于报告 NoTask 错误
 	var lastCompletedTask []*task
 
 	// Main execution loop.
+	// 主执行循环。
 	for step := 0; ; step++ {
 		// Check for context cancellation.
+		// 检查 context 是否取消。
 		select {
 		case <-ctx.Done():
 			_, _ = tm.waitAll()
@@ -253,6 +269,10 @@ func (r *runner) run(ctx context.Context, isStream bool, input any, opts ...Opti
 		// 1. submit next tasks
 		// 2. get completed tasks
 		// 3. calculate next tasks
+		//
+		// 1. 提交下一批任务
+		// 2. 获取已完成任务
+		// 3. 计算下一批任务
 
 		err = tm.submit(nextTasks)
 		if err != nil {
@@ -269,6 +289,7 @@ func (r *runner) run(ctx context.Context, isStream bool, input any, opts ...Opti
 		err = r.resolveInterruptCompletedTasks(tempInfo, completedTasks)
 		if err != nil {
 			return nil, err // err has been wrapped
+			// err 已包装
 		}
 
 		if len(tempInfo.subGraphInterrupts)+len(tempInfo.interruptRerunNodes) > 0 {
@@ -277,22 +298,30 @@ func (r *runner) run(ctx context.Context, isStream bool, input any, opts ...Opti
 			totalCanceledTasks = append(totalCanceledTasks, canceledTasks...)
 			for _, ct := range canceledTasks {
 				// handle timeout tasks as rerun
+				// 将超时任务按重新运行处理
 				tempInfo.interruptRerunNodes = append(tempInfo.interruptRerunNodes, ct.nodeKey)
 			}
 
 			err = r.resolveInterruptCompletedTasks(tempInfo, newCompletedTasks)
 			if err != nil {
 				return nil, err // err has been wrapped
+				// err 已包装
 			}
 
 			// subgraph has interrupted
 			// save other completed tasks to channel
 			// save interrupted subgraph as next task with SkipPreHandler
 			// report current graph interrupt info
+			//
+			// 子图已中断
+			// 将其他已完成任务保存到 channel
+			// 将中断的子图作为带 SkipPreHandler 的下一个任务保存
+			// 报告当前图的中断信息
 			return nil, r.handleInterruptWithSubGraphAndRerunNodes(
 				ctx,
 				tempInfo,
 				append(append(completedTasks, newCompletedTasks...), totalCanceledTasks...), // canceled tasks are handled as rerun
+				// 已取消任务按重新运行处理
 				writeToCheckPointID,
 				isSubGraph,
 				cm,
@@ -327,6 +356,7 @@ func (r *runner) run(ctx context.Context, isStream bool, input any, opts ...Opti
 			err = r.resolveInterruptCompletedTasks(tempInfo, newCompletedTasks)
 			if err != nil {
 				return nil, err // err has been wrapped
+				// err 已包装
 			}
 
 			if len(tempInfo.subGraphInterrupts)+len(tempInfo.interruptRerunNodes) > 0 {
@@ -354,6 +384,7 @@ func (r *runner) run(ctx context.Context, isStream bool, input any, opts ...Opti
 			tempInfo.interruptBeforeNodes = append(tempInfo.interruptBeforeNodes, getHitKey(newNextTasks, r.interruptBeforeNodes)...)
 
 			// simple interrupt
+			// 简单中断
 			return nil, r.handleInterrupt(ctx, tempInfo, append(nextTasks, newNextTasks...), cm.channels, isStream, isSubGraph, writeToCheckPointID)
 		}
 	}
@@ -515,6 +546,7 @@ func (r *runner) handleInterrupt(
 	}
 	if r.runCtx != nil {
 		// current graph has enable state
+		// 当前图已启用 state
 		if state, ok := ctx.Value(stateKey{}).(*internalState); ok {
 			state.mu.Lock()
 			copiedState, err := deepCopyState(state.state)
@@ -569,6 +601,7 @@ func (r *runner) handleInterrupt(
 }
 
 // deepCopyState creates a deep copy of the state using serialization
+// deepCopyState 使用序列化创建 state 的深拷贝
 func deepCopyState(state any) (any, error) {
 	if state == nil {
 		return nil, nil
@@ -580,6 +613,7 @@ func deepCopyState(state any) (any, error) {
 	}
 
 	// Create new instance of the same type
+	// 创建相同类型的新实例
 	stateType := reflect.TypeOf(state)
 	isPtr := stateType.Kind() == reflect.Ptr
 	if isPtr {
@@ -610,6 +644,7 @@ func (r *runner) handleInterruptWithSubGraphAndRerunNodes(
 		if _, ok := tempInfo.subGraphInterrupts[t.nodeKey]; ok {
 			subgraphTasks = append(subgraphTasks, t)
 			skipPreHandler[t.nodeKey] = true // subgraph won't run pre-handler again, but rerun nodes will
+			// 子图不会再次运行 pre-handler，但重新运行的节点会
 			continue
 		}
 		rerun := false
@@ -626,6 +661,7 @@ func (r *runner) handleInterruptWithSubGraphAndRerunNodes(
 	}
 
 	// forward completed tasks
+	// 转发已完成任务
 	toValue, controls, err := r.resolveCompletedTasks(ctx, otherTasks, isStream, cm)
 	if err != nil {
 		return fmt.Errorf("failed to resolve completed tasks in interrupt: %w", err)
@@ -647,6 +683,7 @@ func (r *runner) handleInterruptWithSubGraphAndRerunNodes(
 	}
 	if r.runCtx != nil {
 		// current graph has enable state
+		// 当前图已启用 state
 		if state, ok := ctx.Value(stateKey{}).(*internalState); ok {
 			state.mu.Lock()
 			copiedState, err_ := deepCopyState(state.state)
@@ -719,11 +756,13 @@ func (r *runner) calculateNextTasks(ctx context.Context, completedTasks []*task,
 	var nextTasks []*task
 	if len(nodeMap) > 0 {
 		// Check if we've reached the END node.
+		// 检查是否已到达 END 节点。
 		if v, ok := nodeMap[END]; ok {
 			return nil, v, true, nil
 		}
 
 		// Create and submit the next batch of tasks.
+		// 创建并提交下一批任务。
 		nextTasks, err = r.createTasks(ctx, nodeMap, optMap)
 		if err != nil {
 			return nil, nil, false, fmt.Errorf("failed to create tasks: %w", err)
@@ -805,6 +844,7 @@ func (r *runner) restoreTasks(
 
 		if call.action.nodeInfo != nil && call.action.nodeInfo.compileOption != nil {
 			// sub graph
+			// 子图
 			ctx = forwardCheckPoint(ctx, key)
 		}
 
@@ -834,6 +874,7 @@ func (r *runner) resolveCompletedTasks(ctx context.Context, completedTasks []*ta
 		}
 
 		// update channel & new_next_tasks
+		// 更新 channel 和 new_next_tasks
 		vs := copyItem(t.output, len(t.call.writeTo)+len(t.call.writeToBranches)*2)
 		nextNodeKeys, err := r.calculateBranch(ctx, t.nodeKey, t.call,
 			vs[len(t.call.writeTo)+len(t.call.writeToBranches):], isStream, cm)
@@ -847,6 +888,7 @@ func (r *runner) resolveCompletedTasks(ctx context.Context, completedTasks []*ta
 		nextNodeKeys = append(nextNodeKeys, t.call.writeTo...)
 
 		// If branches generates more than one successor, the inputs need to be copied accordingly.
+		// 如果 branches 生成多个后继，输入需要相应复制。
 		if len(nextNodeKeys) > 0 {
 			toCopyNum := len(nextNodeKeys) - len(t.call.writeTo) - len(t.call.writeToBranches)
 			nVs := copyItem(vs[len(t.call.writeTo)+len(t.call.writeToBranches)-1], toCopyNum+1)
@@ -874,6 +916,7 @@ func (r *runner) calculateBranch(ctx context.Context, curNodeKey string, startCh
 	skippedNodes := make(map[string]struct{})
 	for i, branch := range startChan.writeToBranches {
 		// check branch input type if needed
+		// 必要时检查 branch 输入类型
 		var err error
 		input[i], err = r.preBranchHandlerManager.handle(curNodeKey, i, input[i], isStream)
 		if err != nil {
@@ -881,6 +924,7 @@ func (r *runner) calculateBranch(ctx context.Context, curNodeKey string, startCh
 		}
 
 		// process branch output
+		// 处理 branch 输出
 		var ws []string
 		if isStream {
 			ws, err = branch.collect(ctx, input[i].(streamReader))
@@ -913,6 +957,10 @@ func (r *runner) calculateBranch(ctx context.Context, curNodeKey string, startCh
 	// When a node has multiple branches,
 	// there may be a situation where a succeeding node is selected by some branches and discarded by the other branches,
 	// in which case the succeeding node should not be skipped.
+	//
+	// 当一个节点有多个 branches 时，
+	// 可能出现某个后继节点被部分 branches 选中、被其他 branches 丢弃的情况，
+	// 此时不应跳过该后继节点。
 	var skippedNodeList []string
 	for _, selected := range ret {
 		if _, ok := skippedNodes[selected]; ok {
@@ -1012,6 +1060,7 @@ func (r *runner) toComposableRunnable() *composableRunnable {
 		outputType:    r.outputType,
 		genericHelper: r.genericHelper,
 		optionType:    nil, // if option type is nil, graph will transmit all options.
+		// 如果 option 类型为 nil，graph 会传递所有 options。
 	}
 
 	return cr

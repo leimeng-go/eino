@@ -31,6 +31,7 @@ import (
 )
 
 // WorkflowNode is the node of the Workflow.
+// WorkflowNode 是 Workflow 的节点。
 type WorkflowNode struct {
 	g                *graph
 	key              string
@@ -42,6 +43,9 @@ type WorkflowNode struct {
 
 // Workflow is wrapper of graph, replacing AddEdge with declaring dependencies and field mappings between nodes.
 // Under the hood it uses NodeTriggerMode(AllPredecessor), so does not support cycles.
+//
+// Workflow 是 graph 的包装器，用声明节点间依赖和字段映射来替代 AddEdge。
+// 底层使用 NodeTriggerMode(AllPredecessor)，因此不支持环。
 type Workflow[I, O any] struct {
 	g                *graph
 	workflowNodes    map[string]*WorkflowNode
@@ -58,6 +62,7 @@ const (
 )
 
 // NewWorkflow creates a new Workflow.
+// NewWorkflow 创建一个新的 Workflow。
 func NewWorkflow[I, O any](opts ...NewGraphOption) *Workflow[I, O] {
 	options := &newGraphOptions{}
 	for _, opt := range opts {
@@ -79,89 +84,104 @@ func NewWorkflow[I, O any](opts ...NewGraphOption) *Workflow[I, O] {
 }
 
 // Compile builds the workflow into a runnable graph.
+// Compile 将 workflow 构建为可运行的图。
 func (wf *Workflow[I, O]) Compile(ctx context.Context, opts ...GraphCompileOption) (Runnable[I, O], error) {
 	return compileAnyGraph[I, O](ctx, wf, opts...)
 }
 
 // AddChatModelNode adds a chat model node and returns it.
+// AddChatModelNode 添加一个聊天模型节点并返回它。
 func (wf *Workflow[I, O]) AddChatModelNode(key string, chatModel model.BaseChatModel, opts ...GraphAddNodeOpt) *WorkflowNode {
 	_ = wf.g.AddChatModelNode(key, chatModel, opts...)
 	return wf.initNode(key)
 }
 
 // AddAgenticModelNode adds an agentic model node and returns it.
+// AddAgenticModelNode 添加一个 agentic 模型节点并返回它。
 func (wf *Workflow[I, O]) AddAgenticModelNode(key string, agenticModel model.AgenticModel, opts ...GraphAddNodeOpt) *WorkflowNode {
 	_ = wf.g.AddAgenticModelNode(key, agenticModel, opts...)
 	return wf.initNode(key)
 }
 
 // AddChatTemplateNode adds a chat template node and returns it.
+// AddChatTemplateNode 添加一个聊天模板节点并返回它。
 func (wf *Workflow[I, O]) AddChatTemplateNode(key string, chatTemplate prompt.ChatTemplate, opts ...GraphAddNodeOpt) *WorkflowNode {
 	_ = wf.g.AddChatTemplateNode(key, chatTemplate, opts...)
 	return wf.initNode(key)
 }
 
 // AddAgenticChatTemplateNode adds an agentic chat template node and returns it.
+// AddAgenticChatTemplateNode 添加一个 agentic 聊天模板节点并返回它。
 func (wf *Workflow[I, O]) AddAgenticChatTemplateNode(key string, chatTemplate prompt.AgenticChatTemplate, opts ...GraphAddNodeOpt) *WorkflowNode {
 	_ = wf.g.AddAgenticChatTemplateNode(key, chatTemplate, opts...)
 	return wf.initNode(key)
 }
 
 // AddToolsNode adds a tools node and returns it.
+// AddToolsNode 添加一个工具节点并返回它。
 func (wf *Workflow[I, O]) AddToolsNode(key string, tools *ToolsNode, opts ...GraphAddNodeOpt) *WorkflowNode {
 	_ = wf.g.AddToolsNode(key, tools, opts...)
 	return wf.initNode(key)
 }
 
 // AddAgenticToolsNode adds an agentic tools node and returns it.
+// AddAgenticToolsNode 添加一个 agentic 工具节点并返回它。
 func (wf *Workflow[I, O]) AddAgenticToolsNode(key string, tools *AgenticToolsNode, opts ...GraphAddNodeOpt) *WorkflowNode {
 	_ = wf.g.AddAgenticToolsNode(key, tools, opts...)
 	return wf.initNode(key)
 }
 
 // AddRetrieverNode adds a retriever node and returns it.
+// AddRetrieverNode 添加一个检索器节点并返回它。
 func (wf *Workflow[I, O]) AddRetrieverNode(key string, retriever retriever.Retriever, opts ...GraphAddNodeOpt) *WorkflowNode {
 	_ = wf.g.AddRetrieverNode(key, retriever, opts...)
 	return wf.initNode(key)
 }
 
 // AddEmbeddingNode adds an embedding node and returns it.
+// AddEmbeddingNode 添加一个嵌入节点并返回它。
 func (wf *Workflow[I, O]) AddEmbeddingNode(key string, embedding embedding.Embedder, opts ...GraphAddNodeOpt) *WorkflowNode {
 	_ = wf.g.AddEmbeddingNode(key, embedding, opts...)
 	return wf.initNode(key)
 }
 
 // AddIndexerNode adds an indexer node to the workflow and returns it.
+// AddIndexerNode 向 workflow 添加一个索引器节点并返回它。
 func (wf *Workflow[I, O]) AddIndexerNode(key string, indexer indexer.Indexer, opts ...GraphAddNodeOpt) *WorkflowNode {
 	_ = wf.g.AddIndexerNode(key, indexer, opts...)
 	return wf.initNode(key)
 }
 
 // AddLoaderNode adds a document loader node to the workflow and returns it.
+// AddLoaderNode 向 workflow 添加一个文档加载器节点并返回它。
 func (wf *Workflow[I, O]) AddLoaderNode(key string, loader document.Loader, opts ...GraphAddNodeOpt) *WorkflowNode {
 	_ = wf.g.AddLoaderNode(key, loader, opts...)
 	return wf.initNode(key)
 }
 
 // AddDocumentTransformerNode adds a document transformer node and returns it.
+// AddDocumentTransformerNode 添加一个文档转换器节点并返回它。
 func (wf *Workflow[I, O]) AddDocumentTransformerNode(key string, transformer document.Transformer, opts ...GraphAddNodeOpt) *WorkflowNode {
 	_ = wf.g.AddDocumentTransformerNode(key, transformer, opts...)
 	return wf.initNode(key)
 }
 
 // AddGraphNode adds a nested graph node to the workflow and returns it.
+// AddGraphNode 向 workflow 添加一个嵌套图节点并返回它。
 func (wf *Workflow[I, O]) AddGraphNode(key string, graph AnyGraph, opts ...GraphAddNodeOpt) *WorkflowNode {
 	_ = wf.g.AddGraphNode(key, graph, opts...)
 	return wf.initNode(key)
 }
 
 // AddLambdaNode adds a lambda node to the workflow and returns it.
+// AddLambdaNode 向 workflow 添加一个 lambda 节点并返回它。
 func (wf *Workflow[I, O]) AddLambdaNode(key string, lambda *Lambda, opts ...GraphAddNodeOpt) *WorkflowNode {
 	_ = wf.g.AddLambdaNode(key, lambda, opts...)
 	return wf.initNode(key)
 }
 
 // End returns the WorkflowNode representing END node.
+// End 返回表示 END 节点的 WorkflowNode。
 func (wf *Workflow[I, O]) End() *WorkflowNode {
 	if node, ok := wf.workflowNodes[END]; ok {
 		return node
@@ -170,6 +190,7 @@ func (wf *Workflow[I, O]) End() *WorkflowNode {
 }
 
 // AddPassthroughNode adds a passthrough node to the workflow and returns it.
+// AddPassthroughNode 向 workflow 添加一个透传节点并返回它。
 func (wf *Workflow[I, O]) AddPassthroughNode(key string, opts ...GraphAddNodeOpt) *WorkflowNode {
 	_ = wf.g.AddPassthroughNode(key, opts...)
 	return wf.initNode(key)
@@ -194,6 +215,20 @@ func (wf *Workflow[I, O]) AddPassthroughNode(key string, opts ...GraphAddNodeOpt
 //	node.AddInput("dataNode")
 //
 // Returns the current node for method chaining.
+//
+// AddInput 在节点之间同时创建数据依赖和执行依赖。
+// 它配置数据如何从前置节点（fromNodeKey）流向当前节点，
+// 并确保当前节点只在前置节点完成后执行。
+// 参数：
+// - fromNodeKey: 前置节点的 key
+// - inputs: 字段映射，指定数据应如何从前置节点流向当前节点。
+// 如果未提供映射，则使用前置节点的完整输出作为输入。
+// 示例：
+// Map between specific field
+// node.AddInput("userNode", MapFields("user.name", "displayName"))
+// Use entire output
+// node.AddInput("dataNode")
+// 返回当前节点以支持方法链式调用。
 func (n *WorkflowNode) AddInput(fromNodeKey string, inputs ...*FieldMapping) *WorkflowNode {
 	return n.addDependencyRelation(fromNodeKey, inputs, &workflowAddInputOpts{})
 }
@@ -202,14 +237,21 @@ type workflowAddInputOpts struct {
 	// noDirectDependency indicates whether to create a data mapping without establishing
 	// a direct execution dependency. When true, the current node can access data from
 	// the predecessor node but its execution is not directly blocked by it.
+	//
+	// noDirectDependency 表示是否创建数据映射但不建立直接执行依赖。
+	// 为 true 时，当前节点可以访问前置节点的数据，但其执行不会被它直接阻塞。
 	noDirectDependency bool
 	// dependencyWithoutInput indicates whether to create an execution dependency
 	// without any data mapping. When true, the current node will wait for the
 	// predecessor node to complete but won't receive any data from it.
+	//
+	// dependencyWithoutInput 表示是否创建执行依赖但不创建任何数据映射。
+	// 为 true 时，当前节点会等待前置节点完成，但不会从中接收任何数据。
 	dependencyWithoutInput bool
 }
 
 // WorkflowAddInputOpt configures behavior of AddInputWithOptions.
+// WorkflowAddInputOpt 配置 AddInputWithOptions 的行为。
 type WorkflowAddInputOpt func(*workflowAddInputOpts)
 
 func getAddInputOpts(opts []WorkflowAddInputOpt) *workflowAddInputOpts {
@@ -254,6 +296,29 @@ func getAddInputOpts(opts []WorkflowAddInputOpt) *workflowAddInputOpts {
 // Common use cases:
 // - Cross-branch data access where the branch handles execution order
 // - Avoiding redundant dependencies when a path already exists
+//
+// WithNoDirectDependency 创建数据映射但不建立直接执行依赖。
+// 前置节点仍会在当前节点执行前完成，但这是通过间接执行路径而非直接依赖实现的。
+// 在 workflow graph 中，节点依赖通常有两个目的：
+// 1. 执行顺序：决定节点何时运行
+// 2. 数据流：指定数据如何在节点之间传递
+// 该选项通过以下方式分离这两个关注点：
+// - 创建从前置节点到当前节点的数据映射
+// - 依赖前置节点通过其他具有直接执行依赖的节点路径到达当前节点
+// 示例：
+// node.AddInputWithOptions("dataNode", mappings, WithNoDirectDependency())
+// 重要：
+// 1. 分支场景：连接分支不同侧的节点时，必须使用
+// WithNoDirectDependency，让分支自身处理执行顺序，
+// 防止产生可能绕过分支的错误依赖。
+// 2. 执行保证：前置节点仍会在当前节点执行前完成，
+// 因为前置节点必须存在一条（经由其他节点）最终到达当前节点的路径。
+// 3. 图有效性：必须存在一条从前置节点出发、经由其他具有直接依赖的节点
+// 最终到达当前节点的路径。
+// 这既保证执行顺序，又避免冗余的直接依赖。
+// 常见用法：
+// - 跨分支访问数据，由分支处理执行顺序
+// - 已存在路径时避免冗余依赖
 func WithNoDirectDependency() WorkflowAddInputOpt {
 	return func(opt *workflowAddInputOpts) {
 		opt.noDirectDependency = true
@@ -275,6 +340,18 @@ func WithNoDirectDependency() WorkflowAddInputOpt {
 //	node.AddInputWithOptions("dataNode", mappings, WithNoDirectDependency())
 //
 // Returns the current node for method chaining.
+//
+// AddInputWithOptions 使用自定义配置选项在节点之间创建依赖。
+// 它允许精细控制数据流和执行依赖。
+// 参数：
+// - fromNodeKey: 前置节点的 key
+// - inputs: 字段映射，指定数据如何从前置节点流向当前节点。
+// 如果未提供映射，则使用前置节点的完整输出作为输入。
+// - opts: 控制如何建立依赖的配置选项
+// 示例：
+// Create data mapping without direct execution dependency
+// node.AddInputWithOptions("dataNode", mappings, WithNoDirectDependency())
+// 返回当前节点以支持方法链式调用。
 func (n *WorkflowNode) AddInputWithOptions(fromNodeKey string, inputs []*FieldMapping, opts ...WorkflowAddInputOpt) *WorkflowNode {
 	return n.addDependencyRelation(fromNodeKey, inputs, getAddInputOpts(opts))
 }
@@ -297,6 +374,20 @@ func (n *WorkflowNode) AddInputWithOptions(fromNodeKey string, inputs []*FieldMa
 // - You want to explicitly separate execution dependencies from data flow
 //
 // Returns the current node for method chaining.
+//
+// AddDependency 在节点之间创建仅执行依赖。
+// 当前节点会在执行前等待前置节点完成，
+// 但它们之间不会传递数据。
+// 参数：
+// - fromNodeKey: 必须在此节点启动前完成的前置节点 key
+// 示例：
+// Wait for "setupNode" to complete before executing
+// node.AddDependency("setupNode")
+// 适用于以下情况：
+// - 需要确保执行顺序但不传输数据
+// - 前置节点执行必须先完成的设置或初始化
+// - 想显式地将执行依赖与数据流分离
+// 返回当前节点以支持方法链式调用。
 func (n *WorkflowNode) AddDependency(fromNodeKey string) *WorkflowNode {
 	return n.addDependencyRelation(fromNodeKey, nil, &workflowAddInputOpts{dependencyWithoutInput: true})
 }
@@ -308,6 +399,11 @@ func (n *WorkflowNode) AddDependency(fromNodeKey string) *WorkflowNode {
 // Example:
 //
 //	node.SetStaticValue(FieldPath{"query"}, "static query")
+//
+// SetStaticValue 为字段路径设置一个静态值，该值在 workflow 执行期间可用。
+// 这些值在编译时确定，并在 workflow 的整个生命周期内保持不变。
+// 示例：
+// node.SetStaticValue(FieldPath{"query"}, "static query")
 func (n *WorkflowNode) SetStaticValue(path FieldPath, value any) *WorkflowNode {
 	n.staticValues[path.join()] = value
 	return n
@@ -405,6 +501,9 @@ func (n *WorkflowNode) checkAndAddMappedPath(paths []FieldPath) error {
 
 // WorkflowBranch represents a branch added to a workflow.
 // Each branch may define its own end nodes and mappings.
+//
+// WorkflowBranch 表示添加到 workflow 的分支。
+// 每个分支可以定义自己的结束节点和映射。
 type WorkflowBranch struct {
 	fromNodeKey string
 	*GraphBranch
@@ -417,6 +516,13 @@ type WorkflowBranch struct {
 // This is a key distinction between Graph's Branch and Workflow's Branch:
 // - Graph's Branch: Automatically passes its input to the selected node.
 // - Workflow's Branch: Does not pass its input to the selected node.
+//
+// AddBranch 向 workflow 添加一个分支。
+// 结束节点字段映射：
+// 分支的结束节点需要定义自己的字段映射。
+// 这是 Graph 的 Branch 与 Workflow 的 Branch 的关键区别：
+// - Graph 的 Branch：自动将其输入传递给选中的节点。
+// - Workflow 的 Branch：不会将其输入传递给选中的节点。
 func (wf *Workflow[I, O]) AddBranch(fromNodeKey string, branch *GraphBranch) *WorkflowBranch {
 	wb := &WorkflowBranch{
 		fromNodeKey: fromNodeKey,
@@ -429,6 +535,9 @@ func (wf *Workflow[I, O]) AddBranch(fromNodeKey string, branch *GraphBranch) *Wo
 
 // AddEnd connects a node to END with optional field mappings.
 // Deprecated: use *Workflow[I,O].End() to obtain a WorkflowNode instance for END, then work with it just like a normal WorkflowNode.
+//
+// AddEnd 使用可选字段映射将节点连接到 END。
+// Deprecated: 使用 *Workflow[I,O].End() 获取 END 的 WorkflowNode 实例，然后像普通 WorkflowNode 一样使用它。
 func (wf *Workflow[I, O]) AddEnd(fromNodeKey string, inputs ...*FieldMapping) *Workflow[I, O] {
 	for _, input := range inputs {
 		input.fromNodeKey = fromNodeKey
@@ -507,6 +616,7 @@ func (wf *Workflow[I, O]) compile(ctx context.Context, options *graphCompileOpti
 	}
 
 	// TODO: check indirect edges are legal
+	// TODO: 检查间接边是否合法
 
 	return wf.g.compile(ctx, options)
 }

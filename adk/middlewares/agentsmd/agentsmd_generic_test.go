@@ -26,6 +26,7 @@ import (
 )
 
 // --- generic table-driven test helpers ---
+// --- 泛型表驱动测试辅助函数 ---
 
 func makeUserMsg[M adk.MessageType](content string) M {
 	var zero M
@@ -111,6 +112,7 @@ func getMsgExtra[M adk.MessageType](msg M) map[string]any {
 }
 
 // --- generic table-driven test ---
+// --- 泛型表驱动测试 ---
 
 type agentsMDTestCase struct {
 	name string
@@ -282,6 +284,7 @@ func testAgentsMDGeneric[M adk.MessageType](t *testing.T) {
 				}
 
 				// Verify the marker is set in Extra.
+				// 验证标记已设置到 Extra 中。
 				extra := getMsgExtra(state.Messages[0])
 				if extra == nil {
 					t.Fatal("expected Extra to be set on injected message")
@@ -291,6 +294,7 @@ func testAgentsMDGeneric[M adk.MessageType](t *testing.T) {
 				}
 
 				// Call again with the same state (which now contains the marker message).
+				// 使用相同 state 再次调用（其中现在已包含标记消息）。
 				_, state, err = mw.BeforeModelRewriteState(ctx, state, nil)
 				if err != nil {
 					t.Fatal(err)
@@ -325,6 +329,7 @@ func testAgentsMDGeneric[M adk.MessageType](t *testing.T) {
 				}
 
 				// Simulate removal of the marker message (e.g., by summarization).
+				// 模拟移除标记消息（例如由摘要处理移除）。
 				state = &adk.TypedChatModelAgentState[M]{Messages: []M{makeUserMsg[M]("hello")}}
 				_, state, err = mw.BeforeModelRewriteState(ctx, state, nil)
 				if err != nil {

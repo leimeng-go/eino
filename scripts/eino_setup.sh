@@ -68,6 +68,7 @@ EINO_EXT_REPO="https://github.com/cloudwego/eino-ext"
 EINO_EXAMPLES_REPO="https://github.com/cloudwego/eino-examples"
 
 # Parse flags
+# 解析参数
 RESET=false
 UPDATE=false
 for arg in "$@"; do
@@ -80,12 +81,14 @@ done
 echo "==> eino setup in: $PROJECT_ROOT"
 
 # --reset: remove and re-clone
+# --reset：删除并重新克隆
 if [ "$RESET" = true ]; then
   echo "==> --reset: removing $EINO_DIR/"
   rm -rf "$EINO_DIR"
 fi
 
 # --update: pull latest on existing clones
+# --update：在已有克隆中拉取最新内容
 if [ "$UPDATE" = true ]; then
   for repo in eino eino-ext eino-examples; do
     dir="$EINO_DIR/$repo"
@@ -104,6 +107,7 @@ fi
 mkdir -p "$EINO_DIR"
 
 # Clone repos (shallow — we only need source to read, not full history)
+# 克隆仓库（浅克隆——只需要读取源码，不需要完整历史）
 clone_if_missing() {
   local repo_url="$1"
   local dest="$2"
@@ -120,6 +124,7 @@ clone_if_missing "$EINO_EXT_REPO"      "$EINO_DIR/eino-ext"
 clone_if_missing "$EINO_EXAMPLES_REPO" "$EINO_DIR/eino-examples"
 
 # Add _eino/ to .gitignore
+# 将 _eino/ 添加到 .gitignore
 GITIGNORE=".gitignore"
 if ! grep -qxF "$EINO_DIR/" "$GITIGNORE" 2>/dev/null; then
   echo "" >> "$GITIGNORE"
@@ -129,6 +134,7 @@ if ! grep -qxF "$EINO_DIR/" "$GITIGNORE" 2>/dev/null; then
 fi
 
 # Write a README so the directory is self-explanatory
+# 写入 README，使目录用途自解释
 cat > "$EINO_DIR/README.md" <<'EOF'
 # _eino — eino framework source reference
 

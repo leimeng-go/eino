@@ -36,6 +36,7 @@ func TestToolNameAliases(t *testing.T) {
 	ctx := context.Background()
 
 	// Create test tool
+	// 创建测试工具
 	searchTool := newTool(&schema.ToolInfo{
 		Name: "search",
 		Desc: "Search for information",
@@ -47,6 +48,7 @@ func TestToolNameAliases(t *testing.T) {
 	})
 
 	// Configure aliases
+	// 配置别名
 	config := &ToolsNodeConfig{
 		Tools: []tool.BaseTool{searchTool},
 		ToolAliases: map[string]ToolAliasConfig{
@@ -60,11 +62,13 @@ func TestToolNameAliases(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test calling tool with alias
+	// 测试使用别名调用工具
 	input := schema.AssistantMessage("", []schema.ToolCall{
 		{
 			ID: "call_1",
 			Function: schema.FunctionCall{
-				Name:      "search_v1", // Using alias
+				Name: "search_v1", // Using alias
+				// 使用别名
 				Arguments: `{"query": "test"}`,
 			},
 		},
@@ -115,12 +119,14 @@ func TestArgumentsAliases(t *testing.T) {
 	require.NoError(t, err)
 
 	// Use alias parameters
+	// 使用别名参数
 	input := schema.AssistantMessage("", []schema.ToolCall{
 		{
 			ID: "call_1",
 			Function: schema.FunctionCall{
 				Name:      "search",
 				Arguments: `{"q": "test", "max_results": 10}`, // Using aliases
+				// 使用别名
 			},
 		},
 	})
@@ -129,6 +135,7 @@ func TestArgumentsAliases(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify tool received canonical parameter names
+	// 验证工具收到的是规范参数名
 	var args map[string]any
 	err = json.Unmarshal([]byte(receivedArgs), &args)
 	require.NoError(t, err)
@@ -159,6 +166,7 @@ func TestAliasConflict(t *testing.T) {
 				},
 				"query": {
 					NameAliases: []string{"find"}, // Conflict: find already used by search
+					// 冲突：find 已被 search 使用
 				},
 			},
 		}
@@ -174,6 +182,7 @@ func TestAliasConflict(t *testing.T) {
 			ToolAliases: map[string]ToolAliasConfig{
 				"search": {
 					NameAliases: []string{"query"}, // Conflict: "query" is tool2's canonical name
+					// 冲突："query" 是 tool2 的规范名称
 				},
 			},
 		}
@@ -191,6 +200,7 @@ func TestAliasConflict(t *testing.T) {
 					ArgumentsAliases: map[string][]string{
 						"query": {"q"},
 						"limit": {"q"}, // Conflict: q maps to multiple parameters
+						// 冲突：q 映射到多个参数
 					},
 				},
 			},
@@ -219,6 +229,7 @@ func TestAliasConflict(t *testing.T) {
 				"search": {
 					ArgumentsAliases: map[string][]string{
 						"limit": {"query"}, // "query" is already a schema property
+						// "query" 已经是 schema 属性
 					},
 				},
 			},
@@ -258,8 +269,10 @@ func TestArgumentsAliasesWithHandler(t *testing.T) {
 		ToolArgumentsHandler: func(ctx context.Context, name, args string) (string, error) {
 			executionOrder = append(executionOrder, "args_handler")
 			// Handler receives the original model-returned name (alias)
+			// Handler 接收模型返回的原始名称（别名）
 			assert.Equal(t, "search", name)
 			// Verify alias remapping has already been done
+			// 验证别名重映射已完成
 			var m map[string]any
 			err := json.Unmarshal([]byte(args), &m)
 			require.NoError(t, err)
@@ -273,6 +286,7 @@ func TestArgumentsAliasesWithHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	// Call with alias name "find" and alias arg "q"
+	// 使用别名名称 "find" 和别名参数 "q" 调用
 	input := schema.AssistantMessage("", []schema.ToolCall{
 		{
 			ID: "call_1",
@@ -287,6 +301,7 @@ func TestArgumentsAliasesWithHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify execution order: alias remapping → ToolArgumentsHandler → tool execution
+	// 验证执行顺序：别名重映射 → ToolArgumentsHandler → 工具执行
 	assert.Equal(t, []string{"args_handler", "tool_invoke"}, executionOrder)
 }
 
@@ -301,16 +316,19 @@ func TestNonExistentToolInAliasConfig(t *testing.T) {
 		Tools: []tool.BaseTool{tool1},
 		ToolAliases: map[string]ToolAliasConfig{
 			"non_existent_tool": { // Non-existent tool
+				// 不存在的工具
 				NameAliases: []string{"alias1"},
 			},
 		},
 	}
 
 	// Should not error — non-existent tool alias configs are silently skipped
+	// 不应报错——不存在的工具别名配置会被静默跳过
 	node, err := NewToolNode(ctx, config)
 	require.NoError(t, err)
 
 	// The existing tool should still work normally
+	// 已有工具应仍能正常工作
 	input := schema.AssistantMessage("", []schema.ToolCall{
 		{
 			ID: "call_1",
@@ -334,6 +352,7 @@ func TestToolAliasesE2E(t *testing.T) {
 	ctx := context.Background()
 
 	// Create multiple tools
+	// 创建多个工具
 	searchTool := newTool(&schema.ToolInfo{
 		Name: "search",
 		Desc: "Search for information",
@@ -356,6 +375,7 @@ func TestToolAliasesE2E(t *testing.T) {
 	})
 
 	// Configure aliases for multiple tools
+	// 为多个工具配置别名
 	config := &ToolsNodeConfig{
 		Tools: []tool.BaseTool{searchTool, weatherTool},
 		ToolAliases: map[string]ToolAliasConfig{
@@ -379,19 +399,24 @@ func TestToolAliasesE2E(t *testing.T) {
 	require.NoError(t, err)
 
 	// Construct message with multiple tool calls using different aliases
+	// 构造包含多个工具调用且使用不同别名的消息
 	input := schema.AssistantMessage("", []schema.ToolCall{
 		{
 			ID: "call_1",
 			Function: schema.FunctionCall{
-				Name:      "search_v1",                       // Tool name alias
+				Name: "search_v1", // Tool name alias
+				// 工具名称别名
 				Arguments: `{"q": "test", "max_results": 5}`, // Parameter aliases
+				// 参数别名
 			},
 		},
 		{
 			ID: "call_2",
 			Function: schema.FunctionCall{
-				Name:      "get_weather",         // Tool name alias
+				Name: "get_weather", // Tool name alias
+				// 工具名称别名
 				Arguments: `{"city": "Beijing"}`, // Parameter alias
+				// 参数别名
 			},
 		},
 	})
@@ -401,6 +426,7 @@ func TestToolAliasesE2E(t *testing.T) {
 	require.Len(t, output, 2)
 
 	// Verify both tools executed successfully
+	// 验证两个工具均成功执行
 	assert.Equal(t, "call_1", output[0].ToolCallID)
 	assert.Equal(t, "call_2", output[1].ToolCallID)
 	assert.Contains(t, output[0].Content, "search result")
@@ -442,6 +468,7 @@ func TestRemapArgsEdgeCases(t *testing.T) {
 
 	t.Run("alias and canonical both present", func(t *testing.T) {
 		// When both alias "q" and canonical "query" exist, alias is kept as-is (not deleted, not overwritten)
+		// 当别名 "q" 和规范名 "query" 同时存在时，保留别名原样（不删除、不覆盖）
 		result, err := remapArgs(`{"q": "alias_val", "query": "canonical_val"}`, aliasMap)
 		assert.NoError(t, err)
 		var m map[string]any
@@ -490,6 +517,7 @@ func TestCanonicalNameCallWithAliasConfigured(t *testing.T) {
 	require.NoError(t, err)
 
 	// Call with canonical name and canonical arg — should work normally
+	// 使用规范名和规范参数调用——应能正常工作
 	input := schema.AssistantMessage("", []schema.ToolCall{
 		{
 			ID: "call_1",
@@ -568,6 +596,7 @@ func TestNameAliasSameAsCanonical(t *testing.T) {
 	})
 
 	// Alias same as canonical name — should be tolerated (skip, no error)
+	// 别名与规范名相同——应允许（跳过且不报错）
 	config := &ToolsNodeConfig{
 		Tools: []tool.BaseTool{searchTool},
 		ToolAliases: map[string]ToolAliasConfig{
@@ -581,6 +610,7 @@ func TestNameAliasSameAsCanonical(t *testing.T) {
 	require.NoError(t, err)
 
 	// Both canonical and alias should work
+	// 规范名和别名都应可用
 	for _, name := range []string{"search", "find"} {
 		input := schema.AssistantMessage("", []schema.ToolCall{
 			{
@@ -627,6 +657,7 @@ func TestToolAliasesWithDynamicToolList(t *testing.T) {
 	require.NoError(t, err)
 
 	// Use dynamic ToolList via option — alias should still work
+	// 通过 option 使用动态 ToolList——别名仍应可用
 	input := schema.AssistantMessage("", []schema.ToolCall{
 		{
 			ID: "call_1",
@@ -736,6 +767,7 @@ func TestEnhancedToolWithAliases(t *testing.T) {
 	require.NoError(t, err)
 
 	// Call with alias name and alias arg
+	// 使用别名名称和别名参数调用
 	input := schema.AssistantMessage("", []schema.ToolCall{
 		{
 			ID: "call_1",
@@ -751,6 +783,7 @@ func TestEnhancedToolWithAliases(t *testing.T) {
 	require.Len(t, output, 1)
 	assert.Equal(t, "call_1", output[0].ToolCallID)
 	// Verify arg alias was remapped: "q" → "query" in the JSON passed to enhanced tool
+	// 验证参数别名已重映射：传给增强工具的 JSON 中 "q" → "query"
 	assert.Contains(t, output[0].UserInputMultiContent[0].Text, "enhanced:")
 }
 
@@ -787,6 +820,7 @@ func TestDynamicToolListAliasRemoved(t *testing.T) {
 	require.NoError(t, err)
 
 	// Dynamic tool list only contains weatherTool — "search" and its alias "find" should not be available
+	// 动态工具列表仅包含 weatherTool —— "search" 及其别名 "find" 不应可用
 	input := schema.AssistantMessage("", []schema.ToolCall{
 		{
 			ID: "call_1",
@@ -826,6 +860,7 @@ func TestToolAliasesOptionOverridesGlobal(t *testing.T) {
 	})
 
 	// Global aliases: search has alias "find"
+	// 全局别名：search 的别名为 "find"
 	config := &ToolsNodeConfig{
 		Tools: []tool.BaseTool{searchTool, weatherTool},
 		ToolAliases: map[string]ToolAliasConfig{
@@ -843,6 +878,7 @@ func TestToolAliasesOptionOverridesGlobal(t *testing.T) {
 
 	t.Run("opt ToolAliases overrides global in Invoke", func(t *testing.T) {
 		// opt.ToolAliases defines "lookup" as alias for search (not "find")
+		// opt.ToolAliases 将 "lookup" 定义为 search 的别名（不是 "find"）
 		optAliases := map[string]ToolAliasConfig{
 			"search": {
 				NameAliases: []string{"lookup"},
@@ -853,6 +889,7 @@ func TestToolAliasesOptionOverridesGlobal(t *testing.T) {
 		}
 
 		// "lookup" should work with opt aliases
+		// "lookup" 应使用 opt 别名正常工作
 		input := schema.AssistantMessage("", []schema.ToolCall{
 			{
 				ID: "call_1",
@@ -869,6 +906,7 @@ func TestToolAliasesOptionOverridesGlobal(t *testing.T) {
 		assert.Contains(t, output[0].Content, "search result: test")
 
 		// "find" (global alias) should NOT work when opt.ToolAliases is set
+		// 设置 opt.ToolAliases 后，"find"（全局别名）不应可用
 		input2 := schema.AssistantMessage("", []schema.ToolCall{
 			{
 				ID: "call_2",
@@ -924,6 +962,7 @@ func TestToolAliasesOptionOverridesGlobal(t *testing.T) {
 
 	t.Run("nil opt ToolAliases falls back to global filtered", func(t *testing.T) {
 		// No WithToolAliases — should use global "find" alias, filtered by ToolList
+		// 没有 WithToolAliases —— 应使用全局 "find" 别名，并按 ToolList 过滤
 		input := schema.AssistantMessage("", []schema.ToolCall{
 			{
 				ID: "call_1",
@@ -942,6 +981,7 @@ func TestToolAliasesOptionOverridesGlobal(t *testing.T) {
 
 	t.Run("opt ToolAliases only without ToolList replaces global", func(t *testing.T) {
 		// Only WithToolAliases, no WithToolList — should use global tools with opt aliases
+		// 仅有 WithToolAliases，没有 WithToolList —— 应使用带 opt 别名的全局工具
 		optAliases := map[string]ToolAliasConfig{
 			"search": {
 				NameAliases: []string{"lookup"},
@@ -952,6 +992,7 @@ func TestToolAliasesOptionOverridesGlobal(t *testing.T) {
 		}
 
 		// "lookup" (opt alias) should work
+		// "lookup"（opt 别名）应可用
 		input := schema.AssistantMessage("", []schema.ToolCall{
 			{
 				ID: "call_1",
@@ -968,6 +1009,7 @@ func TestToolAliasesOptionOverridesGlobal(t *testing.T) {
 		assert.Contains(t, output[0].Content, "search result: only_alias")
 
 		// "find" (global alias) should NOT work when opt.ToolAliases replaces global
+		// 当 opt.ToolAliases 替换全局配置时，"find"（全局别名）不应可用
 		input2 := schema.AssistantMessage("", []schema.ToolCall{
 			{
 				ID: "call_2",
@@ -1043,6 +1085,7 @@ func TestAliasConfigForToolAddedViaOption(t *testing.T) {
 	})
 
 	// New with only searchTool, but alias config includes weather tool
+	// New 仅包含 searchTool，但别名配置包含 weather 工具
 	config := &ToolsNodeConfig{
 		Tools: []tool.BaseTool{searchTool},
 		ToolAliases: map[string]ToolAliasConfig{
@@ -1145,6 +1188,7 @@ func TestOptionWithToolListAndToolAliases(t *testing.T) {
 		}
 
 		// "forecast" should work via opt aliases
+		// "forecast" 应可通过 opt 别名使用
 		input := schema.AssistantMessage("", []schema.ToolCall{
 			{
 				ID: "call_1",
@@ -1161,6 +1205,7 @@ func TestOptionWithToolListAndToolAliases(t *testing.T) {
 		assert.Contains(t, output[0].Content, "weather result: Shanghai")
 
 		// "find" (global alias) should NOT work when opt aliases override
+		// opt 别名覆盖时，"find"（全局别名）不应可用
 		input2 := schema.AssistantMessage("", []schema.ToolCall{
 			{
 				ID: "call_2",

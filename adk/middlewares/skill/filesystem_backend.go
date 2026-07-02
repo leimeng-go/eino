@@ -35,17 +35,26 @@ type filesystemBackend struct {
 }
 
 // BackendFromFilesystemConfig contains configuration for NewBackendFromFilesystem.
+// BackendFromFilesystemConfig 包含 NewBackendFromFilesystem 的配置。
 type BackendFromFilesystemConfig struct {
 	// Backend is the filesystem.Backend implementation used for file operations.
+	// Backend 是用于文件操作的 filesystem.Backend 实现。
 	Backend filesystem.Backend
 	// BaseDir is the base directory where skill directories are located.
 	// Each skill should be in a subdirectory containing a SKILL.md file.
+	//
+	// BaseDir 是 skill 目录所在的基目录。
+	// 每个 skill 应位于包含 SKILL.md 文件的子目录中。
 	BaseDir string
 }
 
 // NewBackendFromFilesystem creates a new Backend implementation that reads skills from a filesystem.
 // It searches for SKILL.md files in immediate subdirectories of the configured BaseDir.
 // Only first-level subdirectories are scanned; deeply nested SKILL.md files are ignored.
+//
+// NewBackendFromFilesystem 创建一个从文件系统读取 skills 的新 Backend 实现。
+// 它会在配置的 BaseDir 的直接子目录中搜索 SKILL.md 文件。
+// 只扫描第一层子目录；会忽略深层嵌套的 SKILL.md 文件。
 func NewBackendFromFilesystem(_ context.Context, config *BackendFromFilesystemConfig) (Backend, error) {
 	if config == nil {
 		return nil, fmt.Errorf("config is required")

@@ -346,6 +346,7 @@ func TestWorkflowInterrupt(t *testing.T) {
 			return iter
 		},
 	} // interrupt once
+	// 中断一次
 	sa2 := &myAgent{
 		name: "sa2",
 		runFn: func(ctx context.Context, input *AgentInput, options ...AgentRunOption) *AsyncIterator[*AgentEvent] {
@@ -371,6 +372,7 @@ func TestWorkflowInterrupt(t *testing.T) {
 			return iter
 		},
 	} // interrupt once
+	// 中断一次
 	sa3 := &myAgent{
 		name: "sa3",
 		runFn: func(ctx context.Context, input *AgentInput, options ...AgentRunOption) *AsyncIterator[*AgentEvent] {
@@ -387,6 +389,7 @@ func TestWorkflowInterrupt(t *testing.T) {
 			return iter
 		},
 	} // won't interrupt
+	// 不会中断
 	sa4 := &myAgent{
 		name: "sa4",
 		runFn: func(ctx context.Context, input *AgentInput, options ...AgentRunOption) *AsyncIterator[*AgentEvent] {
@@ -403,6 +406,7 @@ func TestWorkflowInterrupt(t *testing.T) {
 			return iter
 		},
 	} // won't interrupt
+	// 不会中断
 
 	firstInterruptEvent := &AgentEvent{
 		AgentName: "sa1",
@@ -548,6 +552,7 @@ func TestWorkflowInterrupt(t *testing.T) {
 		events = []*AgentEvent{}
 
 		// Resume after sa1 interrupt
+		// sa1 中断后恢复
 		iter, err = runner.ResumeWithParams(ctx, "sequential-1", &ResumeParams{
 			Targets: map[string]any{
 				interruptID1: "resume sa1",
@@ -571,6 +576,7 @@ func TestWorkflowInterrupt(t *testing.T) {
 		events = []*AgentEvent{}
 
 		// Resume after sa2 interrupt
+		// sa2 中断后恢复
 		iter, err = runner.ResumeWithParams(ctx, "sequential-1", &ResumeParams{
 			Targets: map[string]any{
 				interruptID2: "resume sa2",
@@ -664,6 +670,7 @@ func TestWorkflowInterrupt(t *testing.T) {
 		events = []*AgentEvent{}
 
 		// Resume after sa1 interrupt
+		// sa1 中断后恢复
 		iter, err = runner.ResumeWithParams(ctx, "loop-1", &ResumeParams{
 			Targets: map[string]any{
 				loopInterruptID1: "resume sa1",
@@ -731,6 +738,7 @@ func TestWorkflowInterrupt(t *testing.T) {
 		events = []*AgentEvent{}
 
 		// Resume after sa2 interrupt
+		// sa2 中断后恢复
 		iter, err = runner.ResumeWithParams(ctx, "loop-1", &ResumeParams{
 			Targets: map[string]any{
 				loopInterruptID2: "resume sa2",
@@ -860,6 +868,7 @@ func TestWorkflowInterrupt(t *testing.T) {
 		}
 		assert.Equal(t, 3, len(events))
 		// Check the first two message events
+		// 检查前两个 message 事件
 		assert.Equal(t, loopMessageEvents[0].AgentName, events[0].AgentName)
 		assert.Equal(t, loopMessageEvents[0].RunPath, events[0].RunPath)
 		assert.Equal(t, loopMessageEvents[0].Output.MessageOutput.Message.Content, events[0].Output.MessageOutput.Message.Content)
@@ -869,6 +878,7 @@ func TestWorkflowInterrupt(t *testing.T) {
 		assert.Equal(t, loopMessageEvents[1].Output.MessageOutput.Message.Content, events[1].Output.MessageOutput.Message.Content)
 
 		// Check the third interrupt event using EqualsWithoutID
+		// 使用 EqualsWithoutID 检查第三个 interrupt 事件
 		assert.Equal(t, loopMessageEvents[2].AgentName, events[2].AgentName)
 		assert.Equal(t, loopMessageEvents[2].RunPath, events[2].RunPath)
 		assert.True(t, events[2].Action.Interrupted.InterruptContexts[0].EqualsWithoutID(loopMessageEvents[2].Action.Interrupted.InterruptContexts[0]))
@@ -876,6 +886,7 @@ func TestWorkflowInterrupt(t *testing.T) {
 		events = []*AgentEvent{}
 
 		// Resume after third interrupt
+		// 第三次中断后恢复
 		iter, err = runner.ResumeWithParams(ctx, "loop-1", &ResumeParams{
 			Targets: map[string]any{
 				loopInterruptID3: "resume sa1",
@@ -897,6 +908,7 @@ func TestWorkflowInterrupt(t *testing.T) {
 		events = []*AgentEvent{}
 
 		// Resume after fourth interrupt
+		// 第四次中断后恢复
 		iter, err = runner.ResumeWithParams(ctx, "loop-1", &ResumeParams{
 			Targets: map[string]any{
 				loopInterruptID4: "resume sa2",
@@ -965,11 +977,13 @@ func TestWorkflowInterrupt(t *testing.T) {
 		assert.Equal(t, 2, len(events))
 
 		// Debug: Print actual events to see what we're getting
+		// 调试：打印实际事件，查看收到的内容
 		for i, event := range events {
 			t.Logf("Event %d: AgentName=%s, RunPath=%v, Output=%v", i, event.AgentName, event.RunPath, event.Output)
 		}
 
 		// Define parallel message events separately
+		// 单独定义并行消息事件
 		parallelMessageEvents := []*AgentEvent{
 			{
 				AgentName: "sa4",
@@ -1373,6 +1387,7 @@ func TestCyclicalAgentInterrupt(t *testing.T) {
 	var agentA, agentB, agentC Agent
 
 	// agentC interrupts
+	// agentC 中断
 	agentC = &myAgent{
 		name: "C",
 		runFn: func(ctx context.Context, input *AgentInput, options ...AgentRunOption) *AsyncIterator[*AgentEvent] {
@@ -1399,6 +1414,7 @@ func TestCyclicalAgentInterrupt(t *testing.T) {
 	}
 
 	// agentB transfers back to its parent A
+	// agentB 转回其父级 A
 	agentB = &myAgent{
 		name: "B",
 		runFn: func(ctx context.Context, input *AgentInput, options ...AgentRunOption) *AsyncIterator[*AgentEvent] {
@@ -1408,6 +1424,7 @@ func TestCyclicalAgentInterrupt(t *testing.T) {
 				Action: &AgentAction{
 					TransferToAgent: &TransferToAgentAction{
 						DestAgentName: "A", // Transfer back to parent
+						// 转回父级
 					},
 				},
 			})
@@ -1417,6 +1434,7 @@ func TestCyclicalAgentInterrupt(t *testing.T) {
 	}
 
 	// agentA is the parent, orchestrating the A->B->A->C flow
+	// agentA 是父级，编排 A->B->A->C 流程
 	agentA = &myAgent{
 		name: "A",
 		runFn: func(ctx context.Context, input *AgentInput, options ...AgentRunOption) *AsyncIterator[*AgentEvent] {
@@ -1425,6 +1443,9 @@ func TestCyclicalAgentInterrupt(t *testing.T) {
 
 			// If the last agent was B, we are in the A->B->A path, so transfer to C.
 			// Otherwise, it's the first run, transfer to B.
+			//
+			// 如果上一个 agent 是 B，则处于 A->B->A 路径，因此转到 C。
+			// 否则是首次运行，转到 B。
 			dest := "B"
 			if len(runCtx.RunPath) > 1 && runCtx.RunPath[len(runCtx.RunPath)-2].agentName == "B" {
 				dest = "C"
@@ -1444,10 +1465,12 @@ func TestCyclicalAgentInterrupt(t *testing.T) {
 	}
 
 	// Set up the hierarchy: A is parent of B and C.
+	// 设置层级：A 是 B 和 C 的父级。
 	agentA, err := SetSubAgents(ctx, agentA, []Agent{agentB, agentC})
 	assert.NoError(t, err)
 
 	// Run the test
+	// 运行测试
 	runner := NewRunner(ctx, RunnerConfig{
 		Agent:           agentA,
 		CheckPointStore: newMyStore(),
@@ -1464,6 +1487,7 @@ func TestCyclicalAgentInterrupt(t *testing.T) {
 	}
 
 	// We expect 3 transfer events (A->B, B->A, A->C) and 1 interrupt event from C.
+	// 预期有 3 个转移事件（A->B、B->A、A->C）和 1 个来自 C 的中断事件。
 	assert.Equal(t, 4, len(events))
 
 	interruptEvent := events[3]
@@ -1471,6 +1495,7 @@ func TestCyclicalAgentInterrupt(t *testing.T) {
 	assert.Equal(t, "C", interruptEvent.AgentName)
 
 	// Check the interrupt context
+	// 检查中断 context
 	assert.Equal(t, 1, len(interruptEvent.Action.Interrupted.InterruptContexts))
 	interruptCtx := interruptEvent.Action.Interrupted.InterruptContexts[0]
 	assert.True(t, interruptCtx.IsRootCause)
@@ -1486,6 +1511,7 @@ func TestCyclicalAgentInterrupt(t *testing.T) {
 	assert.NotEmpty(t, interruptCtx.ID)
 
 	// Resume the execution
+	// 恢复执行
 	iter, err = runner.ResumeWithParams(ctx, "cyclical-1", &ResumeParams{
 		Targets: map[string]any{
 			interruptCtx.ID: "resume C",
@@ -1503,11 +1529,13 @@ func TestCyclicalAgentInterrupt(t *testing.T) {
 	}
 
 	// We expect one output event from C
+	// 预期有一个来自 C 的输出事件
 	assert.Equal(t, 1, len(events))
 	assert.Equal(t, "C completed", events[0].Output.MessageOutput.Message.Content)
 }
 
 // myStatefulTool is a tool that can interrupt and has internal state to track invocations.
+// myStatefulTool 是一个可中断的工具，并带有内部状态用于跟踪调用。
 
 type myStatefulTool struct {
 	name string
@@ -1556,16 +1584,19 @@ func TestChatModelParallelToolInterruptAndResume(t *testing.T) {
 		Model: &myModel{
 			messages: []*schema.Message{
 				// 1. First model response: call toolA and toolB in parallel
+				// 1. 第一次模型响应：并行调用 toolA 和 toolB
 				schema.AssistantMessage("", []schema.ToolCall{
 					{ID: "1", Function: schema.FunctionCall{Name: "toolA", Arguments: "{}"}},
 					{ID: "2", Function: schema.FunctionCall{Name: "toolB", Arguments: "{}"}},
 				}),
 				// 2. Second model response (after tools are resumed): call them again to check state
+				// 2. 第二次模型响应（工具恢复后）：再次调用它们以检查状态
 				schema.AssistantMessage("", []schema.ToolCall{
 					{ID: "3", Function: schema.FunctionCall{Name: "toolA", Arguments: "{}"}},
 					{ID: "4", Function: schema.FunctionCall{Name: "toolB", Arguments: "{}"}},
 				}),
 				// 3. Final completion
+				// 3. 最终完成
 				schema.AssistantMessage("all done", nil),
 			},
 		},
@@ -1583,6 +1614,7 @@ func TestChatModelParallelToolInterruptAndResume(t *testing.T) {
 	})
 
 	// 1. Initial query -> parallel interrupt from toolA and toolB
+	// 1. 初始查询 -> 来自 toolA 和 toolB 的并行中断
 	iter := runner.Query(ctx, "start", WithCheckPointID("parallel-tool-test-1"))
 	normalEvents, interruptEvent := consumeUntilInterrupt(iter)
 
@@ -1606,6 +1638,7 @@ func TestChatModelParallelToolInterruptAndResume(t *testing.T) {
 	assert.NotEmpty(t, toolBInterruptID)
 
 	// 2. Resume, targeting only toolA. toolB should re-interrupt.
+	// 2. 恢复时仅指定 toolA。toolB 应再次中断。
 	iter, err = runner.ResumeWithParams(ctx, "parallel-tool-test-1", &ResumeParams{
 		Targets: map[string]any{
 			toolAInterruptID: "toolA resumed",
@@ -1633,6 +1666,7 @@ func TestChatModelParallelToolInterruptAndResume(t *testing.T) {
 	toolBReInterruptID := rootCause.ID
 
 	// 3. Resume the re-interrupted toolB. The agent should then call the tools again.
+	// 3. 恢复再次中断的 toolB。随后智能体应再次调用工具。
 	iter, err = runner.ResumeWithParams(ctx, "parallel-tool-test-1", &ResumeParams{
 		Targets: map[string]any{
 			toolBReInterruptID: "toolB resumed",
@@ -1642,6 +1676,9 @@ func TestChatModelParallelToolInterruptAndResume(t *testing.T) {
 
 	// 4. Consume all final events. The internal assertions in the tools will check the wasInterrupted flag.
 	// We expect to see the results of the second tool calls, and then the final agent completion.
+	//
+	// 4. 消费所有最终事件。工具内的断言会检查 wasInterrupted 标志。
+	// 预期会看到第二次工具调用的结果，然后是最终的智能体完成。
 	finalEvents, interruptEvent := consumeUntilInterrupt(iter)
 	assert.Equal(t, 2, len(finalEvents))
 	assert.NotNil(t, interruptEvent)
@@ -1650,13 +1687,19 @@ func TestChatModelParallelToolInterruptAndResume(t *testing.T) {
 // TestNestedChatModelAgentWithAgentTool verifies that the shouldFire method correctly prevents
 // duplicate event firing in nested ChatModelAgent scenarios (ChatModelAgent -> AgentTool -> ChatModelAgent).
 // This ensures that only the inner agent's cbHandler fires, not the outer agent's.
+//
+// TestNestedChatModelAgentWithAgentTool 验证 shouldFire 方法能正确防止
+// 嵌套 ChatModelAgent 场景（ChatModelAgent -> AgentTool -> ChatModelAgent）中的重复事件触发。
+// 这确保只有内部智能体的 cbHandler 触发，而不是外部智能体的。
 func TestNestedChatModelAgentWithAgentTool(t *testing.T) {
 	ctx := context.Background()
 
 	// Create an interruptible tool for the inner agent
+	// 为内部智能体创建一个可中断工具
 	innerTool := &myStatefulTool{name: "innerTool", t: t}
 
 	// Create the inner ChatModelAgent that will be wrapped by AgentTool
+	// 创建将由 AgentTool 包装的内部 ChatModelAgent
 	innerAgent, err := NewChatModelAgent(ctx, &ChatModelAgentConfig{
 		Name:        "InnerAgent",
 		Description: "Inner agent with interruptible tool",
@@ -1677,9 +1720,11 @@ func TestNestedChatModelAgentWithAgentTool(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Wrap the inner agent in an AgentTool
+	// 用 AgentTool 包装内部智能体
 	agentTool := NewAgentTool(ctx, innerAgent)
 
 	// Create the outer ChatModelAgent that uses the AgentTool
+	// 创建使用 AgentTool 的外部 ChatModelAgent
 	outerAgent, err := NewChatModelAgent(ctx, &ChatModelAgentConfig{
 		Name:        "OuterAgent",
 		Description: "Outer agent with AgentTool containing inner agent",
@@ -1705,9 +1750,11 @@ func TestNestedChatModelAgentWithAgentTool(t *testing.T) {
 	})
 
 	// Run the query - this should trigger the nested agent structure
+	// 运行查询——这应触发嵌套智能体结构
 	iter := runner.Query(ctx, "start", WithCheckPointID("nested-agent-test-1"))
 
 	// Collect all events to verify no duplicates
+	// 收集所有事件以验证没有重复
 	var allEvents []*AgentEvent
 	var interruptEvent *AgentEvent
 
@@ -1730,16 +1777,19 @@ func TestNestedChatModelAgentWithAgentTool(t *testing.T) {
 	}
 
 	// Verify we got exactly one interrupt event (not duplicated)
+	// 验证只收到一个中断事件（未重复）
 	assert.NotNil(t, interruptEvent, "should have an interrupt event")
 	assert.Equal(t, 1, len(interruptEvent.Action.Interrupted.InterruptContexts),
 		"should have exactly one interrupt context")
 
 	// Verify the interrupt comes from the inner tool, not duplicated
+	// 验证中断来自内部工具，而不是重复事件
 	interruptCtx := interruptEvent.Action.Interrupted.InterruptContexts[0]
 	assert.True(t, interruptCtx.IsRootCause, "interrupt should be root cause")
 	assert.Equal(t, "interrupt from innerTool", interruptCtx.Info)
 
 	// Verify the address path shows the correct nested structure
+	// 验证地址路径显示正确的嵌套结构
 	expectedAddress := Address{
 		{Type: AddressSegmentAgent, ID: "OuterAgent"},
 		{Type: AddressSegmentTool, ID: "InnerAgent", SubID: "1"},
@@ -1750,6 +1800,7 @@ func TestNestedChatModelAgentWithAgentTool(t *testing.T) {
 		"interrupt address should show correct nested structure")
 
 	// Verify no duplicate events by checking agent names in events
+	// 通过检查事件中的智能体名称来验证没有重复事件
 	var agentNames []string
 	for _, event := range allEvents {
 		if event.AgentName != "" {
@@ -1759,12 +1810,16 @@ func TestNestedChatModelAgentWithAgentTool(t *testing.T) {
 
 	// Should only have events from the outer agent (the inner agent's events should be handled
 	// by the AgentTool and not duplicated by the outer agent's cbHandler)
+	//
+	// 应只有来自外部智能体的事件（内部智能体的事件应由
+	// AgentTool 处理，而不会被外部智能体的 cbHandler 重复处理）
 	for _, name := range agentNames {
 		assert.Equal(t, "OuterAgent", name,
 			"all events should come from OuterAgent, not duplicated from InnerAgent")
 	}
 
 	// Now resume the interrupt
+	// 现在恢复该中断
 	interruptID := interruptCtx.ID
 	iter, err = runner.ResumeWithParams(ctx, "nested-agent-test-1", &ResumeParams{
 		Targets: map[string]any{
@@ -1774,6 +1829,7 @@ func TestNestedChatModelAgentWithAgentTool(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Collect final events after resume
+	// 恢复后收集最终事件
 	var finalEvents []*AgentEvent
 	for {
 		event, ok := iter.Next()
@@ -1784,9 +1840,11 @@ func TestNestedChatModelAgentWithAgentTool(t *testing.T) {
 	}
 
 	// Verify completion events
+	// 验证完成事件
 	assert.Greater(t, len(finalEvents), 0, "should have completion events after resume")
 
 	// Check that we get the expected completion messages
+	// 检查是否收到预期的完成消息
 	var foundInnerCompletion, foundOuterCompletion bool
 	for _, event := range finalEvents {
 		if event.Output != nil && event.Output.MessageOutput != nil {
@@ -1807,6 +1865,7 @@ func TestNestedChatModelAgentWithAgentTool(t *testing.T) {
 }
 
 // consumeUntilInterrupt consumes events from the iterator until an interrupt is found or it's exhausted.
+// consumeUntilInterrupt 从迭代器消费事件，直到找到中断或迭代器耗尽。
 func consumeUntilInterrupt(iter *AsyncIterator[*AgentEvent]) (normalEvents []*AgentEvent, interruptEvent *AgentEvent) {
 	for {
 		event, ok := iter.Next()
@@ -2039,6 +2098,10 @@ func TestReturnDirectlyEventSentAfterResume(t *testing.T) {
 // streamErrorThenToolCallModel simulates a model that:
 // - On the first Stream call: emits several good chunks then an error (triggering retry)
 // - On the second Stream call (retry): returns a tool call message (success)
+//
+// streamErrorThenToolCallModel 模拟一个 model：
+// - 第一次 Stream 调用：发出几个正常 chunk 后返回错误（触发重试）
+// - 第二次 Stream 调用（重试）：返回一条工具调用消息（成功）
 type streamErrorThenToolCallModel struct {
 	callCount    int32
 	toolCallName string
@@ -2056,6 +2119,7 @@ func (m *streamErrorThenToolCallModel) Stream(_ context.Context, _ []*schema.Mes
 		defer sw.Close()
 		if count == 1 {
 			// First call: emit good chunks then error
+			// 第一次调用：发出正常 chunk 后返回错误
 			sw.Send(schema.AssistantMessage("chunk1", nil), nil)
 			sw.Send(schema.AssistantMessage("chunk2", nil), nil)
 			sw.Send(schema.AssistantMessage("chunk3", nil), nil)
@@ -2063,6 +2127,7 @@ func (m *streamErrorThenToolCallModel) Stream(_ context.Context, _ []*schema.Mes
 			return
 		}
 		// Second call (retry): return tool call
+		// 第二次调用（重试）：返回工具调用
 		sw.Send(schema.AssistantMessage("", []schema.ToolCall{{
 			ID:       "call-1",
 			Function: schema.FunctionCall{Name: m.toolCallName, Arguments: "{}"},
@@ -2083,6 +2148,15 @@ func (m *streamErrorThenToolCallModel) WithTools(_ []*schema.ToolInfo) (model.To
 //  5. The checkpoint save fails because the first (failed) model call's stream event
 //     is in the session, and when MessageVariant.GobEncode consumes the stream,
 //     it hits the error chunk and returns an encoding error.
+//
+// TestStreamRetryThenToolInterruptCheckpoint 复现一个 bug：
+// 1. ChatModelAgent 设置 ModelRetryConfig.MaxRetries = 2
+// 2. 第一次 model Stream 调用发出正常 chunk 后返回可重试错误
+// 3. 重试成功，model 返回工具调用
+// 4. 该工具触发中断，导致 Runner 保存检查点
+// 5. 检查点保存失败，因为第一次（失败的）model 调用的流事件
+// 在 session 中，而 MessageVariant.GobEncode 消费该流时，
+// 遇到错误 chunk 并返回编码错误。
 func TestStreamRetryThenToolInterruptCheckpoint(t *testing.T) {
 	ctx := context.Background()
 
@@ -2134,6 +2208,10 @@ func TestStreamRetryThenToolInterruptCheckpoint(t *testing.T) {
 	// The bug: checkpoint save fails because the failed stream's error chunk
 	// is encountered during gob encoding of the session events.
 	// If the bug is fixed, checkpointErr should be nil and we should see an interrupt event.
+	//
+	// 该 bug：检查点保存失败，因为在对 session 事件进行 gob 编码时，
+	// 遇到了失败流中的错误 chunk。
+	// 如果 bug 已修复，checkpointErr 应为 nil，并且应看到一个中断事件。
 	assert.NoError(t, checkpointErr, "checkpoint save should not fail due to failed stream's error in session")
 
 	var hasInterrupt bool
@@ -2145,5 +2223,6 @@ func TestStreamRetryThenToolInterruptCheckpoint(t *testing.T) {
 	assert.True(t, hasInterrupt, "should receive an interrupt event from the tool")
 
 	// Verify the model was called twice (first call errored, second succeeded)
+	// 验证 model 被调用了两次（第一次调用出错，第二次成功）
 	assert.Equal(t, int32(2), atomic.LoadInt32(&mdl.callCount), "model should be called exactly twice (1 failure + 1 retry)")
 }

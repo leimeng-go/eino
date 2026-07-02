@@ -91,6 +91,7 @@ func listTasks(ctx context.Context, backend Backend, baseDir string) ([]*task, e
 	}
 
 	// sort tasks by ID
+	// 按 ID 对任务排序
 	sort.Slice(tasks, func(i, j int) bool {
 		return tasks[i].ID < tasks[j].ID
 	})

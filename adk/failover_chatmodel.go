@@ -45,12 +45,16 @@ type failoverHasMoreAttemptsKey struct{}
 // withFailoverHasMoreAttempts sets a flag in context indicating whether additional failover
 // attempts remain after the current one. This is read by buildErrWrapper to decide whether
 // stream errors should be wrapped as WillRetryError.
+//
+// withFailoverHasMoreAttempts 在 context 中设置一个标志，表示当前尝试之后是否还有额外的故障转移尝试。buildErrWrapper 会读取它来决定是否应将流错误包装为 WillRetryError。
 func withFailoverHasMoreAttempts(ctx context.Context, hasMore bool) context.Context {
 	return context.WithValue(ctx, failoverHasMoreAttemptsKey{}, hasMore)
 }
 
 // getFailoverHasMoreAttempts returns true if the current failover attempt has more attempts
 // after it, false otherwise (including when no failover context is present).
+//
+// getFailoverHasMoreAttempts 在当前故障转移尝试之后还有更多尝试时返回 true，否则返回 false（包括没有故障转移 context 的情况）。
 func getFailoverHasMoreAttempts(ctx context.Context) bool {
 	v, _ := ctx.Value(failoverHasMoreAttemptsKey{}).(bool)
 	return v
@@ -102,16 +106,22 @@ func (m *typedFailoverProxyModel[M]) GetType() string {
 type failoverProxyModel = typedFailoverProxyModel[*schema.Message]
 
 // FailoverContext contains context information during failover process.
+// FailoverContext 包含故障转移过程中的上下文信息。
 type FailoverContext[M MessageType] struct {
 	// FailoverAttempt is the current failover attempt number, starting from 1.
+	// FailoverAttempt 是当前故障转移尝试次数，从 1 开始。
 	FailoverAttempt uint
 
 	// InputMessages is the original input messages before any transformation.
+	// InputMessages 是任何转换之前的原始输入消息。
 	InputMessages []M
 
 	// LastOutputMessage is the output message from the last failed attempt.
 	// May be nil if no output was produced. For streaming, this may be a partial message
 	// already received before the stream error.
+	//
+	// LastOutputMessage 是上一次失败尝试的输出消息。
+	// 如果没有产生输出，可能为 nil。对于流式场景，这可能是流错误发生前已收到的部分消息。
 	LastOutputMessage M
 
 	// LastErr is the error from the last failed attempt that triggered this failover.
@@ -119,12 +129,18 @@ type FailoverContext[M MessageType] struct {
 	// Note: When ModelRetryConfig is also configured, LastErr will be a *RetryExhaustedError
 	// (if retries were exhausted) rather than the original model error. The original error
 	// can be retrieved via RetryExhaustedError.LastErr.
+	//
+	// LastErr 是触发本次故障转移的上一次失败尝试的错误。
+	// 注意：当同时配置了 ModelRetryConfig 时，LastErr 将是 *RetryExhaustedError（如果重试已耗尽），而不是原始模型错误。原始错误可通过 RetryExhaustedError.LastErr 获取。
 	LastErr error
 }
 
 // ModelFailoverConfig configures failover behavior for ChatModel.
 // When configured, each ChatModel call first tries the last successful model (initially the configured Model),
 // and if that fails, calls GetFailoverModel to select alternate models.
+//
+// ModelFailoverConfig 配置 ChatModel 的故障转移行为。
+// 配置后，每次 ChatModel 调用会先尝试上一次成功的模型（初始为配置的 Model），如果失败，则调用 GetFailoverModel 选择备用模型。
 type ModelFailoverConfig[M MessageType] struct {
 	// MaxRetries specifies the maximum number of failover attempts.
 	//
@@ -137,6 +153,12 @@ type ModelFailoverConfig[M MessageType] struct {
 	//
 	// Note: if lastSuccessModel is set (from a previous successful call), it will be tried
 	// first before calling GetFailoverModel.
+	//
+	// MaxRetries 指定最大故障转移尝试次数。
+	// 触发故障转移时，GetFailoverModel 最多会被调用 MaxRetries 次（FailoverAttempt 从 1 开始）。如果 GetFailoverModel 返回错误，故障转移会立即停止并返回该错误。
+	// 值为 0 表示不进行故障转移（不会调用 GetFailoverModel）。
+	// 值为 1 表示 GetFailoverModel 最多可被调用一次。
+	// 注意：如果已设置 lastSuccessModel（来自之前的成功调用），会先尝试它，再调用 GetFailoverModel。
 	MaxRetries uint
 
 	// ShouldFailover determines whether to fail over to the next model when an error occurs.
@@ -152,6 +174,14 @@ type ModelFailoverConfig[M MessageType] struct {
 	// as an error while the context is still active, this function will still be called.
 	// Should not be nil when ModelFailoverConfig is set.
 	// Return true to fail over to the next model, false to stop and return the current result/error.
+	//
+	// ShouldFailover 决定发生错误时是否故障转移到下一个模型。
+	// 它接收输出消息（如果没有可用输出，可能为 nil/零值）和错误（失败时非 nil）。
+	// 对于流式错误，outputMessage 可以携带错误发生前累积的部分消息。
+	// 注意：当同时配置了 ModelRetryConfig 时，outputErr 将是 *RetryExhaustedError（如果重试已耗尽），而不是原始模型错误。使用 errors.As 提取 RetryExhaustedError，并通过 RetryExhaustedError.LastErr 访问原始错误。
+	// 注意：当 context 本身被取消（ctx.Err() != nil）时，无论此函数如何，故障转移都会立即停止。但如果模型在 context 仍处于活动状态时返回 context.Canceled 或 context.DeadlineExceeded 作为错误，仍会调用此函数。
+	// 设置 ModelFailoverConfig 时不应为 nil。
+	// 返回 true 表示故障转移到下一个模型，返回 false 表示停止并返回当前结果/错误。
 	ShouldFailover func(ctx context.Context, outputMessage M, outputErr error) bool
 
 	// GetFailoverModel is called when a model call fails and ShouldFailover returns true.
@@ -162,6 +192,15 @@ type ModelFailoverConfig[M MessageType] struct {
 	//   - failoverModelInputMessages: The transformed input messages for the failover model. If nil, will use original input.
 	//   - failoverErr: If non-nil, failover stops and this error is returned.
 	// Should not be nil when ModelFailoverConfig is set via ChatModelAgentConfig.
+	//
+	// GetFailoverModel 在模型调用失败且 ShouldFailover 返回 true 时被调用。
+	// 它选择本次故障转移尝试要使用的下一个模型，并可选择转换输入消息。
+	// 它接收包含尝试次数（从 1 开始）、原始输入和上次结果的故障转移 context。
+	// 返回值：
+	// - failoverModel：本次故障转移尝试使用的模型。
+	// - failoverModelInputMessages：故障转移模型使用的转换后输入消息。如果为 nil，将使用原始输入。
+	// - failoverErr：如果非 nil，故障转移停止并返回此错误。
+	// 通过 ChatModelAgentConfig 设置 ModelFailoverConfig 时不应为 nil。
 	GetFailoverModel func(ctx context.Context, failoverCtx *FailoverContext[M]) (
 		failoverModel model.BaseModel[M], failoverModelInputMessages []M, failoverErr error)
 }
@@ -203,11 +242,15 @@ func (f *failoverModelWrapper[M]) needFailover(ctx context.Context, outputMessag
 
 	// ErrStreamCanceled means the caller voluntarily abandoned the stream;
 	// never retry or fail over in this case.
+	//
+	// ErrStreamCanceled 表示调用方主动放弃了流；
+	// 这种情况下绝不重试或故障转移。
 	if errors.Is(outputErr, ErrStreamCanceled) {
 		return false
 	}
 
 	// ShouldFailover is validated at agent construction; nil here indicates a programmer error.
+	// ShouldFailover 在智能体构造时已校验；此处为 nil 表示程序员错误。
 	return f.config.ShouldFailover(ctx, outputMessage, outputErr)
 }
 
@@ -224,6 +267,7 @@ func (f *failoverModelWrapper[M]) getFailoverModel(ctx context.Context, failover
 
 func (f *failoverModelWrapper[M]) Generate(ctx context.Context, input []M, opts ...model.Option) (M, error) {
 	// Defensive: GetFailoverModel is validated non-nil at agent construction.
+	// 防御性处理：GetFailoverModel 在智能体构造时已校验为非 nil。
 	if f.config.GetFailoverModel == nil {
 		return f.inner.Generate(ctx, input, opts...)
 	}
@@ -232,6 +276,7 @@ func (f *failoverModelWrapper[M]) Generate(ctx context.Context, input []M, opts 
 	var lastErr error
 
 	// Try lastSuccessModel first if available.
+	// 如果可用，先尝试 lastSuccessModel。
 	if lastSuccess := typedGetFailoverLastSuccessModel[M](ctx); lastSuccess != nil {
 		if err := ctx.Err(); err != nil {
 			var zero M
@@ -308,6 +353,7 @@ func (f *failoverModelWrapper[M]) Generate(ctx context.Context, input []M, opts 
 func (f *failoverModelWrapper[M]) Stream(ctx context.Context, input []M, opts ...model.Option) (
 	*schema.StreamReader[M], error) {
 	// Defensive: GetFailoverModel is validated non-nil at agent construction.
+	// 防御性处理：GetFailoverModel 在智能体构造时已校验为非 nil。
 	if f.config.GetFailoverModel == nil {
 		return f.inner.Stream(ctx, input, opts...)
 	}
@@ -316,6 +362,7 @@ func (f *failoverModelWrapper[M]) Stream(ctx context.Context, input []M, opts ..
 	var lastErr error
 
 	// Try lastSuccessModel first if available.
+	// 如果可用，优先尝试 lastSuccessModel。
 	if lastSuccess := typedGetFailoverLastSuccessModel[M](ctx); lastSuccess != nil {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -410,6 +457,13 @@ func (f *failoverModelWrapper[M]) Stream(ctx context.Context, input []M, opts ..
 		// may already have been emitted to the client, and the retry will emit a new stream. Client-side
 		// handlers are expected to handle multiple rounds (e.g., reset on retry or deduplicate by attempt
 		// metadata).
+		//
+		// f.inner.Stream 返回的流已由内部 eventSender 层 Copy 过：其中一个副本会通过事件实时转发给客户端。因此在这里消费一个副本不会阻塞客户端侧流式输出。
+		// 我们将流 Copy 成两个读取器：
+		// - checkCopy：同步消费，用于暴露流中错误并决定是否故障转移。
+		// - returnCopy：返回给调用方（stateModelWrapper），它也会同步消费以构建状态（AfterModelRewriteState），所以在这里等待不会增加额外延迟。
+		// 如果 checkCopy 出错且允许故障转移，则关闭 returnCopy，并用下一个模型重试。否则返回 returnCopy。
+		// 关于故障转移期间重复事件的说明：发生重试时，失败尝试产生的事件可能已发送给客户端，而重试会发出新的流。客户端侧处理器应能处理多轮（例如在重试时重置，或按尝试元数据去重）。
 		copies := stream.Copy(2)
 		checkCopy := copies[0]
 		returnCopy := copies[1]

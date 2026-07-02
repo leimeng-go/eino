@@ -160,6 +160,7 @@ func TestToolMessageToAgenticMessage(t *testing.T) {
 		assert.Equal(t, 2, len(ret))
 
 		// first message: multimodal tool result
+		// 第一条消息：多模态工具结果
 		assert.Equal(t, schema.AgenticRoleTypeUser, ret[0].Role)
 		assert.Equal(t, 1, len(ret[0].ContentBlocks))
 		ftr1 := ret[0].ContentBlocks[0].FunctionToolResult
@@ -178,6 +179,7 @@ func TestToolMessageToAgenticMessage(t *testing.T) {
 		assert.Equal(t, fileURL, ftr1.Content[4].File.URL)
 
 		// second message: text-only tool result
+		// 第二条消息：纯文本工具结果
 		assert.Equal(t, schema.AgenticRoleTypeUser, ret[1].Role)
 		assert.Equal(t, 1, len(ret[1].ContentBlocks))
 		ftr2 := ret[1].ContentBlocks[0].FunctionToolResult
@@ -289,6 +291,7 @@ func TestStreamToolMessageToAgenticMessage(t *testing.T) {
 		assert.Equal(t, 2, len(result))
 
 		// first message: multimodal tool result (single chunk → StreamingMeta preserved)
+		// 第一条消息：多模态工具结果（单个 chunk → 保留 StreamingMeta）
 		assert.Equal(t, schema.AgenticRoleTypeUser, result[0].Role)
 		assert.Equal(t, 1, len(result[0].ContentBlocks))
 		ftr1 := result[0].ContentBlocks[0].FunctionToolResult
@@ -299,6 +302,7 @@ func TestStreamToolMessageToAgenticMessage(t *testing.T) {
 		assert.Equal(t, imageURL, ftr1.Content[1].Image.URL)
 
 		// second message: text-only tool result (single chunk → StreamingMeta preserved)
+		// 第二条消息：纯文本工具结果（单个 chunk → 保留 StreamingMeta）
 		assert.Equal(t, schema.AgenticRoleTypeUser, result[1].Role)
 		assert.Equal(t, 1, len(result[1].ContentBlocks))
 		ftr2 := result[1].ContentBlocks[0].FunctionToolResult

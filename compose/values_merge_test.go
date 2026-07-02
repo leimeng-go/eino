@@ -41,6 +41,7 @@ func Test_mergeValues(t *testing.T) {
 			m := mergedM.(map[int]int)
 
 			// len(m) == len(m1) + len(m2) + len(m3)
+			// len(m) == len(m1) + len(m2) + len(m3)
 			assert.Equal(t, len(m), len(m1)+len(m2)+len(m3))
 		})
 
@@ -120,25 +121,33 @@ func Test_mergeValues(t *testing.T) {
 				if e == io.EOF {
 					// This EOF means all chunks from all sources that were not SourceEOF have been merged and sent.
 					// Or, if all sources send SourceEOF first, this io.EOF means the merged stream itself is now empty.
+					//
+					// 此 EOF 表示所有非 SourceEOF 来源的全部 chunk 都已合并并发送。
+					// 或者，如果所有来源都先发送 SourceEOF，则此 io.EOF 表示合并后的流本身现在为空。
 					break
 				}
 
 				require.NoError(t, e) // Fail on any other error
+				// 遇到任何其他错误都失败
 			}
 			// If streamMergeWithSourceEOF is true, the final merged result comes as a single map chunk
 			// after all SourceEOFs (if any non-empty streams existed) or directly if all streams were empty.
+			//
+			// 如果 streamMergeWithSourceEOF 为 true，最终合并结果会在所有 SourceEOF 之后作为单个 map chunk 返回（如果存在非空流），或者在所有流都为空时直接返回。
 			for k, v := range m {
 				got[k] = v
 			}
 		}
 
 		// Check that all expected sources have ended if they were part of opts.names
+		// 检查 opts.names 中包含的所有预期来源是否都已结束
 		for i := 0; i < len(ass); i++ {
 			expectedSourceName := opts.names[i]
 			assert.True(t, endedSources[expectedSourceName], "Expected source %s to have sent SourceEOF", expectedSourceName)
 		}
 
 		// The final 'got' map should contain all items because streamMergeWithSourceEOF merges them at the end.
+		// 最终的 'got' map 应包含所有项，因为 streamMergeWithSourceEOF 会在最后合并它们。
 		assert.Equal(t, map[int]string{
 			1: "1",
 			2: "2",

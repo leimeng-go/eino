@@ -29,6 +29,7 @@ import (
 )
 
 // mockAgent is a simple implementation of the Agent interface for testing
+// mockAgent 是用于测试的 Agent 接口简单实现
 type mockAgent struct {
 	name        string
 	description string
@@ -53,6 +54,7 @@ func (a *mockAgent) Run(_ context.Context, _ *AgentInput, _ ...AgentRunOption) *
 			generator.Send(event)
 
 			// If the event has an Exit action, stop sending events
+			// 如果事件包含 Exit action，则停止发送事件
 			if event.Action != nil && event.Action.Exit {
 				break
 			}
@@ -63,6 +65,7 @@ func (a *mockAgent) Run(_ context.Context, _ *AgentInput, _ ...AgentRunOption) *
 }
 
 // newMockAgent creates a new mock agent with the given name, description, and responses
+// newMockAgent 使用给定的 name、description 和 responses 创建新的 mock agent
 func newMockAgent(name, description string, responses []*AgentEvent) *mockAgent {
 	return &mockAgent{
 		name:        name,
@@ -72,10 +75,12 @@ func newMockAgent(name, description string, responses []*AgentEvent) *mockAgent 
 }
 
 // TestSequentialAgent tests the sequential workflow agent
+// TestSequentialAgent 测试顺序工作流智能体
 func TestSequentialAgent(t *testing.T) {
 	ctx := context.Background()
 
 	// Create mock agents with predefined responses
+	// 创建带预定义 responses 的 mock agents
 	agent1 := newMockAgent("Agent1", "First agent", []*AgentEvent{
 		{
 			AgentName: "Agent1",
@@ -102,6 +107,7 @@ func TestSequentialAgent(t *testing.T) {
 	})
 
 	// Create a sequential agent with the mock agents
+	// 使用 mock agents 创建顺序智能体
 	config := &SequentialAgentConfig{
 		Name:        "SequentialTestAgent",
 		Description: "Test sequential agent",
@@ -115,6 +121,7 @@ func TestSequentialAgent(t *testing.T) {
 	assert.Equal(t, "Test sequential agent", sequentialAgent.Description(ctx))
 
 	// Run the sequential agent
+	// 运行顺序智能体
 	input := &AgentInput{
 		Messages: []Message{
 			schema.UserMessage("Test input"),
@@ -122,12 +129,14 @@ func TestSequentialAgent(t *testing.T) {
 	}
 
 	// Initialize the run context
+	// 初始化运行上下文
 	ctx, _ = initRunCtx(ctx, sequentialAgent.Name(ctx), input)
 
 	iterator := sequentialAgent.Run(ctx, input)
 	assert.NotNil(t, iterator)
 
 	// First event should be from agent1
+	// 第一个事件应来自 agent1
 	event1, ok := iterator.Next()
 	assert.True(t, ok)
 	assert.NotNil(t, event1)
@@ -136,11 +145,13 @@ func TestSequentialAgent(t *testing.T) {
 	assert.NotNil(t, event1.Output.MessageOutput)
 
 	// Get the message content from agent1
+	// 获取 agent1 的消息内容
 	msg1 := event1.Output.MessageOutput.Message
 	assert.NotNil(t, msg1)
 	assert.Equal(t, "Response from Agent1", msg1.Content)
 
 	// Second event should be from agent2
+	// 第二个事件应来自 agent2
 	event2, ok := iterator.Next()
 	assert.True(t, ok)
 	assert.NotNil(t, event2)
@@ -149,20 +160,24 @@ func TestSequentialAgent(t *testing.T) {
 	assert.NotNil(t, event2.Output.MessageOutput)
 
 	// Get the message content from agent2
+	// 获取 agent2 的消息内容
 	msg2 := event2.Output.MessageOutput.Message
 	assert.NotNil(t, msg2)
 	assert.Equal(t, "Response from Agent2", msg2.Content)
 
 	// No more events
+	// 没有更多事件
 	_, ok = iterator.Next()
 	assert.False(t, ok)
 }
 
 // TestSequentialAgentWithExit tests the sequential workflow agent with an exit action
+// TestSequentialAgentWithExit 测试带 exit action 的顺序工作流智能体
 func TestSequentialAgentWithExit(t *testing.T) {
 	ctx := context.Background()
 
 	// Create mock agents with predefined responses
+	// 创建带有预定义响应的 mock 智能体
 	agent1 := newMockAgent("Agent1", "First agent", []*AgentEvent{
 		{
 			AgentName: "Agent1",
@@ -193,6 +208,7 @@ func TestSequentialAgentWithExit(t *testing.T) {
 	})
 
 	// Create a sequential agent with the mock agents
+	// 使用这些 mock 智能体创建一个顺序智能体
 	config := &SequentialAgentConfig{
 		Name:        "SequentialTestAgent",
 		Description: "Test sequential agent",
@@ -204,6 +220,7 @@ func TestSequentialAgentWithExit(t *testing.T) {
 	assert.NotNil(t, sequentialAgent)
 
 	// Run the sequential agent
+	// 运行顺序智能体
 	input := &AgentInput{
 		Messages: []Message{
 			schema.UserMessage("Test input"),
@@ -216,6 +233,7 @@ func TestSequentialAgentWithExit(t *testing.T) {
 	assert.NotNil(t, iterator)
 
 	// First event should be from agent1 with exit action
+	// 第一个事件应来自 agent1，并带有退出动作
 	event1, ok := iterator.Next()
 	assert.True(t, ok)
 	assert.NotNil(t, event1)
@@ -226,15 +244,18 @@ func TestSequentialAgentWithExit(t *testing.T) {
 	assert.True(t, event1.Action.Exit)
 
 	// No more events due to exit action
+	// 由于退出动作，不再有事件
 	_, ok = iterator.Next()
 	assert.False(t, ok)
 }
 
 // TestParallelAgent tests the parallel workflow agent
+// TestParallelAgent 测试并行工作流智能体
 func TestParallelAgent(t *testing.T) {
 	ctx := context.Background()
 
 	// Create mock agents with predefined responses
+	// 创建带有预定义响应的 mock 智能体
 	agent1 := newMockAgent("Agent1", "First agent", []*AgentEvent{
 		{
 			AgentName: "Agent1",
@@ -262,6 +283,7 @@ func TestParallelAgent(t *testing.T) {
 	})
 
 	// Create a parallel agent with the mock agents
+	// 使用这些 mock 智能体创建一个并行智能体
 	config := &ParallelAgentConfig{
 		Name:        "ParallelTestAgent",
 		Description: "Test parallel agent",
@@ -273,6 +295,7 @@ func TestParallelAgent(t *testing.T) {
 	assert.NotNil(t, parallelAgent)
 
 	// Run the parallel agent
+	// 运行并行智能体
 	input := &AgentInput{
 		Messages: []Message{
 			schema.UserMessage("Test input"),
@@ -285,6 +308,7 @@ func TestParallelAgent(t *testing.T) {
 	assert.NotNil(t, iterator)
 
 	// Collect all events
+	// 收集所有事件
 	var events []*AgentEvent
 	for {
 		event, ok := iterator.Next()
@@ -295,9 +319,11 @@ func TestParallelAgent(t *testing.T) {
 	}
 
 	// Should have two events, one from each agent
+	// 应有两个事件，每个智能体各一个
 	assert.Equal(t, 2, len(events))
 
 	// Verify the events
+	// 验证事件
 	for _, event := range events {
 		assert.Nil(t, event.Err)
 		assert.NotNil(t, event.Output)
@@ -308,6 +334,7 @@ func TestParallelAgent(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Check the source agent name and message content
+		// 检查源智能体名称和消息内容
 		switch event.AgentName {
 		case "Agent1":
 			assert.Equal(t, "Response from Agent1", msg.Content)
@@ -320,10 +347,12 @@ func TestParallelAgent(t *testing.T) {
 }
 
 // TestLoopAgent tests the loop workflow agent
+// TestLoopAgent 测试循环工作流智能体
 func TestLoopAgent(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a mock agent that will be called multiple times
+	// 创建一个会被多次调用的 mock 智能体
 	agent := newMockAgent("LoopAgent", "Loop agent", []*AgentEvent{
 		{
 			AgentName: "LoopAgent",
@@ -338,6 +367,7 @@ func TestLoopAgent(t *testing.T) {
 	})
 
 	// Create a loop agent with the mock agent and max iterations set to 3
+	// 创建一个包含该 mock 智能体且最大迭代次数设为 3 的循环智能体
 	config := &LoopAgentConfig{
 		Name:        "LoopTestAgent",
 		Description: "Test loop agent",
@@ -351,6 +381,7 @@ func TestLoopAgent(t *testing.T) {
 	assert.NotNil(t, loopAgent)
 
 	// Run the loop agent
+	// 运行循环智能体
 	input := &AgentInput{
 		Messages: []Message{
 			schema.UserMessage("Test input"),
@@ -363,6 +394,7 @@ func TestLoopAgent(t *testing.T) {
 	assert.NotNil(t, iterator)
 
 	// Collect all events
+	// 收集所有事件
 	var events []*AgentEvent
 	for {
 		event, ok := iterator.Next()
@@ -373,9 +405,11 @@ func TestLoopAgent(t *testing.T) {
 	}
 
 	// Should have 3 events (one for each iteration)
+	// 应有 3 个事件（每次迭代一个）
 	assert.Equal(t, 3, len(events))
 
 	// Verify all events
+	// 验证所有事件
 	for _, event := range events {
 		assert.Nil(t, event.Err)
 		assert.NotNil(t, event.Output)
@@ -388,10 +422,12 @@ func TestLoopAgent(t *testing.T) {
 }
 
 // TestLoopAgentWithBreakLoop tests the loop workflow agent with an break loop action
+// TestLoopAgentWithBreakLoop 测试带 break loop 动作的循环工作流智能体
 func TestLoopAgentWithBreakLoop(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a mock agent that will break the loop after the first iteration
+	// 创建一个 mock agent，在第一次迭代后跳出循环
 	agent := newMockAgent("LoopAgent", "Loop agent", []*AgentEvent{
 		{
 			AgentName: "LoopAgent",
@@ -407,6 +443,7 @@ func TestLoopAgentWithBreakLoop(t *testing.T) {
 	})
 
 	// Create a loop agent with the mock agent and max iterations set to 3
+	// 创建一个包含 mock agent 且 max iterations 设为 3 的 loop agent
 	config := &LoopAgentConfig{
 		Name:          "LoopTestAgent",
 		Description:   "Test loop agent",
@@ -419,6 +456,7 @@ func TestLoopAgentWithBreakLoop(t *testing.T) {
 	assert.NotNil(t, loopAgent)
 
 	// Run the loop agent
+	// 运行 loop agent
 	input := &AgentInput{
 		Messages: []Message{
 			schema.UserMessage("Test input"),
@@ -430,6 +468,7 @@ func TestLoopAgentWithBreakLoop(t *testing.T) {
 	assert.NotNil(t, iterator)
 
 	// Collect all events
+	// 收集所有事件
 	var events []*AgentEvent
 	for {
 		event, ok := iterator.Next()
@@ -440,9 +479,11 @@ func TestLoopAgentWithBreakLoop(t *testing.T) {
 	}
 
 	// Should have only 1 event due to break loop action
+	// 由于 break loop 动作，应只有 1 个事件
 	assert.Equal(t, 1, len(events))
 
 	// Verify the event
+	// 验证事件
 	event := events[0]
 	assert.Nil(t, event.Err)
 	assert.NotNil(t, event.Output)
@@ -459,12 +500,15 @@ func TestLoopAgentWithBreakLoop(t *testing.T) {
 }
 
 // Add these test functions to the existing workflow_test.go file
+// 将这些测试函数添加到现有 workflow_test.go 文件中
 
 // Replace the existing TestWorkflowAgentPanicRecovery function
+// 替换现有的 TestWorkflowAgentPanicRecovery 函数
 func TestWorkflowAgentPanicRecovery(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a panic agent that panics in Run method
+	// 创建一个在 Run 方法中 panic 的 panic agent
 	panicAgent := &panicMockAgent{
 		mockAgent: mockAgent{
 			name:        "PanicAgent",
@@ -474,6 +518,7 @@ func TestWorkflowAgentPanicRecovery(t *testing.T) {
 	}
 
 	// Create a sequential agent with the panic agent
+	// 创建一个包含 panic agent 的 sequential agent
 	config := &SequentialAgentConfig{
 		Name:        "PanicTestAgent",
 		Description: "Test agent with panic",
@@ -484,6 +529,7 @@ func TestWorkflowAgentPanicRecovery(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Run the agent and expect panic recovery
+	// 运行 agent，并期望 panic recovery
 	input := &AgentInput{
 		Messages: []Message{
 			schema.UserMessage("Test input"),
@@ -495,6 +541,7 @@ func TestWorkflowAgentPanicRecovery(t *testing.T) {
 	assert.NotNil(t, iterator)
 
 	// Should receive an error event due to panic recovery
+	// 由于 panic recovery，应收到一个错误事件
 	event, ok := iterator.Next()
 	assert.True(t, ok)
 	assert.NotNil(t, event)
@@ -502,11 +549,13 @@ func TestWorkflowAgentPanicRecovery(t *testing.T) {
 	assert.Contains(t, event.Err.Error(), "panic")
 
 	// No more events
+	// 没有更多事件
 	_, ok = iterator.Next()
 	assert.False(t, ok)
 }
 
 // Add these new mock agent types that properly panic
+// 添加这些会正确 panic 的新 mock agent 类型
 type panicMockAgent struct {
 	mockAgent
 }
@@ -519,11 +568,13 @@ func TestParallelWorkflowResumeWithEvents(t *testing.T) {
 	ctx := context.Background()
 
 	// Create interruptible agents
+	// 创建可中断的智能体
 	sa1 := &myAgent{
 		name: "sa1",
 		runFn: func(ctx context.Context, input *AgentInput, options ...AgentRunOption) *AsyncIterator[*AgentEvent] {
 			iter, generator := NewAsyncIteratorPair[*AgentEvent]()
 			// Send a normal message event first, called event1
+			// 先发送一个普通消息事件，称为 event1
 			generator.Send(&AgentEvent{
 				AgentName: "sa1",
 				Output: &AgentOutput{
@@ -544,11 +595,13 @@ func TestParallelWorkflowResumeWithEvents(t *testing.T) {
 			assert.Equal(t, "resume sa1", info.ResumeData)
 
 			// Get the events from session and verify visibility
+			// 从 session 获取事件并验证可见性
 			runCtx := getRunCtx(ctx)
 			assert.NotNil(t, runCtx.Session, "sa1 resumer should have session")
 			allEvents := runCtx.Session.getEvents()
 
 			// Assert that allEvents only have 1 event, that is event1
+			// 断言 allEvents 只有 1 个事件，即 event1
 			assert.Equal(t, 1, len(allEvents), "sa1 should only see its own event in session")
 			assert.Equal(t, "sa1", allEvents[0].AgentEvent.AgentName, "sa1 should see its own event")
 			assert.Equal(t, "sa1 normal message", allEvents[0].AgentEvent.Output.MessageOutput.Message.Content, "sa1 should see its own message content")
@@ -564,6 +617,7 @@ func TestParallelWorkflowResumeWithEvents(t *testing.T) {
 		runFn: func(ctx context.Context, input *AgentInput, options ...AgentRunOption) *AsyncIterator[*AgentEvent] {
 			iter, generator := NewAsyncIteratorPair[*AgentEvent]()
 			// Send a normal message event first, called event2
+			// 先发送一个普通消息事件，称为 event2
 			generator.Send(&AgentEvent{
 				AgentName: "sa2",
 				Output: &AgentOutput{
@@ -585,11 +639,13 @@ func TestParallelWorkflowResumeWithEvents(t *testing.T) {
 			assert.Equal(t, "resume sa2", info.ResumeData)
 
 			// Get the events from session and verify visibility
+			// 从 session 获取事件并验证可见性
 			runCtx := getRunCtx(ctx)
 			assert.NotNil(t, runCtx.Session, "sa2 resumer should have session")
 			allEvents := runCtx.Session.getEvents()
 
 			// Assert that allEvents only have 1 event, that is event2
+			// 断言 allEvents 只有 1 个事件，即 event2
 			assert.Equal(t, 1, len(allEvents), "sa2 should only see its own event in session")
 			assert.Equal(t, "sa2", allEvents[0].AgentEvent.AgentName, "sa2 should see its own event")
 			assert.Equal(t, "sa2 normal message", allEvents[0].AgentEvent.Output.MessageOutput.Message.Content, "sa2 should see its own message content")
@@ -665,6 +721,7 @@ func TestParallelWorkflowResumeWithEvents(t *testing.T) {
 		assert.Equal(t, 4, len(events), "should have 4 events (2 normal messages + 2 completed agents)")
 
 		// Verify specific properties of each event
+		// 验证每个事件的特定属性
 		var sa3Event, sa4Event *AgentEvent
 		for _, event := range events {
 			switch event.AgentName {
@@ -676,6 +733,7 @@ func TestParallelWorkflowResumeWithEvents(t *testing.T) {
 		}
 
 		// Verify sa3 event properties
+		// 验证 sa3 事件属性
 		assert.NotNil(t, sa3Event, "should have event from sa3")
 		assert.Equal(t, "sa3", sa3Event.AgentName, "sa3 event should have correct agent name")
 		assert.Equal(t, []RunStep{{"parallel agent"}, {"sa3"}}, sa3Event.RunPath, "sa3 event should have correct run path")
@@ -684,6 +742,7 @@ func TestParallelWorkflowResumeWithEvents(t *testing.T) {
 		assert.Equal(t, "sa3 completed", sa3Event.Output.MessageOutput.Message.Content, "sa3 event should have correct message content")
 
 		// Verify sa4 event properties
+		// 验证 sa4 事件属性
 		assert.NotNil(t, sa4Event, "should have event from sa4")
 		assert.Equal(t, "sa4", sa4Event.AgentName, "sa4 event should have correct agent name")
 		assert.Equal(t, []RunStep{{"parallel agent"}, {"sa4"}}, sa4Event.RunPath, "sa4 event should have correct run path")
@@ -738,6 +797,7 @@ func TestNestedParallelWorkflow(t *testing.T) {
 	ctx := context.Background()
 
 	// Create predecessor agent that runs before the parallel structure
+	// 创建在并行结构之前运行的前置智能体
 	predecessorAgent := &myAgent{
 		name: "predecessor",
 		runFn: func(ctx context.Context, input *AgentInput, options ...AgentRunOption) *AsyncIterator[*AgentEvent] {
@@ -756,12 +816,14 @@ func TestNestedParallelWorkflow(t *testing.T) {
 	}
 
 	// Create interruptible inner agents
+	// 创建可中断的内部智能体
 	innerAgent1 := &myAgent{
 		name: "inner1",
 		runFn: func(ctx context.Context, input *AgentInput, options ...AgentRunOption) *AsyncIterator[*AgentEvent] {
 			iter, generator := NewAsyncIteratorPair[*AgentEvent]()
 
 			// Verify inner1 can see predecessor's event
+			// 验证 inner1 可以看到 predecessor 的事件
 			runCtx := getRunCtx(ctx)
 			allEvents := runCtx.Session.getEvents()
 			assert.Equal(t, 1, len(allEvents), "inner1 should see exactly 1 event (predecessor)")
@@ -787,11 +849,13 @@ func TestNestedParallelWorkflow(t *testing.T) {
 			assert.Equal(t, "resume inner1", info.ResumeData)
 
 			// Verify inner1 can see predecessor's event during resume
+			// 验证恢复期间 inner1 可以看到 predecessor 的事件
 			runCtx := getRunCtx(ctx)
 			allEvents := runCtx.Session.getEvents()
 			assert.Equal(t, 2, len(allEvents), "inner1 should see exactly 2 events (predecessor + own normal message) during resume")
 
 			// Find and verify predecessor event
+			// 查找并验证 predecessor 事件
 			var foundPredecessor bool
 			for _, event := range allEvents {
 				if event.AgentEvent != nil && event.AgentEvent.AgentName == "predecessor" {
@@ -813,6 +877,7 @@ func TestNestedParallelWorkflow(t *testing.T) {
 			iter, generator := NewAsyncIteratorPair[*AgentEvent]()
 
 			// Verify inner2 can see predecessor's event
+			// 验证 inner2 可以看到 predecessor 的事件
 			runCtx := getRunCtx(ctx)
 			allEvents := runCtx.Session.getEvents()
 			assert.Equal(t, 1, len(allEvents), "inner2 should see exactly 1 event (predecessor)")
@@ -839,11 +904,13 @@ func TestNestedParallelWorkflow(t *testing.T) {
 			assert.Equal(t, "resume inner2", info.ResumeData)
 
 			// Verify inner2 can see predecessor's event during resume
+			// 验证恢复期间 inner2 可以看到 predecessor 的事件
 			runCtx := getRunCtx(ctx)
 			allEvents := runCtx.Session.getEvents()
 			assert.Equal(t, 2, len(allEvents), "inner2 should see exactly 2 events (predecessor + own normal message) during resume")
 
 			// Find and verify predecessor event
+			// 查找并验证 predecessor 事件
 			var foundPredecessor bool
 			for _, event := range allEvents {
 				if event.AgentEvent != nil && event.AgentEvent.AgentName == "predecessor" {
@@ -860,6 +927,7 @@ func TestNestedParallelWorkflow(t *testing.T) {
 	}
 
 	// Create inner parallel workflow
+	// 创建内部并行 workflow
 	innerParallel, err := NewParallelAgent(ctx, &ParallelAgentConfig{
 		Name:      "inner parallel",
 		SubAgents: []Agent{innerAgent1, innerAgent2},
@@ -867,6 +935,7 @@ func TestNestedParallelWorkflow(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Create simple outer agents
+	// 创建简单的外部智能体
 	outerAgent1 := &myAgent{
 		name: "outer1",
 		runFn: func(ctx context.Context, input *AgentInput, options ...AgentRunOption) *AsyncIterator[*AgentEvent] {
@@ -902,6 +971,7 @@ func TestNestedParallelWorkflow(t *testing.T) {
 	}
 
 	// Create outer parallel workflow with nested parallel agent
+	// 创建带嵌套并行智能体的外部并行 workflow
 	outerParallel, err := NewParallelAgent(ctx, &ParallelAgentConfig{
 		Name:      "outer parallel",
 		SubAgents: []Agent{outerAgent1, innerParallel, outerAgent2},
@@ -909,12 +979,14 @@ func TestNestedParallelWorkflow(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Create successor agent that runs after the parallel structure
+	// 创建在并行结构之后运行的后续智能体
 	successorAgent := &myAgent{
 		name: "successor",
 		runFn: func(ctx context.Context, input *AgentInput, options ...AgentRunOption) *AsyncIterator[*AgentEvent] {
 			iter, generator := NewAsyncIteratorPair[*AgentEvent]()
 
 			// Verify successor can see all events from predecessor and parallel agents
+			// 验证 successor 可以看到 predecessor 和并行智能体的所有事件
 			runCtx := getRunCtx(ctx)
 			allEvents := runCtx.Session.getEvents()
 			assert.GreaterOrEqual(t, len(allEvents), 5, "successor should see all events")
@@ -958,6 +1030,7 @@ func TestNestedParallelWorkflow(t *testing.T) {
 	}
 
 	// Create sequential workflow: predecessor -> parallel -> successor
+	// 创建顺序 workflow：predecessor -> parallel -> successor
 	sequentialWorkflow, err := NewSequentialAgent(ctx, &SequentialAgentConfig{
 		Name:      "sequential workflow",
 		SubAgents: []Agent{predecessorAgent, outerParallel, successorAgent},
@@ -982,12 +1055,14 @@ func TestNestedParallelWorkflow(t *testing.T) {
 	}
 
 	// Should get events from predecessor, outer agents, and inner normal messages (successor doesn't run due to interruption)
+	// 应获取 predecessor、外部智能体和内部普通消息的事件（successor 因中断未运行）
 	assert.Equal(t, 5, len(events), "should have 5 events (predecessor + 2 outer + 2 inner)")
 	if interruptEvent == nil {
 		t.Fatal("should have interrupt event")
 	}
 
 	// Resume the inner parallel workflow
+	// 恢复内部 parallel 工作流
 	var innerInterruptID1, innerInterruptID2 string
 	for _, ctx := range interruptEvent.Action.Interrupted.InterruptContexts {
 		switch ctx.Info {
@@ -1007,21 +1082,25 @@ func TestNestedParallelWorkflow(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify resume completes successfully and successor runs
+	// 验证恢复成功完成且后继节点运行
 	var resumeEvents []*AgentEvent
 	for event, ok := iter.Next(); ok; event, ok = iter.Next() {
 		resumeEvents = append(resumeEvents, event)
 	}
 
 	// Should get successor event after resume
+	// 恢复后应收到后继事件
 	assert.Equal(t, 1, len(resumeEvents), "should have successor event after resume")
 	assert.Equal(t, "successor", resumeEvents[0].AgentName)
 }
 
 // TestWorkflowAgentUnsupportedMode tests unsupported workflow mode error (lines 65-71)
+// TestWorkflowAgentUnsupportedMode 测试不支持的工作流模式错误（第 65-71 行）
 func TestWorkflowAgentUnsupportedMode(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a workflow agent with unsupported mode
+	// 创建使用不支持模式的工作流智能体
 	agent := &workflowAgent{
 		name:        "UnsupportedModeAgent",
 		description: "Agent with unsupported mode",
@@ -1030,6 +1109,7 @@ func TestWorkflowAgentUnsupportedMode(t *testing.T) {
 	}
 
 	// Run the agent and expect error
+	// 运行智能体并期望出错
 	input := &AgentInput{
 		Messages: []Message{
 			schema.UserMessage("Test input"),
@@ -1041,6 +1121,7 @@ func TestWorkflowAgentUnsupportedMode(t *testing.T) {
 	assert.NotNil(t, iterator)
 
 	// Should receive an error event due to unsupported mode
+	// 应收到因模式不支持导致的错误事件
 	event, ok := iterator.Next()
 	assert.True(t, ok)
 	assert.NotNil(t, event)
@@ -1048,6 +1129,7 @@ func TestWorkflowAgentUnsupportedMode(t *testing.T) {
 	assert.Contains(t, event.Err.Error(), "unsupported workflow agent mode")
 
 	// No more events
+	// 没有更多事件
 	_, ok = iterator.Next()
 	assert.False(t, ok)
 }

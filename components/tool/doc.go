@@ -50,4 +50,23 @@
 //
 // See https://www.cloudwego.io/docs/eino/core_modules/components/tools_node_guide/
 // See https://www.cloudwego.io/docs/eino/core_modules/components/tools_node_guide/how_to_create_a_tool/
+//
+// Package tool 定义工具组件接口，使语言模型能够调用外部能力，并提供工具内 Interrupt/Resume 的辅助函数。
+// # 接口层级
+// BaseTool                  — 仅 Info()；用于向 ChatModel 传递工具元数据
+// ├── InvokableTool         — 标准：参数为 JSON 字符串，返回 string
+// ├── StreamableTool        — 标准流式：参数为 JSON 字符串，返回 StreamReader[string]
+// ├── EnhancedInvokableTool — 多模态：参数为 *schema.ToolArgument，返回 *schema.ToolResult
+// └── EnhancedStreamableTool— 多模态流式
+// # 选择接口
+// 多数工具实现 [InvokableTool] 即可 —— 参数以 JSON 字符串传入，由模型的工具调用自动解码，结果作为 string 返回给模型。
+// 当工具需要返回结构化多模态内容（图片、音频、文件）而不是纯文本时，实现 [EnhancedInvokableTool]。当工具同时实现标准接口和增强接口时，ToolsNode 会优先使用增强接口。
+// # 创建工具
+// [utils] 子包提供构造器以消除样板代码：
+// - [utils.InferTool] / [utils.InferStreamTool] — 从 Go struct tags 推断参数 schema
+// - [utils.NewTool] / [utils.NewStreamTool] — 手动 ToolInfo + 类型化函数
+// # Interrupt / Resume
+// 工具可以使用 [Interrupt]、[StatefulInterrupt] 和 [CompositeInterrupt] 暂停执行并等待外部输入。在工具内部使用 [GetInterruptState] 和 [GetResumeContext] 区分首次运行与恢复运行。
+// See https://www.cloudwego.io/docs/eino/core_modules/components/tools_node_guide/
+// See https://www.cloudwego.io/docs/eino/core_modules/components/tools_node_guide/how_to_create_a_tool/
 package tool

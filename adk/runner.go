@@ -52,6 +52,10 @@ func newUserMessage[M MessageType](query string) (M, error) {
 //
 // Execution always goes through the flowAgent pipeline, which handles
 // multi-agent orchestration, callbacks, agent naming, run paths, and cancellation.
+//
+// TypedRunner 是执行 Agent 的主要入口。
+// 它管理智能体的生命周期，包括启动、恢复和创建检查点。
+// 执行始终经过 flowAgent pipeline，由它处理多智能体编排、回调、智能体命名、运行路径和取消。
 type TypedRunner[M MessageType] struct {
 	a               TypedAgent[M]
 	enableStreaming bool
@@ -59,6 +63,7 @@ type TypedRunner[M MessageType] struct {
 }
 
 // Runner is the default runner type using *schema.Message.
+// Runner 是使用 *schema.Message 的默认 runner 类型。
 type Runner = TypedRunner[*schema.Message]
 
 type CheckPointStore = core.CheckPointStore
@@ -73,24 +78,33 @@ type TypedRunnerConfig[M MessageType] struct {
 }
 
 // RunnerConfig is the default runner config type using *schema.Message.
+// RunnerConfig 是使用 *schema.Message 的默认 runner 配置类型。
 type RunnerConfig = TypedRunnerConfig[*schema.Message]
 
 // ResumeParams contains all parameters needed to resume an execution.
 // This struct provides an extensible way to pass resume parameters without
 // requiring breaking changes to method signatures.
+//
+// ResumeParams 包含恢复执行所需的所有参数。
+// 该结构体提供了可扩展的恢复参数传递方式，无需破坏性修改方法签名。
 type ResumeParams struct {
 	// Targets contains the addresses of components to be resumed as keys,
 	// with their corresponding resume data as values
+	//
+	// Targets 以待恢复组件的地址为键，以对应的恢复数据为值。
 	Targets map[string]any
 	// Future extensible fields can be added here without breaking changes
+	// 以后可在此添加可扩展字段而不造成破坏性变更。
 }
 
 // NewRunner creates a new Runner with the given config.
+// NewRunner 使用给定配置创建新的 Runner。
 func NewRunner(_ context.Context, conf RunnerConfig) *Runner {
 	return NewTypedRunner(conf)
 }
 
 // NewTypedRunner creates a new TypedRunner with the given config.
+// NewTypedRunner 使用给定配置创建新的 TypedRunner。
 func NewTypedRunner[M MessageType](conf TypedRunnerConfig[M]) *TypedRunner[M] {
 	return &TypedRunner[M]{
 		enableStreaming: conf.EnableStreaming,
@@ -105,6 +119,7 @@ func (r *TypedRunner[M]) Run(ctx context.Context, messages []M,
 }
 
 // Query is a convenience method that starts a new execution with a single user query string.
+// Query 是一个便捷方法，用单个用户查询字符串启动新的执行。
 func (r *TypedRunner[M]) Query(ctx context.Context,
 	query string, opts ...AgentRunOption) *AsyncIterator[*TypedAgentEvent[M]] {
 	msgs, err := newUserMessage[M](query)
@@ -121,6 +136,11 @@ func (r *TypedRunner[M]) Query(ctx context.Context,
 // When using this method, all interrupted agents will receive `isResumeFlow = false` when they
 // call `GetResumeContext`, as no specific agent was targeted. This is suitable for the "Simple Confirmation"
 // pattern where an agent only needs to know `wasInterrupted` is true to continue.
+//
+// Resume 使用“Implicit Resume All”策略，从检查点继续被中断的执行。
+// 该方法最适合较简单的用例：恢复动作本身就表示所有先前的中断点都应继续执行，且无需特定数据。
+// 使用此方法时，所有被中断的智能体调用 GetResumeContext 时都会收到 `isResumeFlow = false`，因为没有指定特定智能体。
+// 这适用于“Simple Confirmation”模式：智能体只需知道 `wasInterrupted` 为 true 即可继续。
 func (r *TypedRunner[M]) Resume(ctx context.Context, checkPointID string, opts ...AgentRunOption) (
 	*AsyncIterator[*TypedAgentEvent[M]], error) {
 	return r.resumeInternal(ctx, checkPointID, nil, opts...)
@@ -144,6 +164,15 @@ func (r *TypedRunner[M]) Resume(ctx context.Context, checkPointID string, opts .
 //     execution. They act as conduits, allowing the resume signal to flow to their children. They will
 //     naturally re-interrupt if one of their interrupted children re-interrupts, as they receive the
 //     new `CompositeInterrupt` signal from them.
+//
+// ResumeWithParams 使用指定参数，从检查点继续被中断的执行。
+// 这是最常见且最强大的恢复方式，可定位特定中断点（由其地址/ID 标识）并向其提供数据。
+// params.Targets map 应以待恢复组件的地址为键。这些地址可以指向整个执行图中的任意可中断组件，包括 ADK 智能体、compose 图节点或工具。值可以是该组件的恢复数据；若不需要数据，则为 `nil`。
+// 使用此方法时：
+// - 地址在 params.Targets map 中的组件调用 GetResumeContext 时会收到 `isResumeFlow = true`。
+// - 地址不在 params.Targets map 中的被中断组件必须自行决定如何继续：
+// -- “Leaf”组件（原始中断的实际根因）必须重新中断自身，以保留其状态。
+// -- “Composite”智能体（如 SequentialAgent 或 ChatModelAgent）通常应继续执行。它们充当通道，让恢复信号传递给子组件。如果某个被中断的子组件重新中断，它们会收到该子组件发出的新 `CompositeInterrupt` 信号，并自然地再次中断。
 func (r *TypedRunner[M]) ResumeWithParams(ctx context.Context, checkPointID string, params *ResumeParams, opts ...AgentRunOption) (*AsyncIterator[*TypedAgentEvent[M]], error) {
 	return r.resumeInternal(ctx, checkPointID, params.Targets, opts...)
 }
@@ -217,6 +246,9 @@ func typedRunnerResumeInternalImpl[M MessageType](a TypedAgent[M], store CheckPo
 	// caller passed when constructing the runner. This is the runner's own invariant:
 	// the checkpoint is the source of truth for what mode the original execution was
 	// running in, and any new checkpoint written during this resume must preserve it.
+	//
+	// Resume 使用检查点中持久化的流式模式，而不是调用者构造 runner 时传入的值。
+	// 这是 runner 自身的不变式：检查点是原始执行所运行模式的事实来源，恢复期间写入的任何新检查点都必须保留该模式。
 	enableStreaming := resumeInfo.EnableStreaming
 
 	o := getCommonOptions(nil, opts...)

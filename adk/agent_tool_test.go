@@ -52,6 +52,7 @@ func (m *mockChatModelForAttack) Stream(ctx context.Context, input []*schema.Mes
 }
 
 // mockAgent implements the Agent interface for testing
+// mockAgent 实现 Agent 接口用于测试
 type mockAgentForTool struct {
 	name        string
 	description string
@@ -76,6 +77,7 @@ func (a *mockAgentForTool) Run(_ context.Context, _ *AgentInput, _ ...AgentRunOp
 			generator.Send(event)
 
 			// If the event has an Exit action, stop sending events
+			// 如果事件包含 Exit action，则停止发送事件
 			if event.Action != nil && event.Action.Exit {
 				break
 			}
@@ -95,16 +97,20 @@ func newMockAgentForTool(name, description string, responses []*AgentEvent) *moc
 
 func TestAgentTool_Info(t *testing.T) {
 	// Create a mock agent
+	// 创建 mock agent
 	mockAgent_ := newMockAgentForTool("TestAgent", "Test agent description", nil)
 
 	// Create an agentTool with the mock agent
+	// 使用 mock agent 创建 agentTool
 	agentTool_ := NewAgentTool(context.Background(), mockAgent_)
 
 	// Test the Info method
+	// 测试 Info 方法
 	ctx := context.Background()
 	info, err := agentTool_.Info(ctx)
 
 	// Verify results
+	// 验证结果
 	assert.NoError(t, err)
 	assert.NotNil(t, info)
 	assert.Equal(t, "TestAgent", info.Name)
@@ -202,9 +208,11 @@ func (a *sessionValuesAgent) Run(ctx context.Context, _ *AgentInput, _ ...AgentR
 
 func TestAgentTool_InvokableRun(t *testing.T) {
 	// Create a context
+	// 创建 context
 	ctx := context.Background()
 
 	// Test cases
+	// 测试用例
 	tests := []struct {
 		name           string
 		agentResponses []*AgentEvent
@@ -279,15 +287,19 @@ func TestAgentTool_InvokableRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a mock agent with the test responses
+			// 创建带有测试响应的 mock agent
 			mockAgent_ := newMockAgentForTool("TestAgent", "Test agent description", tt.agentResponses)
 
 			// Create an agentTool with the mock agent
+			// 使用 mock agent 创建 agentTool
 			agentTool_ := NewAgentTool(ctx, mockAgent_)
 
 			// Call InvokableRun
+			// 调用 InvokableRun
 			output, err := agentTool_.(tool.InvokableTool).InvokableRun(ctx, tt.request)
 
 			// Verify results
+			// 验证结果
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
@@ -331,6 +343,7 @@ func TestGetReactHistory(t *testing.T) {
 }
 
 // mockAgentWithInputCapture implements the Agent interface for testing and captures the input it receives
+// mockAgentWithInputCapture 实现 Agent 接口用于测试，并捕获收到的输入
 type mockAgentWithInputCapture struct {
 	name          string
 	description   string
@@ -358,6 +371,7 @@ func (a *mockAgentWithInputCapture) Run(_ context.Context, input *AgentInput, _ 
 			generator.Send(event)
 
 			// If the event has an Exit action, stop sending events
+			// 如果事件包含 Exit action，则停止发送事件
 			if event.Action != nil && event.Action.Exit {
 				break
 			}
@@ -377,10 +391,12 @@ func newMockAgentWithInputCapture(name, description string, responses []*AgentEv
 
 func TestAgentToolWithOptions(t *testing.T) {
 	// Test Case 1: WithFullChatHistoryAsInput
+	// 测试用例 1：WithFullChatHistoryAsInput
 	t.Run("WithFullChatHistoryAsInput", func(t *testing.T) {
 		ctx := context.Background()
 
 		// 1. Set up a mock agent that will capture the input it receives
+		// 1. 设置一个 mock agent，用于捕获收到的输入
 		mockAgent := newMockAgentWithInputCapture("test-agent", "a test agent", []*AgentEvent{
 			{
 				AgentName: "test-agent",
@@ -395,9 +411,11 @@ func TestAgentToolWithOptions(t *testing.T) {
 		})
 
 		// 2. Create an agentTool with the option
+		// 2. 使用该 option 创建 agentTool
 		agentTool := NewAgentTool(ctx, mockAgent, WithFullChatHistoryAsInput())
 
 		// 3. Set up a context with a chat history using a graph
+		// 3. 使用图设置带有聊天历史的 context
 		history := []Message{
 			schema.UserMessage("first user message"),
 			schema.AssistantMessage("first assistant response", nil),
@@ -411,6 +429,7 @@ func TestAgentToolWithOptions(t *testing.T) {
 
 		assert.NoError(t, g.AddLambdaNode("1", compose.InvokableLambda(func(ctx context.Context, input string) (output string, err error) {
 			// Run the tool within the graph context that has the state
+			// 在包含 state 的图 context 中运行工具
 			_, err = agentTool.(tool.InvokableTool).InvokableRun(ctx, `{"request":"some ignored input"}`)
 			return "done", err
 		})))
@@ -422,12 +441,17 @@ func TestAgentToolWithOptions(t *testing.T) {
 		assert.NoError(t, err)
 
 		// 4. Run the graph which will execute the tool with the state
+		// 4. 运行图，这会用 state 执行工具
 		_, err = runner.Invoke(ctx, "")
 		assert.NoError(t, err)
 
 		// 5. Assert that the agent received the full history
 		// The agent should receive: history (minus last assistant message) + transfer messages
+		//
+		// 5. 断言 agent 收到了完整历史
+		// agent 应收到：history（去掉最后一条 assistant 消息）+ transfer messages
 		assert.Len(t, mockAgent.capturedInput, 4) // 2 from history + 2 transfer messages
+		// history 中的 2 条 + 2 条 transfer messages
 		assert.Equal(t, "first user message", mockAgent.capturedInput[0].Content)
 		assert.Equal(t, "For context: [react-agent] said: first assistant response.", mockAgent.capturedInput[1].Content)
 		assert.Equal(t, "For context: [react-agent] called tool: `transfer_to_agent` with arguments: test-agent.", mockAgent.capturedInput[2].Content)
@@ -435,10 +459,12 @@ func TestAgentToolWithOptions(t *testing.T) {
 	})
 
 	// Test Case 2: WithAgentInputSchema
+	// 测试用例 2：WithAgentInputSchema
 	t.Run("WithAgentInputSchema", func(t *testing.T) {
 		ctx := context.Background()
 
 		// 1. Define a custom schema
+		// 1. 定义自定义 schema
 		customSchema := schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"custom_arg": {
 				Desc:     "a custom argument",
@@ -448,6 +474,7 @@ func TestAgentToolWithOptions(t *testing.T) {
 		})
 
 		// 2. Set up a mock agent to capture input
+		// 2. 设置一个 mock agent 来捕获输入
 		mockAgent := newMockAgentWithInputCapture("schema-agent", "agent with custom schema", []*AgentEvent{
 			{
 				AgentName: "schema-agent",
@@ -462,28 +489,36 @@ func TestAgentToolWithOptions(t *testing.T) {
 		})
 
 		// 3. Create agentTool with the custom schema option
+		// 3. 使用自定义 schema option 创建 agentTool
 		agentTool := NewAgentTool(ctx, mockAgent, WithAgentInputSchema(customSchema))
 
 		// 4. Verify the Info() method returns the custom schema
+		// 4. 验证 Info() 方法返回自定义 schema
 		info, err := agentTool.Info(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, customSchema, info.ParamsOneOf)
 
 		// 5. Run the tool with arguments matching the custom schema
+		// 5. 使用匹配自定义 schema 的参数运行工具
 		_, err = agentTool.(tool.InvokableTool).InvokableRun(ctx, `{"custom_arg":"hello world"}`)
 		assert.NoError(t, err)
 
 		// 6. Assert that the agent received the correctly parsed argument
 		// With custom schema, the agent should receive the raw JSON as input
+		//
+		// 6. 断言 agent 收到了正确解析的参数
+		// 使用自定义 schema 时，agent 应收到原始 JSON 作为输入
 		assert.Len(t, mockAgent.capturedInput, 1)
 		assert.Equal(t, `{"custom_arg":"hello world"}`, mockAgent.capturedInput[0].Content)
 	})
 
 	// Test Case 3: WithAgentInputSchema with complex schema
+	// 测试用例 3：WithAgentInputSchema 使用复杂 schema
 	t.Run("WithAgentInputSchema_ComplexSchema", func(t *testing.T) {
 		ctx := context.Background()
 
 		// 1. Define a complex custom schema with multiple parameters
+		// 1. 定义包含多个参数的复杂自定义 schema
 		complexSchema := schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"name": {
 				Desc:     "user name",
@@ -503,6 +538,7 @@ func TestAgentToolWithOptions(t *testing.T) {
 		})
 
 		// 2. Set up a mock agent
+		// 2. 设置一个 mock agent
 		mockAgent := newMockAgentWithInputCapture("complex-agent", "agent with complex schema", []*AgentEvent{
 			{
 				AgentName: "complex-agent",
@@ -517,27 +553,33 @@ func TestAgentToolWithOptions(t *testing.T) {
 		})
 
 		// 3. Create agentTool with the complex schema option
+		// 3. 使用复杂 schema option 创建 agentTool
 		agentTool := NewAgentTool(ctx, mockAgent, WithAgentInputSchema(complexSchema))
 
 		// 4. Verify the Info() method returns the complex schema
+		// 4. 验证 Info() 方法返回复杂 schema
 		info, err := agentTool.Info(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, complexSchema, info.ParamsOneOf)
 
 		// 5. Run the tool with complex arguments
+		// 5. 使用复杂参数运行工具
 		_, err = agentTool.(tool.InvokableTool).InvokableRun(ctx, `{"name":"John","age":30,"active":true}`)
 		assert.NoError(t, err)
 
 		// 6. Assert that the agent received the complex JSON
+		// 6. 断言智能体收到了复杂 JSON
 		assert.Len(t, mockAgent.capturedInput, 1)
 		assert.Equal(t, `{"name":"John","age":30,"active":true}`, mockAgent.capturedInput[0].Content)
 	})
 
 	// Test Case 4: Both options together
+	// 测试用例 4：两个 option 一起使用
 	t.Run("BothOptionsTogether", func(t *testing.T) {
 		ctx := context.Background()
 
 		// 1. Define a custom schema
+		// 1. 定义自定义 schema
 		customSchema := schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"query": {
 				Desc:     "search query",
@@ -547,6 +589,7 @@ func TestAgentToolWithOptions(t *testing.T) {
 		})
 
 		// 2. Set up a mock agent
+		// 2. 设置一个 mock 智能体
 		mockAgent := newMockAgentWithInputCapture("combined-agent", "agent with both options", []*AgentEvent{
 			{
 				AgentName: "combined-agent",
@@ -561,9 +604,11 @@ func TestAgentToolWithOptions(t *testing.T) {
 		})
 
 		// 3. Create agentTool with both options
+		// 3. 使用两个 option 创建 agentTool
 		agentTool := NewAgentTool(ctx, mockAgent, WithAgentInputSchema(customSchema), WithFullChatHistoryAsInput())
 
 		// 4. Set up a context with chat history using a graph
+		// 4. 使用图设置带聊天历史的 context
 		history := []Message{
 			schema.UserMessage("previous conversation"),
 			schema.AssistantMessage("previous response", nil),
@@ -577,6 +622,7 @@ func TestAgentToolWithOptions(t *testing.T) {
 
 		assert.NoError(t, g.AddLambdaNode("1", compose.InvokableLambda(func(ctx context.Context, input string) (output string, err error) {
 			// Run the tool within the graph context that has the state
+			// 在带有状态的图 context 中运行工具
 			_, err = agentTool.(tool.InvokableTool).InvokableRun(ctx, `{"query":"current query"}`)
 			return "done", err
 		})))
@@ -588,16 +634,20 @@ func TestAgentToolWithOptions(t *testing.T) {
 		assert.NoError(t, err)
 
 		// 5. Run the graph which will execute the tool with the state
+		// 5. 运行图，它会带着状态执行工具
 		_, err = runner.Invoke(ctx, "")
 		assert.NoError(t, err)
 
 		// 6. Verify both options work together
+		// 6. 验证两个 option 能一起工作
 		info, err := agentTool.Info(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, customSchema, info.ParamsOneOf)
 
 		// The agent should receive full history + the custom query
+		// 智能体应收到完整历史 + 自定义查询
 		assert.Len(t, mockAgent.capturedInput, 4) // 2 history + 2 transfer messages
+		// 2 条历史 + 2 条 transfer 消息
 		assert.Equal(t, "previous conversation", mockAgent.capturedInput[0].Content)
 		assert.Equal(t, "For context: [react-agent] said: previous response.", mockAgent.capturedInput[1].Content)
 		assert.Equal(t, "For context: [react-agent] called tool: `transfer_to_agent` with arguments: combined-agent.", mockAgent.capturedInput[2].Content)
@@ -653,6 +703,7 @@ func (e *emitEventsAgent) Run(context.Context, *AgentInput, ...AgentRunOption) *
 }
 
 // spyAgent captures runSession from ctx in a single nested run
+// spyAgent 在单次嵌套运行中从 ctx 捕获 runSession
 type spyAgent struct {
 	a        Agent
 	mu       sync.Mutex

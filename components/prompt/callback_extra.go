@@ -22,26 +22,35 @@ import (
 )
 
 // CallbackInput is the input for the callback.
+// CallbackInput 是回调的输入。
 type CallbackInput struct {
 	// Variables is the variables for the callback.
+	// Variables 是回调的变量。
 	Variables map[string]any
 	// Templates is the templates for the callback.
+	// Templates 是回调用的模板。
 	Templates []schema.MessagesTemplate
 	// Extra is the extra information for the callback.
+	// Extra 是回调用的额外信息。
 	Extra map[string]any
 }
 
 // CallbackOutput is the output for the callback.
+// CallbackOutput 是回调的输出。
 type CallbackOutput struct {
 	// Result is the result for the callback.
+	// Result 是回调的结果。
 	Result []*schema.Message
 	// Templates is the templates for the callback.
+	// Templates 是回调用的模板。
 	Templates []schema.MessagesTemplate
 	// Extra is the extra information for the callback.
+	// Extra 是回调用的额外信息。
 	Extra map[string]any
 }
 
 // ConvCallbackInput converts the callback input to the prompt callback input.
+// ConvCallbackInput 将回调输入转换为 prompt 回调输入。
 func ConvCallbackInput(src callbacks.CallbackInput) *CallbackInput {
 	switch t := src.(type) {
 	case *CallbackInput:
@@ -56,6 +65,7 @@ func ConvCallbackInput(src callbacks.CallbackInput) *CallbackInput {
 }
 
 // ConvCallbackOutput converts the callback output to the prompt callback output.
+// ConvCallbackOutput 将回调输出转换为 prompt 回调输出。
 func ConvCallbackOutput(src callbacks.CallbackOutput) *CallbackOutput {
 	switch t := src.(type) {
 	case *CallbackOutput:

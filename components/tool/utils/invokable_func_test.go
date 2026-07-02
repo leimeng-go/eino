@@ -301,6 +301,7 @@ func TestNewTool(t *testing.T) {
 		})
 
 		content, err := tl.InvokableRun(ctx, `100`) // json unmarshal must contains double quote if is not json string.
+		// 如果不是 JSON 字符串，json unmarshal 必须包含双引号。
 		assert.Error(t, err)
 		assert.Equal(t, "", content)
 	})

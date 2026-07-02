@@ -24,26 +24,35 @@ import (
 )
 
 // GraphNodeInfo the info which end users pass in when they are adding nodes to graph.
+// GraphNodeInfo 是最终用户向 graph 添加节点时传入的信息。
 type GraphNodeInfo struct {
 	Component             components.Component
 	Instance              any
 	GraphAddNodeOpts      []GraphAddNodeOpt
 	InputType, OutputType reflect.Type // mainly for lambda, whose input and output types cannot be inferred by component type
-	Name                  string
-	InputKey, OutputKey   string
-	GraphInfo             *GraphInfo
-	Mappings              []*FieldMapping
+	// 主要用于 lambda，其输入和输出类型无法通过组件类型推断。
+	Name                string
+	InputKey, OutputKey string
+	GraphInfo           *GraphInfo
+	Mappings            []*FieldMapping
 }
 
 // GraphInfo the info which end users pass in when they are compiling a graph.
 // it is used in compile callback for user to get the node info and instance.
 // you may need all details info of the graph for observation.
+//
+// GraphInfo 是终端用户在编译 graph 时传入的信息。
+// 它用于 compile callback，让用户获取 node 信息和实例。
+// 你可能需要 graph 的所有详细信息用于观测。
 type GraphInfo struct {
-	CompileOptions        []GraphCompileOption
-	Nodes                 map[string]GraphNodeInfo // node key -> node info
-	Edges                 map[string][]string      // edge start node key -> edge end node key, control edges
-	DataEdges             map[string][]string
-	Branches              map[string][]GraphBranch // branch start node key -> branch
+	CompileOptions []GraphCompileOption
+	Nodes          map[string]GraphNodeInfo // node key -> node info
+	// node key -> node info
+	Edges map[string][]string // edge start node key -> edge end node key, control edges
+	// edge start node key -> edge end node key，control edges
+	DataEdges map[string][]string
+	Branches  map[string][]GraphBranch // branch start node key -> branch
+	// branch start node key -> branch
 	InputType, OutputType reflect.Type
 	Name                  string
 
@@ -52,6 +61,7 @@ type GraphInfo struct {
 }
 
 // GraphCompileCallback is the callback which will be called when graph compilation finishes.
+// GraphCompileCallback 是 graph 编译完成时会被调用的 callback。
 type GraphCompileCallback interface {
 	OnFinish(ctx context.Context, info *GraphInfo)
 }

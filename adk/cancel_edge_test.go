@@ -34,8 +34,10 @@ import (
 )
 
 // --- helpers shared across edge-case tests ---
+// --- 边界场景测试共享的辅助项 ---
 
 // blockingChatModel blocks until unblockCh is closed, then returns a fixed response.
+// blockingChatModel 会阻塞直到 unblockCh 被关闭，然后返回固定响应。
 type blockingChatModel struct {
 	unblockCh chan struct{}
 	response  *schema.Message
@@ -74,6 +76,7 @@ func (m *blockingChatModel) Stream(ctx context.Context, _ []*schema.Message, _ .
 func (m *blockingChatModel) BindTools(_ []*schema.ToolInfo) error { return nil }
 
 // errorChatModel returns an error from Generate/Stream.
+// errorChatModel 从 Generate/Stream 返回错误。
 type errorChatModel struct {
 	err     error
 	started chan struct{}
@@ -96,6 +99,7 @@ func (m *errorChatModel) Stream(_ context.Context, _ []*schema.Message, _ ...mod
 func (m *errorChatModel) BindTools(_ []*schema.ToolInfo) error { return nil }
 
 // plainResponseModel returns immediately with a fixed text response (no tool calls).
+// plainResponseModel 立即返回固定文本响应（无工具调用）。
 type plainResponseModel struct {
 	text string
 }
@@ -111,6 +115,7 @@ func (m *plainResponseModel) Stream(_ context.Context, _ []*schema.Message, _ ..
 func (m *plainResponseModel) BindTools(_ []*schema.ToolInfo) error { return nil }
 
 // blockingTool blocks until unblockCh is closed.
+// blockingTool 会阻塞直到 unblockCh 被关闭。
 type blockingTool struct {
 	name      string
 	unblockCh chan struct{}
@@ -172,10 +177,13 @@ func drainEvents(iter *AsyncIterator[*AgentEvent]) ([]*AgentEvent, bool) {
 }
 
 // --- tests ---
+// --- 测试 ---
 
 // TestWithCancel_BeforeExecutionStarts verifies that a cancel issued before
 // the graph begins executing still produces a CancelError without invoking
 // the model or tools.
+//
+// TestWithCancel_BeforeExecutionStarts 验证在图开始执行前发出的取消，仍会产生 CancelError，且不会调用模型或工具。
 func TestWithCancel_BeforeExecutionStarts(t *testing.T) {
 	ctx := context.Background()
 
@@ -196,10 +204,15 @@ func TestWithCancel_BeforeExecutionStarts(t *testing.T) {
 
 	// Extract the cancelContext so we can wait for cancelChan to close,
 	// ensuring the cancel is fully registered before Run starts.
+	//
+	// 提取 cancelContext，以便等待 cancelChan 关闭，确保在 Run 启动前取消已完全注册。
 	cc := getCommonOptions(nil, cancelOpt).cancelCtx
 
 	// Call cancel BEFORE calling agent.Run.
 	// The cancelFunc must succeed (not hang) even though execution hasn't started.
+	//
+	// 在调用 agent.Run 之前调用 cancel。
+	// 即使执行尚未开始，cancelFunc 也必须成功（不挂起）。
 	cancelDone := make(chan error, 1)
 	go func() {
 		handle, _ := cancelFn()
@@ -208,30 +221,40 @@ func TestWithCancel_BeforeExecutionStarts(t *testing.T) {
 
 	// Wait for cancelChan to close so the pre-execution check in runFunc
 	// deterministically sees shouldCancel()=true (eliminates goroutine scheduling race).
+	//
+	// 等待 cancelChan 关闭，使 runFunc 中的执行前检查确定性地看到 shouldCancel()=true（消除 goroutine 调度竞争）。
 	<-cc.cancelChan
 
 	// Now start the run — it should see shouldCancel()=true and emit CancelError immediately.
+	// 现在启动运行——它应看到 shouldCancel()=true 并立即发出 CancelError。
 	iter := agent.Run(ctx, &AgentInput{Messages: []Message{schema.UserMessage("hi")}}, cancelOpt)
 
 	_, hasCancelError := drainEvents(iter)
 	assert.True(t, hasCancelError, "expected CancelError when cancel precedes execution")
 
 	// cancelFn must have already returned (or return quickly now that doneChan is closed).
+	// cancelFn 必须已经返回（或在 doneChan 关闭后很快返回）。
 	select {
 	case cancelErr := <-cancelDone:
 		// Either nil (cancel handled) or ErrExecutionEnded is acceptable
 		// depending on exact timing; what matters is it didn't hang.
+		//
+		// nil（已处理取消）或 ErrExecutionEnded 都可以，
+		// 取决于具体时序；关键是不能挂起。
 		_ = cancelErr
 	case <-time.After(3 * time.Second):
 		t.Fatal("cancelFn blocked indefinitely after pre-start cancel")
 	}
 
 	// Model and tool must not have been invoked.
+	// Model 和 tool 不应被调用。
 	assert.Equal(t, int32(0), atomic.LoadInt32(&bt.callCount), "tool must not be called")
 }
 
 // TestWithCancel_AfterCompletion verifies cancelFn returns ErrExecutionEnded
 // when called after a normal run finishes.
+//
+// TestWithCancel_AfterCompletion 验证正常运行结束后调用 cancelFn 时会返回 ErrExecutionEnded。
 func TestWithCancel_AfterCompletion(t *testing.T) {
 	ctx := context.Background()
 
@@ -246,6 +269,7 @@ func TestWithCancel_AfterCompletion(t *testing.T) {
 	iter := agent.Run(ctx, &AgentInput{Messages: []Message{schema.UserMessage("hi")}}, cancelOpt)
 
 	// Drain all events so the run completes.
+	// 消费所有事件，让运行完成。
 	for {
 		_, ok := iter.Next()
 		if !ok {
@@ -261,6 +285,9 @@ func TestWithCancel_AfterCompletion(t *testing.T) {
 // TestWithCancel_DerivedAgentToolCancelContextMarkedDoneAfterRun verifies that
 // an explicitly derived AgentTool child cancel context is owned by the child run,
 // even when the Go context also carries the parent cancel context.
+//
+// TestWithCancel_DerivedAgentToolCancelContextMarkedDoneAfterRun 验证显式派生的 AgentTool 子取消 context 由子运行拥有，
+// 即使 Go context 也携带父取消 context。
 func TestWithCancel_DerivedAgentToolCancelContextMarkedDoneAfterRun(t *testing.T) {
 	ctx := context.Background()
 
@@ -295,10 +322,13 @@ func TestWithCancel_DerivedAgentToolCancelContextMarkedDoneAfterRun(t *testing.T
 
 // TestWithCancel_AfterBusinessInterrupt verifies cancelFn returns ErrExecutionEnded
 // when called after the agent has been interrupted by business logic.
+//
+// TestWithCancel_AfterBusinessInterrupt 验证智能体被业务逻辑中断后调用 cancelFn 时会返回 ErrExecutionEnded。
 func TestWithCancel_AfterBusinessInterrupt(t *testing.T) {
 	ctx := context.Background()
 
 	// Use a model that triggers a compose.Interrupt so the agent stops with an interrupt.
+	// 使用会触发 compose.Interrupt 的 model，让智能体因中断而停止。
 	interruptModel := &interruptingChatModel{}
 
 	agent, err := NewChatModelAgent(ctx, &ChatModelAgentConfig{
@@ -318,6 +348,7 @@ func TestWithCancel_AfterBusinessInterrupt(t *testing.T) {
 	iter := runner.Run(ctx, []Message{schema.UserMessage("hi")}, cancelOpt, WithCheckPointID("biz-interrupt-1"))
 
 	// Drain — expect an interrupt action event, no cancel error.
+	// 消费事件——预期有 interrupt action event，没有 cancel error。
 	var gotInterrupt bool
 	for {
 		e, ok := iter.Next()
@@ -337,6 +368,8 @@ func TestWithCancel_AfterBusinessInterrupt(t *testing.T) {
 
 // TestWithCancel_AfterError verifies cancelFn returns ErrExecutionEnded
 // when called after the agent errors out.
+//
+// TestWithCancel_AfterError 验证智能体出错后调用 cancelFn 时会返回 ErrExecutionEnded。
 func TestWithCancel_AfterError(t *testing.T) {
 	ctx := context.Background()
 
@@ -371,6 +404,13 @@ func TestWithCancel_AfterError(t *testing.T) {
 // so the safe-point can't fire naturally. After the timeout, escalateToImmediate
 // closes immediateChan which aborts the model stream via cancelMonitoredModel
 // and causes a CancelError — no compose graph-interrupt races involved.
+//
+// TestWithCancel_TimeoutEscalation 测试 WithAgentCancelTimeout 会在 safe-point 尚未触发时将取消升级为 immediate，
+// 并且生成的 CancelError 的 Escalated=true。
+// 策略：使用 CancelAfterChatModel 模式。model 会阻塞（永不完成），
+// 因此 safe-point 无法自然触发。超时后，escalateToImmediate
+// 会关闭 immediateChan，通过 cancelMonitoredModel 中止 model stream，
+// 并导致 CancelError——不涉及 compose graph-interrupt 竞争。
 func TestWithCancel_TimeoutEscalation(t *testing.T) {
 	ctx := context.Background()
 
@@ -386,11 +426,15 @@ func TestWithCancel_TimeoutEscalation(t *testing.T) {
 	runner := NewRunner(ctx, RunnerConfig{
 		Agent:           agent,
 		EnableStreaming: true, // use streaming so cancelMonitoredModel.Stream is exercised
+		// 使用流式，以覆盖 cancelMonitoredModel.Stream
 	})
 
 	timeout := 300 * time.Millisecond
 	// CancelAfterChatModel + timeout: safe-point can't fire (model never finishes),
 	// so after 300ms the timeout goroutine escalates to immediate.
+	//
+	// CancelAfterChatModel + timeout：safe-point 无法触发（model 永不结束），
+	// 因此 300ms 后 timeout goroutine 会升级为 immediate。
 	cancelOpt, cancelFn := WithCancel()
 	iter := runner.Run(ctx, []Message{schema.UserMessage("go")}, cancelOpt)
 
@@ -401,6 +445,7 @@ func TestWithCancel_TimeoutEscalation(t *testing.T) {
 	}
 
 	// Fire cancelFn; it will wait for escalation to complete.
+	// 触发 cancelFn；它会等待升级完成。
 	start := time.Now()
 	handle, _ := cancelFn(WithAgentCancelMode(CancelAfterChatModel), WithAgentCancelTimeout(timeout))
 	cancelErr := handle.Wait()
@@ -429,6 +474,8 @@ func TestWithCancel_TimeoutEscalation(t *testing.T) {
 
 // TestWithCancel_AfterChatModel_WithTools verifies CancelAfterChatModel fires
 // when the model returns tool calls (the safe-point is on the tool-calls path).
+//
+// TestWithCancel_AfterChatModel_WithTools 验证当 model 返回 tool calls 时 CancelAfterChatModel 会触发（safe-point 在 tool-calls 路径上）。
 func TestWithCancel_AfterChatModel_WithTools(t *testing.T) {
 	ctx := context.Background()
 
@@ -475,6 +522,9 @@ func TestWithCancel_AfterChatModel_WithTools(t *testing.T) {
 // during model execution surfaces CancelError and completes quickly.
 // Uses blockingChatModel which blocks in Stream(), keeping the agent's run
 // function alive so the cancel context stays in stateRunning.
+//
+// TestWithCancel_CancelImmediate_StreamAborted 验证在 model 执行期间 CancelImmediate 会暴露 CancelError 并快速完成。
+// 使用 blockingChatModel，它会在 Stream() 中阻塞，使智能体的 run function 保持存活，从而让 cancel context 维持 stateRunning。
 func TestWithCancel_CancelImmediate_StreamAborted(t *testing.T) {
 	ctx := context.Background()
 
@@ -528,6 +578,8 @@ func TestWithCancel_CancelImmediate_StreamAborted(t *testing.T) {
 
 // TestWithCancel_MultipleToolsConcurrent verifies that CancelAfterToolCalls
 // waits for ALL concurrent tool calls to complete before cancelling.
+//
+// TestWithCancel_MultipleToolsConcurrent 验证 CancelAfterToolCalls 会等待所有并发 tool calls 完成后再取消。
 func TestWithCancel_MultipleToolsConcurrent(t *testing.T) {
 	ctx := context.Background()
 
@@ -535,6 +587,7 @@ func TestWithCancel_MultipleToolsConcurrent(t *testing.T) {
 	bt2 := newBlockingTool("tool2")
 
 	// Model calls both tools in one response.
+	// Model 在一个响应中调用两个 tools。
 	modelResp := toolCallMsg(
 		toolCall("c1", "tool1", `{"input":"a"}`),
 		toolCall("c2", "tool2", `{"input":"b"}`),
@@ -555,6 +608,7 @@ func TestWithCancel_MultipleToolsConcurrent(t *testing.T) {
 	iter := agent.Run(ctx, &AgentInput{Messages: []Message{schema.UserMessage("go")}}, cancelOpt)
 
 	// Wait for both tools to start.
+	// 等待两个 tools 都启动。
 	for i := 0; i < 2; i++ {
 		select {
 		case <-bt1.started:
@@ -565,6 +619,7 @@ func TestWithCancel_MultipleToolsConcurrent(t *testing.T) {
 	}
 
 	// Request cancel after tool calls while both are still blocking.
+	// 在两个 tools 仍阻塞时，请求在 tool calls 后取消。
 	cancelDone := make(chan error, 1)
 	go func() {
 		handle, _ := cancelFn(WithAgentCancelMode(CancelAfterToolCalls))
@@ -572,6 +627,7 @@ func TestWithCancel_MultipleToolsConcurrent(t *testing.T) {
 	}()
 
 	// Unblock both tools — cancel should fire only after both complete.
+	// 解除两个工具的阻塞——只有两者都完成后才应触发 cancel。
 	time.Sleep(50 * time.Millisecond)
 	close(bt1.unblockCh)
 	time.Sleep(50 * time.Millisecond)
@@ -590,6 +646,9 @@ func TestWithCancel_MultipleToolsConcurrent(t *testing.T) {
 // TestWithCancel_GraphInterruptRaceBeforeSet verifies that a CancelImmediate
 // issued before setGraphInterruptFunc is called still results in cancellation.
 // This exercises the retroactive-fire path in setGraphInterruptFunc.
+//
+// TestWithCancel_GraphInterruptRaceBeforeSet 验证在调用 setGraphInterruptFunc 之前发出的 CancelImmediate 仍会导致取消。
+// 这会覆盖 setGraphInterruptFunc 中的回溯触发路径。
 func TestWithCancel_GraphInterruptRaceBeforeSet(t *testing.T) {
 	ctx := context.Background()
 
@@ -605,6 +664,7 @@ func TestWithCancel_GraphInterruptRaceBeforeSet(t *testing.T) {
 	cancelOpt, cancelFn := WithCancel()
 
 	// Cancel immediately before run starts.
+	// 在运行开始前立即取消。
 	go func() {
 		handle, _ := cancelFn()
 		_ = handle.Wait()
@@ -627,6 +687,8 @@ func TestWithCancel_GraphInterruptRaceBeforeSet(t *testing.T) {
 
 // TestWithCancel_NoCheckpointStore verifies cancel completes and does not panic
 // when no checkpoint store is configured.
+//
+// TestWithCancel_NoCheckpointStore 验证未配置 checkpoint store 时，取消会完成且不会 panic。
 func TestWithCancel_NoCheckpointStore(t *testing.T) {
 	ctx := context.Background()
 
@@ -642,6 +704,7 @@ func TestWithCancel_NoCheckpointStore(t *testing.T) {
 	runner := NewRunner(ctx, RunnerConfig{
 		Agent: agent,
 		// No CheckPointStore set.
+		// 未设置 CheckPointStore。
 	})
 
 	cancelOpt, cancelFn := WithCancel()
@@ -673,6 +736,8 @@ func TestWithCancel_NoCheckpointStore(t *testing.T) {
 
 // TestWithCancel_ModelError verifies that a model error marks the cancelCtx as
 // done so that a subsequent cancelFn call returns ErrExecutionEnded.
+//
+// TestWithCancel_ModelError 验证模型错误会将 cancelCtx 标记为 done，使后续 cancelFn 调用返回 ErrExecutionEnded。
 func TestWithCancel_ModelError(t *testing.T) {
 	ctx := context.Background()
 
@@ -706,10 +771,13 @@ func TestWithCancel_ModelError(t *testing.T) {
 
 // TestWithCancel_Resume_SafePoint covers CancelAfterChatModel and
 // CancelAfterToolCalls on a Resume path.
+//
+// TestWithCancel_Resume_SafePoint 覆盖 Resume 路径上的 CancelAfterChatModel 和 CancelAfterToolCalls。
 func TestWithCancel_Resume_SafePoint(t *testing.T) {
 	ctx := context.Background()
 
 	// --- phase 1: run to get a checkpoint via CancelImmediate ---
+	// --- 阶段 1：通过 CancelImmediate 运行以获取检查点 ---
 	blk := newBlockingChatModel(toolCallMsg(toolCall("c1", "bt", `{"input":"x"}`)))
 	bt := newSlowTool("bt", 50*time.Millisecond, "result")
 
@@ -741,6 +809,7 @@ func TestWithCancel_Resume_SafePoint(t *testing.T) {
 	drainEvents(iter1)
 
 	// --- phase 2: resume, cancel after chat model ---
+	// --- 阶段 2：恢复，在 chat model 后取消 ---
 	resumeModel := newBlockingChatModel(toolCallMsg(toolCall("c1", "bt", `{"input":"x"}`)))
 
 	bt2 := newSlowTool("bt", 50*time.Millisecond, "result")
@@ -787,6 +856,7 @@ func TestWithCancel_Resume_SafePoint(t *testing.T) {
 }
 
 // callbackTool is a tool that calls onCall when invoked.
+// callbackTool 是一个在调用时会调用 onCall 的工具。
 type callbackTool struct {
 	name   string
 	onCall func()
@@ -811,6 +881,8 @@ func (t *callbackTool) InvokableRun(_ context.Context, _ string, _ ...tool.Optio
 
 // interruptingChatModel returns a compose.Interrupt error to simulate a
 // business interrupt during execution.
+//
+// interruptingChatModel 返回 compose.Interrupt 错误，用于模拟执行期间的业务中断。
 type interruptingChatModel struct{}
 
 func (m *interruptingChatModel) Generate(ctx context.Context, _ []*schema.Message, _ ...model.Option) (*schema.Message, error) {
@@ -826,6 +898,8 @@ func (m *interruptingChatModel) BindTools(_ []*schema.ToolInfo) error { return n
 // TestWithCancel_TargetedResume_CancelImmediate cancels an agent via CancelImmediate,
 // extracts InterruptContexts from the resulting CancelError, and uses them
 // for targeted resumption via Runner.ResumeWithParams.
+//
+// TestWithCancel_TargetedResume_CancelImmediate 通过 CancelImmediate 取消智能体，从生成的 CancelError 中提取 InterruptContexts，并用它们通过 Runner.ResumeWithParams 进行定向恢复。
 func TestWithCancel_TargetedResume_CancelImmediate(t *testing.T) {
 	ctx := context.Background()
 
@@ -858,6 +932,7 @@ func TestWithCancel_TargetedResume_CancelImmediate(t *testing.T) {
 	}
 
 	handle, _ := cancelFn() // CancelImmediate (default)
+	// CancelImmediate（默认）
 	cancelErr := handle.Wait()
 	assert.NoError(t, cancelErr)
 
@@ -877,6 +952,7 @@ func TestWithCancel_TargetedResume_CancelImmediate(t *testing.T) {
 	require.NotEmpty(t, cancelError.InterruptContexts, "CancelError should have InterruptContexts for targeted resume")
 
 	// --- resume with targeted params ---
+	// --- 使用定向参数恢复 ---
 	targets := make(map[string]any)
 	for _, ic := range cancelError.InterruptContexts {
 		targets[ic.ID] = nil
@@ -922,11 +998,16 @@ func TestWithCancel_TargetedResume_CancelImmediate(t *testing.T) {
 // and that targeted resume via ResumeWithParams succeeds.
 // Since safe-point cancels now use compose.Interrupt, compose saves checkpoint data,
 // making the cancel fully resumable.
+//
+// TestWithCancel_TargetedResume_SafePoint 通过 CancelAfterChatModel（safe-point）取消智能体，并验证 CancelError 上填充了 InterruptContexts，且通过 ResumeWithParams 定向恢复成功。
+// 由于 safe-point 取消现在使用 compose.Interrupt，compose 会保存检查点数据，使取消完全可恢复。
 func TestWithCancel_TargetedResume_SafePoint(t *testing.T) {
 	ctx := context.Background()
 
 	// The model returns a tool call so the react graph routes to toolPreHandle,
 	// which detects CancelAfterChatModel and fires compose.Interrupt.
+	//
+	// 模型返回一个工具调用，因此 react 图会路由到 toolPreHandle，后者检测到 CancelAfterChatModel 并触发 compose.Interrupt。
 	blk := newBlockingChatModel(toolCallMsg(toolCall("c1", "st", `{"input":"x"}`)))
 	st := newSlowTool("st", 0, "result")
 
@@ -956,6 +1037,7 @@ func TestWithCancel_TargetedResume_SafePoint(t *testing.T) {
 	}
 
 	// Start cancelFn in background so the CAS happens before the model unblocks.
+	// 在后台启动 cancelFn，使 CAS 在模型解除阻塞前发生。
 	cancelDone := make(chan error, 1)
 	go func() {
 		handle, _ := cancelFn(WithAgentCancelMode(CancelAfterChatModel))
@@ -983,6 +1065,7 @@ func TestWithCancel_TargetedResume_SafePoint(t *testing.T) {
 	require.NotEmpty(t, cancelError.InterruptContexts, "CancelError should have InterruptContexts for targeted resume")
 
 	// --- resume with targeted params ---
+	// --- 使用定向参数恢复 ---
 	targets := make(map[string]any)
 	for _, ic := range cancelError.InterruptContexts {
 		targets[ic.ID] = nil
@@ -1035,12 +1118,19 @@ func TestWithCancel_TargetedResume_SafePoint(t *testing.T) {
 //
 // For the noTools path: the model returns a plain text message. On resume the
 // cancel-check lambda must return that same message as the chain output.
+//
+// TestWithCancel_Resume_CancelAfterChatModel_MessagePreserved 测试 ReAct（带工具）和 noTools 两条路径，以确保触发 CancelAfterChatModel safe-point 且稍后恢复运行时，chat model 返回的原始 Message 会通过 StatefulInterrupt 检查点保留下来。
+// 对于 ReAct 路径：模型返回工具调用消息。恢复时，cancelCheck 节点必须返回同一条消息，以便分支路由到 ToolNode 并实际执行工具。
+// 对于 noTools 路径：模型返回纯文本消息。恢复时，cancel-check lambda 必须返回同一条消息作为链输出。
 func TestWithCancel_Resume_CancelAfterChatModel_MessagePreserved(t *testing.T) {
 	t.Run("react_path_tool_call_preserved", func(t *testing.T) {
 		ctx := context.Background()
 
 		// Phase-2 model returns no tool calls so the graph ends.
 		// We track whether the tool actually executes on resume.
+		//
+		// 阶段 2 的模型不返回工具调用，因此图会结束。
+		// 我们跟踪工具是否确实在恢复时执行。
 		toolExecuted := make(chan struct{}, 1)
 		st := &callbackTool{
 			name: "my_tool",
@@ -1053,6 +1143,7 @@ func TestWithCancel_Resume_CancelAfterChatModel_MessagePreserved(t *testing.T) {
 		}
 
 		// Phase-1 model returns a tool call.
+		// Phase-1 模型返回一个工具调用。
 		blk := newBlockingChatModel(toolCallMsg(toolCall("c1", "my_tool", `{"input":"x"}`)))
 
 		agent1, err := NewChatModelAgent(ctx, &ChatModelAgentConfig{
@@ -1098,6 +1189,8 @@ func TestWithCancel_Resume_CancelAfterChatModel_MessagePreserved(t *testing.T) {
 		// Phase 2: resume. The model for phase-2 returns plain text (no tool
 		// calls) so the react graph ends after one iteration. But first the
 		// tool from the checkpoint must execute.
+		//
+		// Phase 2: 恢复。phase-2 的模型返回纯文本（无工具调用），因此 react graph 一次迭代后结束。但必须先执行检查点中的工具。
 		resumeModel := &plainResponseModel{text: "done"}
 		agent2, err := NewChatModelAgent(ctx, &ChatModelAgentConfig{
 			Name:        "TestAgent",
@@ -1129,6 +1222,8 @@ func TestWithCancel_Resume_CancelAfterChatModel_MessagePreserved(t *testing.T) {
 
 		// The key assertion: the tool must have been called during resume,
 		// which can only happen if the tool-call message was preserved.
+		//
+		// 关键断言：恢复期间必须调用过该工具，这只有在工具调用消息被保留时才可能发生。
 		select {
 		case <-toolExecuted:
 			// success
@@ -1148,14 +1243,19 @@ func TestWithCancel_Resume_CancelAfterChatModel_MessagePreserved(t *testing.T) {
 // fires in cma1's handleRunFuncError (claiming markCancelHandled). The
 // sequential workflow's checkCancel at the transition point should find
 // markCancelHandled returns false and skip — producing exactly 1 CancelError.
+//
+// TestHandleRunFuncError_AlreadyHandled_NoDuplicate 验证：当 markCancelHandled() 已被子智能体的 handleRunFuncError 认领时，顺序工作流的 checkCancel 不会再发出第二个 CancelError。
+// 设置：带 CancelAfterToolCalls 的 sequential[cma1, cma2]。cma1 有工具，取消在工具运行时触发。工具完成后，安全点在 cma1 的 handleRunFuncError 中触发（认领 markCancelHandled）。顺序工作流在转换点的 checkCancel 应发现 markCancelHandled 返回 false 并跳过——最终只产生 1 个 CancelError。
 func TestHandleRunFuncError_AlreadyHandled_NoDuplicate(t *testing.T) {
 	ctx := context.Background()
 
 	bt := newBlockingTool("bt")
 
 	// cma1: model returns a tool call immediately, tool blocks until unblocked
+	// cma1：模型立即返回一个工具调用，工具会阻塞直到解除阻塞
 	cma1Model := newBlockingChatModel(toolCallMsg(toolCall("c1", "bt", `{"input":"x"}`)))
 	close(cma1Model.unblockCh) // model returns immediately
+	// 模型立即返回
 
 	agent1, err := NewChatModelAgent(ctx, &ChatModelAgentConfig{
 		Name: "agent1", Description: "first", Instruction: "test",
@@ -1186,6 +1286,7 @@ func TestHandleRunFuncError_AlreadyHandled_NoDuplicate(t *testing.T) {
 	iter := runner.Run(ctx, []Message{schema.UserMessage("test")}, cancelOpt)
 
 	// Wait for tool to start
+	// 等待工具启动
 	select {
 	case <-bt.started:
 	case <-time.After(5 * time.Second):
@@ -1194,12 +1295,15 @@ func TestHandleRunFuncError_AlreadyHandled_NoDuplicate(t *testing.T) {
 
 	// Cancel while tool is still running (in goroutine because cancelFn blocks
 	// until execution finishes), then unblock tool so safe-point fires
+	//
+	// 在工具仍在运行时取消（放在 goroutine 中，因为 cancelFn 会阻塞直到执行完成），然后解除工具阻塞以触发安全点
 	go func() {
 		handle, _ := cancelFn(WithAgentCancelMode(CancelAfterToolCalls))
 		_ = handle.Wait()
 	}()
 
 	// Give cancel time to register, then unblock tool
+	// 给取消一点时间完成登记，然后解除工具阻塞
 	time.Sleep(50 * time.Millisecond)
 	close(bt.unblockCh)
 
@@ -1305,12 +1409,15 @@ func TestWithCancel_CancelAfterChatModel_NestedAgentTool(t *testing.T) {
 
 // slowStreamingTool implements StreamableTool (but NOT InvokableTool), streaming
 // chunks slowly so CancelImmediate can fire mid-stream.
+//
+// slowStreamingTool 实现 StreamableTool（但不实现 InvokableTool），缓慢流式输出分块，使 CancelImmediate 能在流中途触发。
 type slowStreamingTool struct {
 	name          string
 	chunkInterval time.Duration
 	chunks        []string
 	started       chan struct{}
 	gate          chan struct{} // if non-nil, blocks after first chunk until closed
+	// 若非 nil，则在第一个分块后阻塞直到关闭
 }
 
 func (t *slowStreamingTool) Info(_ context.Context) (*schema.ToolInfo, error) {
@@ -1341,6 +1448,8 @@ func (t *slowStreamingTool) StreamableRun(_ context.Context, _ string, _ ...tool
 			// We wait until chunk index 1 (second chunk) so that the framework
 			// has time to receive the first chunk and forward the streaming
 			// event to the iterator, ensuring ErrStreamCanceled is observable.
+			//
+			// 第二个分块之后，在 gate 上阻塞，使调用方可以在工具确定仍在流式输出时发起取消。我们等到分块索引 1（第二个分块），让框架有时间接收第一个分块并把流式事件转发给迭代器，确保 ErrStreamCanceled 可被观测到。
 			if i == 1 && t.gate != nil {
 				<-t.gate
 			}
@@ -1351,6 +1460,8 @@ func (t *slowStreamingTool) StreamableRun(_ context.Context, _ string, _ ...tool
 
 // toolCallStreamModel returns a tool-call message on the first Stream call,
 // then a plain text response on subsequent calls.
+//
+// toolCallStreamModel 在第一次 Stream 调用时返回工具调用消息，后续调用返回纯文本响应。
 type toolCallStreamModel struct {
 	callCount int32
 }
@@ -1375,6 +1486,8 @@ func (m *toolCallStreamModel) BindTools(_ []*schema.ToolInfo) error { return nil
 // TestWithCancel_CancelImmediate_StreamableToolAborted verifies that CancelImmediate
 // during StreamableTool streaming surfaces ErrStreamCanceled on the tool's
 // MessageStream.Recv(), just like it does for ChatModel streaming.
+//
+// TestWithCancel_CancelImmediate_StreamableToolAborted 验证：在 StreamableTool 流式输出期间触发 CancelImmediate，会在工具的 MessageStream.Recv() 上暴露 ErrStreamCanceled，和 ChatModel 流式输出时一样。
 func TestWithCancel_CancelImmediate_StreamableToolAborted(t *testing.T) {
 	ctx := context.Background()
 
@@ -1409,6 +1522,8 @@ func TestWithCancel_CancelImmediate_StreamableToolAborted(t *testing.T) {
 	// Wait for the tool to start streaming and send its first chunk.
 	// The tool then blocks on the gate, guaranteeing the execution is
 	// still in progress when we issue the cancel.
+	//
+	// 等待工具开始流式输出并发送第一个分块。随后工具会在 gate 上阻塞，保证我们发起取消时执行仍在进行。
 	select {
 	case <-st.started:
 	case <-time.After(5 * time.Second):
@@ -1418,6 +1533,8 @@ func TestWithCancel_CancelImmediate_StreamableToolAborted(t *testing.T) {
 	// Drain events in a separate goroutine so we can issue the cancel
 	// from the main goroutine after confirming the tool stream event
 	// has been received.
+	//
+	// 在单独的 goroutine 中耗尽事件，这样主 goroutine 可在确认收到工具流事件后发起取消。
 	type result struct {
 		foundStreamCanceled bool
 		foundCancelError    bool
@@ -1433,9 +1550,11 @@ func TestWithCancel_CancelImmediate_StreamableToolAborted(t *testing.T) {
 			}
 
 			// ErrStreamCanceled appears on the tool's MessageStream.Recv()
+			// ErrStreamCanceled 出现在工具的 MessageStream.Recv() 上
 			if e.Output != nil && e.Output.MessageOutput != nil && e.Output.MessageOutput.IsStreaming &&
 				e.Output.MessageOutput.Role == schema.Tool {
 				// Signal that the tool stream event has been received.
+				// 标记已收到工具流事件。
 				close(toolStreamReady)
 				stream := e.Output.MessageOutput.MessageStream
 				for {
@@ -1464,6 +1583,8 @@ func TestWithCancel_CancelImmediate_StreamableToolAborted(t *testing.T) {
 	// At this point the tool goroutine is blocked on the gate, and the
 	// iterator goroutine is blocked on stream.Recv(), so the execution is
 	// guaranteed to still be in progress.
+	//
+	// 等待迭代器 goroutine 收到工具流事件。此时工具 goroutine 阻塞在 gate 上，迭代器 goroutine 阻塞在 stream.Recv() 上，因此可保证执行仍在进行。
 	select {
 	case <-toolStreamReady:
 	case <-time.After(5 * time.Second):
@@ -1475,6 +1596,8 @@ func TestWithCancel_CancelImmediate_StreamableToolAborted(t *testing.T) {
 	// ErrStreamCanceled to the consumer side. We do NOT close gate here —
 	// keeping the tool goroutine blocked ensures the graph interrupt (timeout=0)
 	// wins the race against normal completion. Close gate in defer for cleanup.
+	//
+	// 在工具 goroutine 阻塞于 gate 时发起取消。wrapStreamWithCancelMonitoring 检测到 immediateChan，并向消费者侧发送 ErrStreamCanceled。这里不要关闭 gate——保持工具 goroutine 阻塞可确保图中断（timeout=0）在与正常完成的竞争中胜出。清理时在 defer 中关闭 gate。
 	defer close(gate)
 	handle, _ := cancelFn()
 	cancelErr := handle.Wait()
@@ -1484,6 +1607,8 @@ func TestWithCancel_CancelImmediate_StreamableToolAborted(t *testing.T) {
 	if errors.Is(cancelErr, ErrExecutionEnded) {
 		// On slower runtimes (e.g. Go 1.19 CI), the execution can complete
 		// before the cancel signal is delivered — this is a valid race outcome.
+		//
+		// 在较慢的运行时（例如 Go 1.19 CI）上，执行可能会在 cancel 信号送达前完成——这是有效的竞态结果。
 		t.Log("cancel raced with completion (ErrExecutionEnded) — skipping cancel assertions")
 		return
 	}
@@ -1500,6 +1625,12 @@ func TestWithCancel_CancelImmediate_StreamableToolAborted(t *testing.T) {
 // Regression test: previously, the outer ChatModelAgent would restart from its Init/ChatModel
 // node instead of resuming from the ToolsNode, causing the outer model to be called again
 // with the original user message before the AgentTool and inner ChatModelAgent were resumed.
+//
+// TestWithCancel_CancelImmediate_NestedAgentTool_ResumeFromToolsNode 验证：
+// 当嵌套的 ChatModelAgent（作为外层 ChatModelAgent 内的 AgentTool 包装）通过 CancelImmediate 取消，然后用 Runner.Resume（无参数）恢复时，
+// 外层智能体会从 ToolsNode 恢复，而不是从头重新开始。
+// 回归测试：以前外层 ChatModelAgent 会从其 Init/ChatModel 节点重新开始，而不是从 ToolsNode 恢复，
+// 导致在 AgentTool 和内层 ChatModelAgent 恢复前，外层模型再次用原始用户消息被调用。
 func TestWithCancel_CancelImmediate_NestedAgentTool_ResumeFromToolsNode(t *testing.T) {
 	for _, tc := range []struct {
 		name            string
@@ -1520,6 +1651,7 @@ func TestWithCancel_CancelImmediate_NestedAgentTool_ResumeFromToolsNode(t *testi
 			ctx := context.Background()
 
 			// --- inner agent: its model blocks so we can cancel mid-execution ---
+			// --- 内层智能体：其模型会阻塞，以便我们在执行中途取消 ---
 			var innerTools []tool.BaseTool
 			var innerModelResp *schema.Message
 			if tc.innerHasTools {
@@ -1550,6 +1682,10 @@ func TestWithCancel_CancelImmediate_NestedAgentTool_ResumeFromToolsNode(t *testi
 			// --- outer agent: counting model ---
 			// Call 1: returns a tool call that invokes InnerAgent.
 			// Call 2 (only needed on resume): returns a plain final answer.
+			//
+			// --- 外层智能体：计数模型 ---
+			// 第 1 次调用：返回调用 InnerAgent 的工具调用。
+			// 第 2 次调用（仅恢复时需要）：返回普通的最终答案。
 			outerModelCallCount := int32(0)
 			outerModel := &countingChatModel{
 				callCount: &outerModelCallCount,
@@ -1582,10 +1718,12 @@ func TestWithCancel_CancelImmediate_NestedAgentTool_ResumeFromToolsNode(t *testi
 			})
 
 			// --- phase 1: run and cancel while inner agent model is blocked ---
+			// --- 阶段 1：运行并在内层智能体模型阻塞时取消 ---
 			cancelOpt, cancelFn := WithCancel()
 			iter := runner1.Run(ctx, []Message{schema.UserMessage("go")}, cancelOpt, WithCheckPointID(checkpointID))
 
 			// Wait for inner model to start (meaning outer model already returned tool call).
+			// 等待内层模型启动（表示外层模型已经返回工具调用）。
 			select {
 			case <-innerModel.started:
 			case <-time.After(5 * time.Second):
@@ -1593,11 +1731,14 @@ func TestWithCancel_CancelImmediate_NestedAgentTool_ResumeFromToolsNode(t *testi
 			}
 
 			// At this point outerModel should have been called exactly once.
+			// 此时 outerModel 应该只被调用一次。
 			assert.Equal(t, int32(1), atomic.LoadInt32(&outerModelCallCount),
 				"outer model should have been called once before cancel")
 
 			// Cancel immediately. Recursive cases additionally propagate the cancel
 			// request into the AgentTool's internal ChatModelAgent.
+			//
+			// 立即取消。递归场景还会把取消请求传播到 AgentTool 内部的 ChatModelAgent。
 			var handle *CancelHandle
 			if tc.recursive {
 				handle, _ = cancelFn(WithRecursive())
@@ -1614,6 +1755,10 @@ func TestWithCancel_CancelImmediate_NestedAgentTool_ResumeFromToolsNode(t *testi
 			// Build fresh agents for resume. Recursive cancel should resume the
 			// inner ChatModelAgent inside AgentTool before the top-level
 			// ChatModelAgent produces the final answer.
+			//
+			// --- 阶段 2：使用 Runner.Resume 恢复（无 ResumeWithParams，无 interrupt ID） ---
+			// 为恢复构建新的智能体。递归取消应先恢复 AgentTool 内部的内层 ChatModelAgent，
+			// 然后顶层 ChatModelAgent 再生成最终答案。
 			resumeFirstModelCall := make(chan string, 5)
 			resumeOuterModelCallCount := int32(0)
 			resumeOuterModel := &countingChatModel{
@@ -1707,11 +1852,15 @@ func TestWithCancel_CancelImmediate_NestedAgentTool_ResumeFromToolsNode(t *testi
 			// If it was called with the original user message (restarting from scratch),
 			// the counting model would either exceed its response list or the call count
 			// would be wrong.
+			//
+			// 恢复期间外层模型应该只被调用一次（在收到工具结果后生成最终答案）。
+			// 如果它以原始用户消息被调用（从头重启），计数模型要么会超出响应列表，要么调用次数会不正确。
 			assert.Equal(t, int32(1), atomic.LoadInt32(&resumeOuterModelCallCount),
 				"outer model should be called exactly once during resume (for final answer after tool results), "+
 					"not restarted from the beginning")
 
 			// Verify we got the completion output.
+			// 验证我们获得了完成输出。
 			var gotOutput bool
 			for _, event := range resumeEvents {
 				content, err := messageOutputContent(event)
@@ -2023,10 +2172,15 @@ func TestWithCancel_CancelImmediate_ConcurrentAgentTools_ResumeWithoutRestart(t 
 
 // countingChatModel is a chat model that counts calls and records inputs.
 // It returns responses from a fixed slice, indexed by call count.
+//
+// countingChatModel 是一个会统计调用次数并记录输入的聊天模型。
+// 它按调用次数作为索引，从固定切片返回响应。
 type countingChatModel struct {
 	callCount *int32
 	inputsCh  chan []*schema.Message // optional: receives a copy of each input
-	callCh    chan string            // optional: receives callLabel when Generate is called
+	// 可选：接收每次输入的副本
+	callCh chan string // optional: receives callLabel when Generate is called
+	// 可选：在调用 Generate 时接收 callLabel
 	callLabel string
 	responses []*schema.Message
 }

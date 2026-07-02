@@ -114,6 +114,9 @@ func (a *turnLoopCancellableMockAgent) Run(ctx context.Context, input *AgentInpu
 				// If cancel() fires first, the runFunc returns immediately,
 				// flowAgent's defer calls markDone(), and doneChan closes
 				// before onCancel can read cc.config.
+				//
+				// 关键：在 cancel() 之前调用 onCancel，以避免竞态条件。
+				// 如果 cancel() 先触发，runFunc 会立即返回，flowAgent 的 defer 会调用 markDone()，doneChan 会在 onCancel 读取 cc.config 前关闭。
 				if a.onCancel != nil {
 					a.onCancel(cc)
 				}
@@ -1044,6 +1047,9 @@ func TestTurnLoop_PrepareAgentError_RecoverItemsInOrder(t *testing.T) {
 // Context cancel tests: the TurnLoop monitors context cancellation by closing
 // the internal buffer when ctx.Done() fires, which unblocks the blocking
 // Receive() call. The loop then checks ctx.Err() and exits with the context error.
+//
+// 上下文取消测试：TurnLoop 通过在 ctx.Done() 触发时关闭内部缓冲区来监控 context 取消，从而解除阻塞中的 Receive() 调用。
+// 随后循环检查 ctx.Err()，并带着 context 错误退出。
 
 func TestTurnLoop_ContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1106,6 +1112,8 @@ func TestTurnLoop_ContextCancelBeforeReceive(t *testing.T) {
 
 	// Push before Run to guarantee the item is buffered before the
 	// context-monitoring goroutine can close the buffer.
+	//
+	// 在 Run 前 Push，确保该项在 context 监控 goroutine 关闭缓冲区之前已进入缓冲区。
 	_, _ = loop.Push("msg1")
 	loop.Run(ctx)
 
@@ -1117,6 +1125,8 @@ func TestTurnLoop_ContextCancelBeforeReceive(t *testing.T) {
 func TestTurnLoop_ContextCancelDuringBlockingReceive(t *testing.T) {
 	// When context is cancelled while Receive() is blocking (no items in buffer),
 	// the context monitoring goroutine closes the buffer, which unblocks Receive().
+	//
+	// 当 context 在 Receive() 阻塞时（缓冲区无项）被取消，context 监控 goroutine 会关闭缓冲区，从而解除 Receive() 阻塞。
 	ctx, cancel := context.WithCancel(context.Background())
 
 	loop := newAndRunTurnLoop(ctx, TurnLoopConfig[string, *schema.Message]{
@@ -1125,6 +1135,7 @@ func TestTurnLoop_ContextCancelDuringBlockingReceive(t *testing.T) {
 	})
 
 	// Don't push any items — let Receive() block
+	// 不要 Push 任何项 —— 让 Receive() 阻塞
 	time.Sleep(50 * time.Millisecond)
 	cancel()
 
@@ -1208,6 +1219,8 @@ func TestTurnLoop_OnAgentEventsReceivesEvents(t *testing.T) {
 // bare Stop(): the running agent finishes naturally with an uncanceled context,
 // the loop exits cleanly (ExitReason == nil), and no new turn starts even when
 // additional items are buffered.
+//
+// TestTurnLoop_BareStop_AgentRunsToCompletion 验证 bare Stop() 的核心契约：运行中的智能体会在未取消的 context 下自然完成，循环干净退出（ExitReason == nil），即使还有额外项已缓冲，也不会启动新的 turn。
 func TestTurnLoop_BareStop_AgentRunsToCompletion(t *testing.T) {
 	const agentWorkDuration = 200 * time.Millisecond
 
@@ -1227,9 +1240,11 @@ func TestTurnLoop_BareStop_AgentRunsToCompletion(t *testing.T) {
 					close(agentStarted)
 
 					// Simulate real work (NOT blocking on <-ctx.Done())
+					// 模拟真实工作（不要阻塞在 <-ctx.Done() 上）
 					time.Sleep(agentWorkDuration)
 
 					// Record context state AFTER work completes
+					// 在工作完成后记录 context 状态
 					agentCtxErr <- ctx.Err()
 					agentOutput <- "work-done"
 
@@ -1240,18 +1255,22 @@ func TestTurnLoop_BareStop_AgentRunsToCompletion(t *testing.T) {
 	})
 
 	// Push two items so the loop has a reason to start a second turn.
+	// Push 两个项，让循环有理由启动第二个 turn。
 	loop.Push("task1")
 	loop.Push("task2")
 
 	// Wait for the agent to start processing task1.
+	// 等待智能体开始处理 task1。
 	waitOrFail(t, agentStarted, "agent did not start")
 
 	// Call bare Stop() while the agent is doing work.
+	// 在智能体工作期间调用 bare Stop()。
 	loop.Stop()
 
 	result := loop.Wait()
 
 	// 1. Agent's context was NOT canceled.
+	// 1. 智能体的 context 未被取消。
 	select {
 	case err := <-agentCtxErr:
 		assert.NoError(t, err, "bare Stop must not cancel the agent's context")
@@ -1260,6 +1279,7 @@ func TestTurnLoop_BareStop_AgentRunsToCompletion(t *testing.T) {
 	}
 
 	// 2. Agent completed its work.
+	// 2. 智能体完成了工作。
 	select {
 	case out := <-agentOutput:
 		assert.Equal(t, "work-done", out)
@@ -1268,12 +1288,15 @@ func TestTurnLoop_BareStop_AgentRunsToCompletion(t *testing.T) {
 	}
 
 	// 3. ExitReason is nil (clean exit, not a CancelError).
+	// 3. ExitReason 为 nil（干净退出，不是 CancelError）。
 	assert.NoError(t, result.ExitReason)
 
 	// 4. InterruptedItems is empty (agent was not interrupted).
+	// 4. InterruptedItems 为空（智能体未被中断）。
 	assert.Empty(t, result.InterruptedItems)
 
 	// 5. Only one turn executed; the second item is unhandled.
+	// 5. 只执行了一个 turn；第二个项未处理。
 	assert.Equal(t, int32(1), atomic.LoadInt32(&turnsExecuted),
 		"bare Stop must prevent new turns from starting after the current one completes")
 	assert.Equal(t, []string{"task2"}, result.UnhandledItems,
@@ -1332,6 +1355,9 @@ func TestTurnLoop_StopCheckPointIDInCancelError(t *testing.T) {
 // the user's custom OnAgentEvents callback swallows the CancelError (returns nil).
 // This tests the documented guarantee: "the callback should NEVER propagate CancelError
 // — the framework handles it automatically."
+//
+// TestTurnLoop_CancelError_CapturedIndependentlyOfCallback 验证即使用户自定义的 OnAgentEvents 回调吞掉 CancelError（返回 nil），TurnLoop 也能正确将 *CancelError 报告为 ExitReason，并填充 InterruptedItems。
+// 这测试了文档中的保证：“the callback should NEVER propagate CancelError — the framework handles it automatically.”
 func TestTurnLoop_CancelError_CapturedIndependentlyOfCallback(t *testing.T) {
 	ctx := context.Background()
 	modelStarted := make(chan struct{}, 1)
@@ -1362,6 +1388,7 @@ func TestTurnLoop_CancelError_CapturedIndependentlyOfCallback(t *testing.T) {
 		GenInput:     genInputConsumeAllWithMsg,
 		PrepareAgent: prepareAgent(agent),
 		// Custom OnAgentEvents that deliberately swallows all errors including CancelError.
+		// 自定义 OnAgentEvents，故意吞掉包括 CancelError 在内的所有错误。
 		OnAgentEvents: func(ctx context.Context, tc *TurnContext[string, *schema.Message], events *AsyncIterator[*TypedAgentEvent[*schema.Message]]) error {
 			for {
 				_, ok := events.Next()
@@ -1369,8 +1396,10 @@ func TestTurnLoop_CancelError_CapturedIndependentlyOfCallback(t *testing.T) {
 					break
 				}
 				// Deliberately ignore event.Err — do NOT propagate CancelError.
+				// 故意忽略 event.Err —— 不要传播 CancelError。
 			}
 			return nil // swallow everything
+			// 吞掉所有错误
 		},
 	})
 
@@ -1382,15 +1411,18 @@ func TestTurnLoop_CancelError_CapturedIndependentlyOfCallback(t *testing.T) {
 	result := loop.Wait()
 
 	// The framework should capture CancelError independently of the callback's return value.
+	// 框架应独立于回调返回值捕获 CancelError。
 	var cancelErr *CancelError
 	assert.True(t, errors.As(result.ExitReason, &cancelErr),
 		"ExitReason should be *CancelError even when OnAgentEvents swallows it, got: %v", result.ExitReason)
 
 	// InterruptedItems should be populated.
+	// InterruptedItems 应被填充。
 	assert.Equal(t, []string{"msg1"}, result.InterruptedItems,
 		"InterruptedItems should contain the items that were being processed")
 
 	// Checkpoint should be saved.
+	// Checkpoint 应被保存。
 	store.mu.Lock()
 	defer store.mu.Unlock()
 	_, ok := store.m[checkpointID]
@@ -1401,6 +1433,11 @@ func TestTurnLoop_CancelError_CapturedIndependentlyOfCallback(t *testing.T) {
 // the user's OnAgentEvents callback returns a custom error during a cancel, the custom
 // error becomes ExitReason (not overwritten by CancelError), but InterruptedItems is still
 // populated because the items were factually mid-execution when the cancel signal arrived.
+//
+// TestTurnLoop_CancelError_CustomErrorWins_InterruptedItemsStillSet 验证：当
+// 用户的 OnAgentEvents 回调在取消期间返回自定义错误时，该自定义
+// 错误会成为 ExitReason（不会被 CancelError 覆盖），但 InterruptedItems 仍会
+// 被填充，因为取消信号到达时这些条目事实上正在执行中。
 func TestTurnLoop_CancelError_CustomErrorWins_InterruptedItemsStillSet(t *testing.T) {
 	ctx := context.Background()
 	modelStarted := make(chan struct{}, 1)
@@ -1432,6 +1469,7 @@ func TestTurnLoop_CancelError_CustomErrorWins_InterruptedItemsStillSet(t *testin
 		GenInput:     genInputConsumeAllWithMsg,
 		PrepareAgent: prepareAgent(agent),
 		// Custom OnAgentEvents that returns a custom error instead of the CancelError.
+		// 自定义 OnAgentEvents 返回自定义错误，而不是 CancelError。
 		OnAgentEvents: func(ctx context.Context, tc *TurnContext[string, *schema.Message], events *AsyncIterator[*TypedAgentEvent[*schema.Message]]) error {
 			for {
 				_, ok := events.Next()
@@ -1451,14 +1489,17 @@ func TestTurnLoop_CancelError_CustomErrorWins_InterruptedItemsStillSet(t *testin
 	result := loop.Wait()
 
 	// User's custom error should win as ExitReason.
+	// 用户的自定义错误应优先作为 ExitReason。
 	assert.ErrorIs(t, result.ExitReason, customErr,
 		"ExitReason should be the user's custom error, not CancelError")
 
 	// But InterruptedItems should still be populated (items were factually in-flight).
+	// 但 InterruptedItems 仍应被填充（条目事实上正在执行中）。
 	assert.Equal(t, []string{"msg1"}, result.InterruptedItems,
 		"InterruptedItems should contain the items that were being processed")
 
 	// Checkpoint should be saved (cancel was captured, items were in-flight).
+	// Checkpoint 应被保存（已捕获取消，条目正在执行中）。
 	store.mu.Lock()
 	defer store.mu.Unlock()
 	_, ok := store.m[checkpointID]
@@ -1595,6 +1636,11 @@ func TestTurnLoop_StopBetweenTurnsAndResume(t *testing.T) {
 // reports the correct InterruptedItems, the checkpoint persists them, and a new
 // TurnLoop restoring from that checkpoint passes the exact same items to
 // GenResume's interruptedItems parameter.
+//
+// TestTurnLoop_StopCancel_InterruptedItems_PersistAndRestore 验证完整
+// 生命周期：Stop(WithImmediate()) 取消正在运行的智能体，退出状态
+// 报告正确的 InterruptedItems，检查点持久化它们，并且从该检查点恢复的新
+// TurnLoop 会将完全相同的条目传给 GenResume 的 interruptedItems 参数。
 func TestTurnLoop_StopCancel_InterruptedItems_PersistAndRestore(t *testing.T) {
 	ctx := context.Background()
 	modelStarted := make(chan struct{}, 1)
@@ -1620,6 +1666,7 @@ func TestTurnLoop_StopCancel_InterruptedItems_PersistAndRestore(t *testing.T) {
 	require.NoError(t, err)
 
 	// Phase 1: Run, cancel mid-turn, verify exit state.
+	// 阶段 1：运行，在 turn 中途取消，并验证退出状态。
 	loop := newAndRunTurnLoop(ctx, TurnLoopConfig[string, *schema.Message]{
 		Store:        store,
 		CheckpointID: cpID,
@@ -1633,14 +1680,17 @@ func TestTurnLoop_StopCancel_InterruptedItems_PersistAndRestore(t *testing.T) {
 	exit := loop.Wait()
 
 	// ExitReason must be CancelError.
+	// ExitReason 必须是 CancelError。
 	var cancelErr *CancelError
 	require.True(t, errors.As(exit.ExitReason, &cancelErr), "expected *CancelError, got: %v", exit.ExitReason)
 
 	// InterruptedItems must contain the consumed items.
+	// InterruptedItems 必须包含已消费的条目。
 	assert.Equal(t, []string{"msg1"}, exit.InterruptedItems,
 		"InterruptedItems in exit state should contain the items that were mid-execution")
 
 	// Checkpoint must be saved.
+	// Checkpoint 必须被保存。
 	assert.True(t, exit.CheckpointAttempted, "checkpoint should be attempted")
 	assert.NoError(t, exit.CheckpointErr, "checkpoint save should succeed")
 
@@ -1650,6 +1700,7 @@ func TestTurnLoop_StopCancel_InterruptedItems_PersistAndRestore(t *testing.T) {
 	require.True(t, cpExists, "checkpoint should exist in store")
 
 	// Phase 2: Restore from checkpoint, verify GenResume receives the exact InterruptedItems.
+	// 阶段 2：从检查点恢复，验证 GenResume 收到完全相同的 InterruptedItems。
 	slowModel.setDelay(10 * time.Millisecond)
 
 	var genResumeCalled bool
@@ -1699,6 +1750,10 @@ func TestTurnLoop_StopCancel_InterruptedItems_PersistAndRestore(t *testing.T) {
 // TestTurnLoop_PreemptThenStop_InterruptedItems_ReflectsStoppedTurn verifies that
 // when a preempt interrupts turn 1 and then Stop(WithImmediate()) cancels turn 2,
 // the reported InterruptedItems correspond to turn 2's consumed items (not turn 1's).
+//
+// TestTurnLoop_PreemptThenStop_InterruptedItems_ReflectsStoppedTurn 验证：
+// 当 preempt 中断 turn 1，随后 Stop(WithImmediate()) 取消 turn 2 时，
+// 报告的 InterruptedItems 对应 turn 2 已消费的条目（而不是 turn 1 的）。
 func TestTurnLoop_PreemptThenStop_InterruptedItems_ReflectsStoppedTurn(t *testing.T) {
 	ctx := context.Background()
 	store := newTestStore()
@@ -1740,27 +1795,35 @@ func TestTurnLoop_PreemptThenStop_InterruptedItems_ReflectsStoppedTurn(t *testin
 	})
 
 	// Turn 1: push "a", wait for agent to start, then preempt with "b".
+	// Turn 1：推入 "a"，等待智能体启动，然后用 "b" preempt。
 	loop.Push("a")
 	<-modelStarted
 
 	_, ack := loop.Push("b", WithPreemptTimeout[string, *schema.Message](AnySafePoint, 10*time.Millisecond))
 	// Wait for the preempt to be acknowledged.
+	// 等待 preempt 被确认。
 	waitOrFail(t, ack, "preempt ack timed out")
 
 	// Turn 2: the loop restarts with all buffered items. Wait for agent to start.
+	// Turn 2：循环带着所有缓冲条目重启。等待智能体启动。
 	<-modelStarted
 
 	// Now stop with immediate cancel on turn 2.
+	// 现在在第 2 轮立即取消并停止。
 	loop.Stop(WithImmediate())
 	exit := loop.Wait()
 
 	// ExitReason must be CancelError.
+	// ExitReason 必须是 CancelError。
 	var cancelErr *CancelError
 	require.True(t, errors.As(exit.ExitReason, &cancelErr), "expected *CancelError, got: %v", exit.ExitReason)
 
 	// KEY ASSERTION: InterruptedItems must reflect turn 2's consumed items (which
 	// includes both "a" and "b" since GenInput consumes all items), NOT turn 1's ["a"].
 	// Turn 2 consumed whatever GenInput received (the re-buffered items from preempt + "b").
+	//
+	// 关键断言：InterruptedItems 必须反映第 2 轮消耗的 items（由于 GenInput 会消耗所有 items，因此包含 "a" 和 "b"），而不是第 1 轮的 ["a"]。
+	// 第 2 轮消耗了 GenInput 收到的内容（preempt 重新缓冲的 items 加上 "b"）。
 	assert.NotEmpty(t, exit.InterruptedItems, "InterruptedItems should not be empty after Stop cancel")
 	assert.Contains(t, exit.InterruptedItems, "b",
 		"InterruptedItems should contain 'b' which was part of turn 2's consumed items")
@@ -1772,6 +1835,7 @@ func TestTurnLoop_BusinessInterrupt_PersistAndResume(t *testing.T) {
 	cpID := "interrupt-session"
 
 	// Agent that produces a business interrupt via Interrupt() call.
+	// 通过 Interrupt() 调用产生业务中断的智能体。
 	interruptAgent := &turnLoopInterruptAgent{interruptInfo: "approval_needed"}
 
 	loop := newAndRunTurnLoop(ctx, TurnLoopConfig[string, *schema.Message]{
@@ -1787,16 +1851,20 @@ func TestTurnLoop_BusinessInterrupt_PersistAndResume(t *testing.T) {
 	exit := loop.Wait()
 
 	// 1. ExitReason is an *InterruptError (not nil, not *CancelError).
+	// 1. ExitReason 是 *InterruptError（非 nil，且不是 *CancelError）。
 	var intErr *InterruptError
 	require.True(t, errors.As(exit.ExitReason, &intErr), "expected *InterruptError, got: %v", exit.ExitReason)
 
 	// 2. InterruptContexts is populated.
+	// 2. InterruptContexts 已填充。
 	require.NotEmpty(t, intErr.InterruptContexts)
 
 	// 3. InterruptedItems contains the items being processed.
+	// 3. InterruptedItems 包含正在处理的 items。
 	assert.Equal(t, []string{"msg1"}, exit.InterruptedItems)
 
 	// 4. Checkpoint was persisted.
+	// 4. Checkpoint 已持久化。
 	assert.True(t, exit.CheckpointAttempted)
 	assert.NoError(t, exit.CheckpointErr)
 
@@ -1806,6 +1874,7 @@ func TestTurnLoop_BusinessInterrupt_PersistAndResume(t *testing.T) {
 	assert.True(t, cpExists, "checkpoint should exist in store")
 
 	// 5. Resume: new TurnLoop with same CheckpointID gets GenResume called.
+	// 5. Resume：使用相同 CheckpointID 的新 TurnLoop 会调用 GenResume。
 	var genResumeCalled bool
 	var resumeInterruptedItems []string
 	loop2 := NewTurnLoop(TurnLoopConfig[string, *schema.Message]{
@@ -1822,6 +1891,7 @@ func TestTurnLoop_BusinessInterrupt_PersistAndResume(t *testing.T) {
 		GenInput: genInputConsumeAll,
 		PrepareAgent: func(ctx context.Context, _ *TurnLoop[string, *schema.Message], consumed []string) (Agent, error) {
 			// On resume, agent completes normally.
+			// 恢复时，智能体正常完成。
 			return &turnLoopMockAgent{
 				name:   "ResumeAgent",
 				events: []*AgentEvent{{Output: &AgentOutput{}}},
@@ -1847,6 +1917,7 @@ func TestTurnLoop_BusinessInterrupt_PersistAndResume(t *testing.T) {
 }
 
 // turnLoopInterruptAgent is a test agent that produces a business interrupt event.
+// turnLoopInterruptAgent 是一个产生业务中断事件的测试智能体。
 type turnLoopInterruptAgent struct {
 	interruptInfo any
 }
@@ -2585,6 +2656,9 @@ func TestTurnLoop_ResumeInterruptAgain_PreservesEnableStreamingCheckpoint(t *tes
 			// fixes: even though loop2's TypedRunner was constructed with the
 			// resume-path placeholder (false), runner uses resumeInfo.EnableStreaming
 			// from the previous checkpoint when re-saving.
+			//
+			// 验证第二次中断持久化的 runner 级 checkpoint 仍然编码了原始流式模式。
+			// 这是该 PR 修复的不变量：即使 loop2 的 TypedRunner 是用 resume 路径占位值（false）构造的，runner 在重新保存时也会使用上一个 checkpoint 中的 resumeInfo.EnableStreaming。
 			store.mu.Lock()
 			data, ok := store.m[cpID]
 			store.mu.Unlock()
@@ -2649,12 +2723,14 @@ func TestTurnLoop_DefaultOnAgentEvents_ErrorPropagation(t *testing.T) {
 			}, nil
 		},
 		// No OnAgentEvents — use default handler
+		// 没有 OnAgentEvents —— 使用默认处理器
 	})
 
 	loop.Push("msg1")
 
 	result := loop.Wait()
 	// The default handler should propagate the agent error as ExitReason
+	// 默认处理器应将智能体错误作为 ExitReason 传播
 	assert.Error(t, result.ExitReason)
 }
 
@@ -2666,6 +2742,7 @@ func TestTurnLoop_OnAgentEventsError(t *testing.T) {
 		PrepareAgent: prepareTestAgent,
 		OnAgentEvents: func(ctx context.Context, tc *TurnContext[string, *schema.Message], events *AsyncIterator[*AgentEvent]) error {
 			// Drain events then return error
+			// 耗尽 events 后返回错误
 			for {
 				_, ok := events.Next()
 				if !ok {
@@ -2684,6 +2761,7 @@ func TestTurnLoop_OnAgentEventsError(t *testing.T) {
 
 func TestTurnLoop_StopCallFromGenInput(t *testing.T) {
 	// Test that calling Stop() from within GenInput works correctly
+	// 测试在 GenInput 内调用 Stop() 能正确工作
 	loop := newAndRunTurnLoop(context.Background(), TurnLoopConfig[string, *schema.Message]{
 		GenInput: func(ctx context.Context, loop *TurnLoop[string, *schema.Message], items []string) (*GenInputResult[string, *schema.Message], error) {
 			loop.Stop()
@@ -2700,6 +2778,7 @@ func TestTurnLoop_StopCallFromGenInput(t *testing.T) {
 
 func TestTurnLoop_PushFromOnAgentEvents(t *testing.T) {
 	// Test that calling Push() from within OnAgentEvents works
+	// 测试在 OnAgentEvents 内调用 Push() 能工作
 	pushCount := int32(0)
 
 	loop := newAndRunTurnLoop(context.Background(), TurnLoopConfig[string, *schema.Message]{
@@ -2715,6 +2794,7 @@ func TestTurnLoop_PushFromOnAgentEvents(t *testing.T) {
 			count := atomic.AddInt32(&pushCount, 1)
 			if count == 1 {
 				// Push a follow-up item from the callback
+				// 从回调中 Push 一个后续 item
 				_, _ = tc.Loop.Push("follow-up")
 			} else {
 				tc.Loop.Stop()
@@ -2732,9 +2812,12 @@ func TestTurnLoop_PushFromOnAgentEvents(t *testing.T) {
 
 // Tests for NewTurnLoop: the permissive API where Push, Stop, and Wait are
 // all valid on a not-yet-running loop.
+//
+// NewTurnLoop 的测试：宽松 API，允许在尚未运行的 loop 上调用 Push、Stop 和 Wait。
 
 func TestNewTurnLoop_PushBeforeRun(t *testing.T) {
 	// Items pushed before Run are buffered and processed after Run starts.
+	// Run 启动前 Push 的 items 会被缓冲，并在 Run 启动后处理。
 	var processedItems []string
 	var mu sync.Mutex
 
@@ -2752,6 +2835,7 @@ func TestNewTurnLoop_PushBeforeRun(t *testing.T) {
 	})
 
 	// Push before Run — items should be buffered.
+	// 在 Run 之前 Push——条目应被缓冲。
 	ok, _ := loop.Push("msg1")
 	assert.True(t, ok)
 	ok, _ = loop.Push("msg2")
@@ -2774,6 +2858,7 @@ func TestNewTurnLoop_PushBeforeRun(t *testing.T) {
 
 func TestNewTurnLoop_WaitBeforeRun(t *testing.T) {
 	// Wait blocks until Run is called AND the loop exits.
+	// Wait 会阻塞，直到调用 Run 且循环退出。
 	loop := NewTurnLoop(TurnLoopConfig[string, *schema.Message]{
 		GenInput:     genInputConsumeAll,
 		PrepareAgent: prepareTestAgent,
@@ -2785,6 +2870,7 @@ func TestNewTurnLoop_WaitBeforeRun(t *testing.T) {
 	}()
 
 	// Wait should not return yet since Run hasn't been called.
+	// 由于尚未调用 Run，Wait 还不应返回。
 	select {
 	case <-waitDone:
 		t.Fatal("Wait returned before Run was called")
@@ -2832,6 +2918,7 @@ func TestNewTurnLoop_RunIsIdempotent(t *testing.T) {
 
 func TestNewTurnLoop_ConcurrentPushAndRun(t *testing.T) {
 	// Concurrent Push and Run should not race.
+	// 并发 Push 和 Run 不应产生竞态。
 	for i := 0; i < 100; i++ {
 		var count int32
 
@@ -2878,6 +2965,8 @@ type turnCtxKey struct{}
 func TestTurnLoop_RunCtx_Propagation(t *testing.T) {
 	// Verify that GenInputResult.RunCtx is propagated to PrepareAgent,
 	// the agent run, and OnAgentEvents.
+	//
+	// 验证 GenInputResult.RunCtx 会传递给 PrepareAgent、智能体运行过程和 OnAgentEvents。
 
 	const traceVal = "trace-123"
 	var prepareCtxVal, agentCtxVal, eventsCtxVal string
@@ -2885,6 +2974,7 @@ func TestTurnLoop_RunCtx_Propagation(t *testing.T) {
 	cfg := TurnLoopConfig[string, *schema.Message]{
 		GenInput: func(ctx context.Context, loop *TurnLoop[string, *schema.Message], items []string) (*GenInputResult[string, *schema.Message], error) {
 			// Derive a new context with per-item trace data
+			// 派生一个带有每项 trace 数据的新 context
 			runCtx := context.WithValue(ctx, turnCtxKey{}, traceVal)
 			return &GenInputResult[string, *schema.Message]{
 				RunCtx:   runCtx,
@@ -2955,6 +3045,7 @@ func TestTurnLoop_TurnContext_PreemptedChannel(t *testing.T) {
 				t.Error("timed out waiting for Preempted channel")
 			}
 			// Drain events
+			// 排空事件
 			for {
 				if _, ok := events.Next(); !ok {
 					break
@@ -2981,6 +3072,10 @@ func TestTurnLoop_TurnContext_PreemptedChannel(t *testing.T) {
 
 // =============================================================================
 // preemptController unit tests
+// =============================================================================
+//
+// =============================================================================
+// preemptController 单元测试
 // =============================================================================
 
 func requireAckClosed(t *testing.T, ack <-chan struct{}) {
@@ -3279,15 +3374,21 @@ func TestPreemptController_CloseForLoopExitDuringDelayedPreempt(t *testing.T) {
 	c.beginActiveTurn(context.Background(), "tc")
 
 	// Capture a snapshot while the turn is active.
+	// 在 turn 活跃期间捕获快照。
 	snapshot := c.beginPush()
 	c.endPush()
 
 	// closeForLoopExit tears down controller state during TurnLoop cleanup.
+	// closeForLoopExit 会在 TurnLoop 清理期间拆除控制器状态。
 	c.closeForLoopExit()
 
 	// A delayed goroutine fires requestPreempt AFTER closeForLoopExit.
 	// This must not panic or deadlock; ack should be closed immediately
 	// because the controller is now closed.
+	//
+	// 一个延迟的 goroutine 会在 closeForLoopExit 之后触发 requestPreempt。
+	// 这不能 panic 或死锁；ack 应立即关闭，
+	// 因为控制器现在已关闭。
 	ack := make(chan struct{})
 	done := make(chan struct{})
 	go func() {
@@ -3309,11 +3410,13 @@ func TestPreemptController_RequestPreemptAfterCloseForLoopExit(t *testing.T) {
 	c.closeForLoopExit()
 
 	// requestPreempt on a closed controller should close ack immediately.
+	// 在已关闭的控制器上调用 requestPreempt 应立即关闭 ack。
 	ack := make(chan struct{})
 	c.requestPreempt(snapshot, ack, WithAgentCancelMode(CancelAfterToolCalls))
 	requireAckClosed(t, ack)
 
 	// receivePreempt should return nothing.
+	// receivePreempt 不应返回任何内容。
 	_, ok := c.receivePreempt()
 	assert.False(t, ok)
 }
@@ -3327,18 +3430,21 @@ func TestPreemptController_ConcurrentBeginPushAndWaitForPushes(t *testing.T) {
 	var wg sync.WaitGroup
 
 	// Launch many goroutines doing beginPush / endPush concurrently.
+	// 启动多个 goroutine 并发执行 beginPush / endPush。
 	for i := 0; i < pushCount; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			_ = c.beginPush()
 			// Simulate some work.
+			// 模拟一些工作。
 			time.Sleep(time.Microsecond)
 			c.endPush()
 		}()
 	}
 
 	// Meanwhile, waitForPushes should eventually return once all are done.
+	// 同时，waitForPushes 应在全部完成后最终返回。
 	waitDone := make(chan struct{})
 	go func() {
 		c.waitForPushes()
@@ -3346,6 +3452,7 @@ func TestPreemptController_ConcurrentBeginPushAndWaitForPushes(t *testing.T) {
 	}()
 
 	wg.Wait() // all pushes complete
+	// 所有 push 完成
 
 	waitOrFail(t, waitDone, "waitForPushes deadlocked with concurrent beginPush/endPush")
 }
@@ -3358,14 +3465,17 @@ func TestPreemptController_RequestPreemptWithNilAck(t *testing.T) {
 	c.endPush()
 
 	// requestPreempt with nil ack channel must not panic.
+	// 使用 nil ack channel 调用 requestPreempt 不得 panic。
 	assert.NotPanics(t, func() {
 		c.requestPreempt(snapshot, nil, WithAgentCancelMode(CancelAfterChatModel))
 	})
 
 	// The request should still be stored and consumable.
+	// 该请求仍应被存储并可被消费。
 	req, ok := c.receivePreempt()
 	require.True(t, ok)
 	// ack() with nil channels in the list must not panic.
+	// 列表中有 nil channel 时，ack() 不得 panic。
 	assert.NotPanics(t, func() {
 		req.ack()
 	})
@@ -3379,12 +3489,14 @@ func TestPreemptController_MergeImmediateOverridesTimeout(t *testing.T) {
 	c.endPush()
 
 	// First request: graceful with timeout.
+	// 第一次请求：带超时的 graceful。
 	ack1 := make(chan struct{})
 	c.requestPreempt(snapshot, ack1,
 		WithAgentCancelMode(CancelAfterToolCalls),
 		WithAgentCancelTimeout(10*time.Second))
 
 	// Second request: CancelImmediate (no timeout).
+	// 第二次请求：CancelImmediate（无超时）。
 	ack2 := make(chan struct{})
 	c.requestPreempt(snapshot, ack2, WithAgentCancelMode(CancelImmediate))
 
@@ -3395,6 +3507,7 @@ func TestPreemptController_MergeImmediateOverridesTimeout(t *testing.T) {
 	cfg := parseAgentCancelOptions(opts...)
 
 	// CancelImmediate should win and timeout should be nil.
+	// CancelImmediate 应胜出，且 timeout 应为 nil。
 	assert.Equal(t, CancelImmediate, cfg.Mode)
 	assert.Nil(t, cfg.Timeout, "CancelImmediate merge should clear timeout")
 
@@ -3407,24 +3520,31 @@ func TestPreemptController_DelayedPreemptTargetGoneBetweenTurns(t *testing.T) {
 	c := newPreemptController()
 
 	// Turn 1: planning → active → end
+	// Turn 1：planning → active → end
 	c.beginPlanningTurn()
 	c.beginActiveTurn(context.Background(), "tc1")
 	oldSnapshot := c.beginPush()
 	c.endPush()
 	req := c.endActiveTurn()
 	assert.Nil(t, req) // no pending request
+	// 无待处理请求
 
 	// Turn 2: start a new turn
+	// Turn 2：开始新 turn
 	c.beginPlanningTurn()
 	c.beginActiveTurn(context.Background(), "tc2")
 
 	// A delayed preempt from Turn 1 fires with stale snapshot.
 	// It should resolve as no-op (ack immediately) because turnID doesn't match.
+	//
+	// 来自 Turn 1 的延迟 preempt 使用过期 snapshot 触发。
+	// 它应解析为 no-op（立即 ack），因为 turnID 不匹配。
 	ack := make(chan struct{})
 	c.requestPreempt(oldSnapshot, ack, WithAgentCancelMode(CancelAfterChatModel))
 	requireAckClosed(t, ack)
 
 	// The new turn should have no pending preempt.
+	// 新 turn 不应有待处理的 preempt。
 	_, ok := c.receivePreempt()
 	assert.False(t, ok, "stale preempt must not affect new turn")
 
@@ -3435,6 +3555,7 @@ func TestPreemptController_EndPushWithoutBeginPushPanics(t *testing.T) {
 	c := newPreemptController()
 
 	// endPush without a matching beginPush should panic with the new invariant.
+	// 没有匹配 beginPush 的 endPush 应按新不变量 panic。
 	assert.PanicsWithValue(t,
 		"adk: preemptController.endPush called without matching beginPush",
 		func() {
@@ -3450,25 +3571,31 @@ func TestPreemptController_BeginActiveTurnNotifiesExistingPending(t *testing.T) 
 	c.endPush()
 
 	// Send a preempt during planning phase.
+	// 在 planning 阶段发送 preempt。
 	ack := make(chan struct{})
 	c.requestPreempt(snapshot, ack, WithAgentCancelMode(CancelAfterChatModel))
 
 	// During planning, receivePreempt returns nothing.
+	// planning 期间，receivePreempt 不返回任何内容。
 	_, ok := c.receivePreempt()
 	assert.False(t, ok)
 
 	// beginActiveTurn should notify the watcher via the notify channel.
+	// beginActiveTurn 应通过 notify channel 通知 watcher。
 	c.beginActiveTurn(context.Background(), "tc")
 
 	// The notify channel should have a message.
+	// notify channel 应有一条消息。
 	select {
 	case <-c.notify:
 		// Expected: watcher notification was sent.
+		// 期望：已发送 watcher 通知。
 	case <-time.After(1 * time.Second):
 		t.Fatal("beginActiveTurn should notify watcher when there is a pending request")
 	}
 
 	// Now receivePreempt should return the pending request.
+	// 现在 receivePreempt 应返回待处理请求。
 	req, ok := c.receivePreempt()
 	require.True(t, ok)
 	req.ack()
@@ -3477,6 +3604,10 @@ func TestPreemptController_BeginActiveTurnNotifiesExistingPending(t *testing.T) 
 
 // =============================================================================
 // Integration tests for race-prone preempt scenarios
+// =============================================================================
+//
+// =============================================================================
+// 易发生竞态的 preempt 场景集成测试
 // =============================================================================
 
 func TestTurnLoop_ConcurrentPreemptsDuringTurn(t *testing.T) {
@@ -3530,6 +3661,8 @@ func TestTurnLoop_ConcurrentPreemptsDuringTurn(t *testing.T) {
 	// Stop the loop concurrently. The run loop may be blocked on
 	// buffer.Receive after processing all preempts; Stop unblocks it
 	// and triggers closeForLoopExit which closes any orphaned ack channels.
+	//
+	// 并发停止 loop。处理完所有 preempt 后，run loop 可能阻塞在 buffer.Receive；Stop 会解除阻塞，并触发 closeForLoopExit 关闭所有孤立的 ack channel。
 	go func() {
 		time.Sleep(500 * time.Millisecond)
 		loop.Stop(WithImmediate())
@@ -3830,6 +3963,7 @@ func TestTurnLoop_TurnContext_StoppedChannel(t *testing.T) {
 				t.Error("timed out waiting for Stopped channel")
 			}
 			// Drain events
+			// 清空 events
 			for {
 				if _, ok := events.Next(); !ok {
 					break
@@ -4003,6 +4137,7 @@ func TestTurnLoop_PushStrategy_DuringTurn(t *testing.T) {
 	waitOrFail(t, agentStarted, "agent did not start")
 
 	// Strategy inspects TurnContext during a running turn and decides to preempt.
+	// Strategy 在运行中的 turn 期间检查 TurnContext，并决定 preempt。
 	var strategyCalled int32
 	var strategyTC *TurnContext[string, *schema.Message]
 	loop.Push("urgent", WithPushStrategy(func(ctx context.Context, tc *TurnContext[string, *schema.Message]) []PushOption[string, *schema.Message] {
@@ -4025,6 +4160,7 @@ func TestTurnLoop_PushStrategy_DuringTurn(t *testing.T) {
 
 func TestTurnLoop_PushStrategy_BetweenTurns(t *testing.T) {
 	// Push with strategy before Run() — TurnContext should be nil.
+	// 在 Run() 之前使用 strategy Push —— TurnContext 应为 nil。
 	var strategyCalled int32
 	var strategyTCWasNil bool
 
@@ -4062,10 +4198,12 @@ func TestTurnLoop_PushStrategy_BetweenTurns(t *testing.T) {
 	})
 
 	// Push with strategy — no turn is active yet, so tc should be nil.
+	// 使用策略推送——此时还没有活跃 turn，因此 tc 应为 nil。
 	loop.Push("item", WithPushStrategy(func(ctx context.Context, tc *TurnContext[string, *schema.Message]) []PushOption[string, *schema.Message] {
 		atomic.AddInt32(&strategyCalled, 1)
 		strategyTCWasNil = tc == nil
 		return nil // plain push, no preempt
+		// 普通推送，不 preempt
 	}))
 
 	waitOrFail(t, agentDone, "agent did not complete")
@@ -4079,6 +4217,7 @@ func TestTurnLoop_PushStrategy_BetweenTurns(t *testing.T) {
 
 func TestTurnLoop_PushStrategy_OverridesOtherOptions(t *testing.T) {
 	// Push with both WithPreempt and WithPushStrategy — only strategy's result applies.
+	// 同时使用 WithPreempt 和 WithPushStrategy 推送——只应用策略的结果。
 	agent := &turnLoopCancellableMockAgent{
 		name: "test",
 		runFunc: func(ctx context.Context, input *AgentInput) (*AgentOutput, error) {
@@ -4114,8 +4253,12 @@ func TestTurnLoop_PushStrategy_OverridesOtherOptions(t *testing.T) {
 
 	// Strategy returns nil (no preempt), even though WithPreempt is also passed.
 	// The strategy should override — so the agent should NOT be preempted.
+	//
+	// 策略返回 nil（不 preempt），即使同时传入了 WithPreempt。
+	// 策略应覆盖它——因此 agent 不应被 preempt。
 	ok, ack := loop.Push("item", WithPreempt[string, *schema.Message](AnySafePoint), WithPushStrategy(func(ctx context.Context, tc *TurnContext[string, *schema.Message]) []PushOption[string, *schema.Message] {
 		return nil // no preempt
+		// 不 preempt
 	}))
 	assert.True(t, ok)
 	assert.Nil(t, ack, "ack should be nil since strategy returned no preempt")
@@ -4161,6 +4304,7 @@ func TestTurnLoop_PushStrategy_NestedStrategyStripped(t *testing.T) {
 	})
 
 	// Strategy returns another WithPushStrategy — the nested one should be stripped.
+	// 策略返回另一个 WithPushStrategy——嵌套的那个应被剥离。
 	innerCalled := int32(0)
 	ok, ack := loop.Push("item", WithPushStrategy(func(ctx context.Context, tc *TurnContext[string, *schema.Message]) []PushOption[string, *schema.Message] {
 		return []PushOption[string, *schema.Message]{
@@ -4183,6 +4327,7 @@ func TestTurnLoop_PushStrategy_NestedStrategyStripped(t *testing.T) {
 
 func TestTurnLoop_PushStrategy_ConsumedInspection(t *testing.T) {
 	// Strategy preempts only when current turn is processing "low-priority" items.
+	// 仅当当前 turn 正在处理 "low-priority" 项时，策略才 preempt。
 	agentStarted := make(chan struct{})
 	agentStartedOnce := sync.Once{}
 
@@ -4223,6 +4368,7 @@ func TestTurnLoop_PushStrategy_ConsumedInspection(t *testing.T) {
 	waitOrFail(t, agentStarted, "agent did not start")
 
 	// Strategy checks Consumed and preempts because current turn has "low-priority" items.
+	// 策略检查 Consumed，并因当前 turn 有 "low-priority" 项而 preempt。
 	loop.Push("urgent-task", WithPushStrategy(func(ctx context.Context, tc *TurnContext[string, *schema.Message]) []PushOption[string, *schema.Message] {
 		if tc != nil && len(tc.Consumed) > 0 && tc.Consumed[0] == "low-priority-task" {
 			return []PushOption[string, *schema.Message]{WithPreempt[string, *schema.Message](AnySafePoint)}
@@ -4265,6 +4411,7 @@ func TestTurnLoop_PushAfterStop_BufferedAsLateItems(t *testing.T) {
 	result := loop.Wait()
 
 	// Push after stop — should be buffered as late items
+	// Stop 后推送——应作为 late items 缓冲
 	ok1, _ := loop.Push("late1")
 	ok2, _ := loop.Push("late2")
 	ok3, _ := loop.Push("late3")
@@ -4332,6 +4479,7 @@ func TestTurnLoop_TakeLateItems_NeverCalled_NoImpact(t *testing.T) {
 	result := loop.Wait()
 
 	// Don't call TakeLateItems — verify UnhandledItems works normally
+	// 不要调用 TakeLateItems——验证 UnhandledItems 正常工作
 	assert.Contains(t, result.UnhandledItems, "b")
 	assert.Nil(t, result.ExitReason)
 }
@@ -4352,6 +4500,7 @@ func TestTurnLoop_CheckpointErr_SeparateFromExitReason(t *testing.T) {
 	result := loop.Wait()
 
 	// ExitReason should be nil (clean stop), checkpoint error should be separate
+	// ExitReason 应为 nil（干净停止），checkpoint 错误应单独处理
 	assert.Nil(t, result.ExitReason)
 	assert.True(t, result.CheckpointAttempted)
 	assert.Error(t, result.CheckpointErr)
@@ -4408,6 +4557,7 @@ func TestTurnLoop_CheckpointAttempted_FalseOnErrorExit(t *testing.T) {
 	result := loop.Wait()
 
 	// Loop exited from error, not Stop() — checkpoint should not be saved
+	// 循环因错误退出，而不是 Stop()——不应保存 checkpoint
 	assert.ErrorIs(t, result.ExitReason, genInputErr)
 	assert.False(t, result.CheckpointAttempted)
 	assert.Nil(t, result.CheckpointErr)
@@ -4431,6 +4581,7 @@ func TestTurnLoop_StopConcurrentWithCallbackError_NoCheckpoint(t *testing.T) {
 			n := atomic.AddInt32(&prepareCount, 1)
 			if n > 1 {
 				// Wait until Stop() has been called so stopCtrl.isCommitted() is true.
+				// 等待 Stop() 已被调用，使 stopCtrl.isCommitted() 为 true。
 				<-stopCalled
 				return nil, prepareErr
 			}
@@ -4452,6 +4603,7 @@ func TestTurnLoop_StopConcurrentWithCallbackError_NoCheckpoint(t *testing.T) {
 	loop.Push("msg2")
 
 	// Call Stop() and signal PrepareAgent to proceed with error
+	// 调用 Stop() 并通知 PrepareAgent 继续并返回错误
 	go func() {
 		loop.Stop()
 		close(stopCalled)
@@ -4462,12 +4614,19 @@ func TestTurnLoop_StopConcurrentWithCallbackError_NoCheckpoint(t *testing.T) {
 	// The loop may exit via Stop (clean) or via PrepareAgent error.
 	// If it exited via PrepareAgent error with Stop also called:
 	// checkpoint should NOT be saved.
+	//
+	// 循环可能通过 Stop（干净）退出，也可能通过 PrepareAgent 错误退出。
+	// 如果它在 Stop 也被调用的情况下通过 PrepareAgent 错误退出：
+	// 不应保存 checkpoint。
 	if result.ExitReason != nil && !errors.As(result.ExitReason, new(*CancelError)) {
 		assert.ErrorIs(t, result.ExitReason, prepareErr)
 		assert.False(t, result.CheckpointAttempted, "should not checkpoint when exit is caused by callback error")
 	}
 	// If Stop won the race, that's fine — checkpoint may or may not be saved
 	// depending on idle state. The test is about the error path.
+	//
+	// 如果 Stop 赢得竞争，也可以——checkpoint 是否保存取决于 idle 状态。
+	// 该测试关注错误路径。
 }
 
 func TestTurnLoop_DeleteWithoutCheckPointDeleter_NoOp(t *testing.T) {
@@ -4476,6 +4635,7 @@ func TestTurnLoop_DeleteWithoutCheckPointDeleter_NoOp(t *testing.T) {
 	cpID := "no-deleter"
 
 	// First loop: save a checkpoint
+	// 第一次循环：保存一个 checkpoint
 	loop1 := NewTurnLoop(TurnLoopConfig[string, *schema.Message]{
 		Store:        store,
 		CheckpointID: cpID,
@@ -4494,6 +4654,9 @@ func TestTurnLoop_DeleteWithoutCheckPointDeleter_NoOp(t *testing.T) {
 
 	// Second loop: exit via context cancel — should try to delete but store
 	// doesn't implement CheckPointDeleter, so checkpoint persists (no-op)
+	//
+	// 第二次循环：通过 context cancel 退出——应尝试删除，但 store
+	// 未实现 CheckPointDeleter，因此 checkpoint 保留（no-op）
 	ctx2, cancel2 := context.WithCancel(ctx)
 	loop2 := NewTurnLoop(TurnLoopConfig[string, *schema.Message]{
 		Store:        store,
@@ -4515,6 +4678,7 @@ func TestTurnLoop_DeleteWithoutCheckPointDeleter_NoOp(t *testing.T) {
 	loop2.Wait()
 
 	// Without CheckPointDeleter, the stale checkpoint should NOT be deleted
+	// 没有 CheckPointDeleter 时，不应删除过期 checkpoint
 	store.mu.Lock()
 	v, exists := store.m[cpID]
 	store.mu.Unlock()
@@ -5013,6 +5177,9 @@ func TestUntilIdleFor(t *testing.T) {
 // TestUntilIdleFor_DoesNotCancelRunningAgent verifies that Stop(UntilIdleFor)
 // records an idle stop policy but does NOT create a pending cancel request for
 // the running agent.
+//
+// TestUntilIdleFor_DoesNotCancelRunningAgent 验证 Stop(UntilIdleFor)
+// 会记录 idle 停止策略，但不会为运行中的 agent 创建待处理的 cancel 请求。
 func TestUntilIdleFor_DoesNotCancelRunningAgent(t *testing.T) {
 	t.Run("BeforeRun", func(t *testing.T) {
 		agentStarted := make(chan struct{})
@@ -5032,6 +5199,7 @@ func TestUntilIdleFor_DoesNotCancelRunningAgent(t *testing.T) {
 					runFunc: func(ctx context.Context, input *AgentInput) (*AgentOutput, error) {
 						close(agentStarted)
 						// Block until context is canceled or a short timeout.
+						// 阻塞直到 context 被取消或短暂超时。
 						select {
 						case <-ctx.Done():
 							atomic.StoreInt32(&agentCtxCanceled, 1)
@@ -5046,6 +5214,7 @@ func TestUntilIdleFor_DoesNotCancelRunningAgent(t *testing.T) {
 
 		loop.Push("msg1")
 		// Call Stop(UntilIdleFor) BEFORE Run.
+		// 在 Run 之前调用 Stop(UntilIdleFor)。
 		loop.Stop(UntilIdleFor(50 * time.Millisecond))
 		loop.Run(context.Background())
 
@@ -5091,6 +5260,7 @@ func TestUntilIdleFor_DoesNotCancelRunningAgent(t *testing.T) {
 		<-agentStarted
 
 		// Call Stop(UntilIdleFor) while the agent is running.
+		// 在智能体运行时调用 Stop(UntilIdleFor)。
 		loop.Stop(UntilIdleFor(50 * time.Millisecond))
 		<-agentDone
 
@@ -5103,6 +5273,9 @@ func TestUntilIdleFor_DoesNotCancelRunningAgent(t *testing.T) {
 	// Cancel opts paired with UntilIdleFor in the same call are silently
 	// dropped. The agent must run to completion even when WithImmediate is
 	// combined with UntilIdleFor.
+	//
+	// 同一次调用中与 UntilIdleFor 配对的取消 opts 会被静默丢弃。
+	// 即使 WithImmediate 与 UntilIdleFor 组合使用，智能体也必须运行到完成。
 	t.Run("CancelOptsDroppedInSameCall", func(t *testing.T) {
 		agentStarted := make(chan struct{})
 		agentCtxCanceled := int32(0)
@@ -5136,6 +5309,7 @@ func TestUntilIdleFor_DoesNotCancelRunningAgent(t *testing.T) {
 		<-agentStarted
 
 		// WithImmediate in the same call as UntilIdleFor must be ignored.
+		// 与 UntilIdleFor 在同一次调用中的 WithImmediate 必须被忽略。
 		loop.Stop(UntilIdleFor(50*time.Millisecond), WithImmediate())
 		<-agentDone
 
@@ -5167,6 +5341,7 @@ func TestUntilIdleFor_ContextCancelDuringIdleWait(t *testing.T) {
 	<-turnDone
 
 	// Start idle timer, then cancel the parent context while idle.
+	// 启动空闲计时器，然后在空闲时取消父 context。
 	loop.Stop(UntilIdleFor(10 * time.Minute))
 	time.Sleep(20 * time.Millisecond)
 	cancel()
@@ -5773,6 +5948,10 @@ func TestAttack_SkipCheckpoint_Sticky(t *testing.T) {
 // call it (e.g. via t.Cleanup) after verifying propagation to avoid a
 // race between markDone closing child.doneChan and the deriveAgentToolCancelContext
 // goroutines propagating the cancel signal.
+//
+// turnLoopNestedProbeAgent 通过派生子 cancelContext 来模拟带嵌套子智能体的智能体。
+// 这允许测试验证 TurnLoop 的 Stop/Push 选项能正确传播递归取消。
+// 重要：probe 不会调用 child.markDone()。测试必须在验证传播后调用它（例如通过 t.Cleanup），以避免 markDone 关闭 child.doneChan 与 deriveAgentToolCancelContext goroutines 传播取消信号之间的竞争。
 type turnLoopNestedProbeAgent struct {
 	parentCCCh chan *cancelContext
 	childCCCh  chan *cancelContext
@@ -5823,6 +6002,7 @@ func TestTurnLoop_Stop_WithImmediate_RecursivePropagation(t *testing.T) {
 	loop.Stop(WithImmediate())
 
 	// Child should receive the cancel signal via recursive propagation.
+	// 子级应通过递归传播收到取消信号。
 	select {
 	case <-child.cancelChan:
 	case <-time.After(2 * time.Second):
@@ -5830,6 +6010,7 @@ func TestTurnLoop_Stop_WithImmediate_RecursivePropagation(t *testing.T) {
 	}
 
 	// Child should also receive the immediate cancel signal.
+	// 子级也应收到 immediate 取消信号。
 	select {
 	case <-child.immediateChan:
 	case <-time.After(2 * time.Second):
@@ -5864,10 +6045,13 @@ func TestTurnLoop_Push_WithPreemptTimeout_RecursivePropagation(t *testing.T) {
 	t.Cleanup(func() { child.markDone() })
 
 	// Preempt with a very short timeout so it escalates to CancelImmediate quickly.
+	// 使用很短的超时时间进行抢占，使其快速升级为 CancelImmediate。
 	loop.Push("urgent", WithPreemptTimeout[string, *schema.Message](AfterChatModel, 10*time.Millisecond))
 
 	// After timeout escalation, child should receive the immediate cancel
 	// via recursive propagation.
+	//
+	// 超时升级后，子级应通过递归传播收到 immediate 取消。
 	select {
 	case <-child.immediateChan:
 	case <-time.After(2 * time.Second):
@@ -5906,11 +6090,15 @@ func TestSetupBridgeStore_NilStore_Resume(t *testing.T) {
 // TestTurnLoop_Preempt_LoopStalledAfterSecondPreemptPush covers a liveness
 // regression where a preempted turn was followed by another preemptive Push and
 // the loop stopped making progress before processing the later item.
+//
+// TestTurnLoop_Preempt_LoopStalledAfterSecondPreemptPush 覆盖一个活性回归：被抢占的轮次之后又跟着一次抢占式 Push，循环在处理后续项之前停止推进。
 func TestTurnLoop_Preempt_LoopStalledAfterSecondPreemptPush(t *testing.T) {
 	// turnCount tracks how many turns have been fully processed.
+	// turnCount 跟踪已完整处理的轮次数。
 	var turnCount int32
 
 	// Channels to synchronize the test with each turn's lifecycle.
+	// 用于让测试与每个轮次生命周期同步的 channels。
 	firstAgentStarted := make(chan struct{})
 	secondTurnDone := make(chan struct{})
 	thirdTurnDone := make(chan struct{})
@@ -5924,10 +6112,12 @@ func TestTurnLoop_Preempt_LoopStalledAfterSecondPreemptPush(t *testing.T) {
 			switch turn {
 			case 1:
 				// First turn: signal started, then block until preempted.
+				// 第一轮：发出已启动信号，然后阻塞直到被抢占。
 				firstAgentStartedOnce.Do(func() { close(firstAgentStarted) })
 				<-ctx.Done()
 			case 2, 3:
 				// Subsequent turns: complete immediately.
+				// 后续轮次：立即完成。
 			}
 			return &AgentOutput{}, nil
 		},
@@ -5954,20 +6144,26 @@ func TestTurnLoop_Preempt_LoopStalledAfterSecondPreemptPush(t *testing.T) {
 	})
 
 	// Step 1: Push item A (no preempt). Wait for agent to start.
+	// 步骤 1：Push 项 A（不抢占）。等待智能体启动。
 	loop.Push("A")
 	waitOrFail(t, firstAgentStarted, "agent did not start for item A")
 
 	// Step 2: Push item B with preempt. This cancels the first turn.
+	// 步骤 2：Push 项 B 并抢占。这会取消第一轮。
 	loop.Push("B", WithPreempt[string, *schema.Message](AnySafePoint))
 
 	// Wait for the second turn (item B) to complete successfully.
+	// 等待第二轮（项 B）成功完成。
 	waitOrFail(t, secondTurnDone, "second turn (item B) did not complete")
 
 	// Step 3: Push item C with preempt. This is the scenario that triggers
 	// the bug — the loop should process item C but instead gets stuck.
+	//
+	// 步骤 3：Push 项 C 并抢占。这是触发 bug 的场景——循环应处理项 C，但实际会卡住。
 	loop.Push("C", WithPreempt[string, *schema.Message](AnySafePoint))
 
 	// The loop should process item C. If the bug is present, this will timeout.
+	// 循环应处理 item C。如果存在该 bug，这里会超时。
 	waitOrFail(t, thirdTurnDone, "third turn (item C) was never processed — loop is stuck between turns")
 
 	loop.Stop()

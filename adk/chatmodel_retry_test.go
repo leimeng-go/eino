@@ -1083,6 +1083,12 @@ func TestSequentialWorkflow_NoRetryConfig_StreamError_StopsFlow(t *testing.T) {
 // The retryModelWrapper then retries, gets a clean stream with a tool call,
 // the tool interrupts, and checkpoint save needs to gob-encode the session
 // (which still contains the unconsumed WillRetryError event stream).
+//
+// failThenToolCallStreamModel 是一个 ChatModel：
+// - 第一次 Stream() 调用：产生一个部分 chunk，然后在流中途因可重试错误失败。
+// - 第二次 Stream() 调用（重试）：产生一条工具调用消息（成功）。
+// - 第三次 Generate() 调用（工具结果之后）：产生最终 assistant 消息。
+// 这用于覆盖以下路径：eventSenderModel 复制第一个流，将其错误包装为 WillRetryError，并作为事件发送到 session。retryModelWrapper 随后重试，获得一个包含工具调用的正常流；工具发生中断；检查点保存需要对 session 进行 gob 编码（其中仍包含未消费的 WillRetryError 事件流）。
 type failThenToolCallStreamModel struct {
 	streamCallCount int32
 	genCallCount    int32
@@ -1101,11 +1107,13 @@ func (m *failThenToolCallStreamModel) Stream(_ context.Context, _ []*schema.Mess
 		defer sw.Close()
 		if count == 1 {
 			// First call: yield a partial chunk then fail.
+			// 第一次调用：产出一个部分 chunk 后失败。
 			sw.Send(schema.AssistantMessage("partial", nil), nil)
 			sw.Send(nil, errRetryAble)
 			return
 		}
 		// Second call (retry): yield a tool-call message.
+		// 第二次调用（retry）：产出一条 tool-call 消息。
 		sw.Send(schema.AssistantMessage("", []schema.ToolCall{{
 			ID: "call-1",
 			Function: schema.FunctionCall{
@@ -1122,6 +1130,7 @@ func (m *failThenToolCallStreamModel) WithTools(_ []*schema.ToolInfo) (model.Too
 }
 
 // interruptToolForRetryTest is a tool that always interrupts.
+// interruptToolForRetryTest 是一个总会中断的工具。
 type interruptToolForRetryTest struct{}
 
 func (t *interruptToolForRetryTest) Info(_ context.Context) (*schema.ToolInfo, error) {
@@ -1155,6 +1164,18 @@ func (t *interruptToolForRetryTest) InvokableRun(ctx context.Context, _ string, 
 //     → agentEventWrapper.GobEncode proactively consumes the stream via
 //     getMessageFromWrappedEvent, so MessageVariant.GobEncode sees an error-free
 //     array and succeeds
+//
+// TestCheckpointSave_WillRetryError_StreamNotConsumed 验证：当 session 中包含一个未消费的流事件，且该流以 WillRetryError 结束时，保存检查点能成功。
+// 场景：
+// 1. ChatModelAgent 启用 retry（MaxRetries=1），并带有一个总会中断的工具
+// 2. Model.Stream() #1 先产出 "partial"，再在流中途返回 errRetryAble
+// → eventSenderModel 复制该流，将错误包装为 WillRetryError，并把事件发送到 session（此时流尚未被任何人消费）
+// → retryModelWrapper 在自己的副本上检测到错误后重试
+// 3. Model.Stream() #2 成功返回一条 tool-call 消息
+// 4. 工具执行 → 中断
+// 5. Runner.handleIter 看到中断 → saveCheckPoint → gob 编码 runSession
+// 6. session 中有带未消费流的 WillRetryError 事件
+// → agentEventWrapper.GobEncode 会通过 getMessageFromWrappedEvent 主动消费该流，因此 MessageVariant.GobEncode 看到的是无错误数组并成功
 func TestCheckpointSave_WillRetryError_StreamNotConsumed(t *testing.T) {
 	ctx := context.Background()
 
@@ -1205,11 +1226,13 @@ func TestCheckpointSave_WillRetryError_StreamNotConsumed(t *testing.T) {
 	}
 
 	// Verify the checkpoint was saved successfully.
+	// 验证检查点已成功保存。
 	_, exists, _ := store.Get(ctx, "ckpt-1")
 	assert.True(t, exists, "checkpoint should be saved successfully; "+
 		"if this fails, the WillRetryError stream in the session caused gob encoding to fail")
 
 	// Sanity: the model should have been called twice for Stream (fail + retry).
+	// Sanity：模型的 Stream 应该被调用两次（失败 + retry）。
 	assert.Equal(t, int32(2), atomic.LoadInt32(&mdl.streamCallCount),
 		"model should be called twice: first fail, then retry success")
 }

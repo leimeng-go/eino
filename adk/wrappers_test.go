@@ -1687,6 +1687,9 @@ func TestEventSenderToolHandler(t *testing.T) {
 
 // mockAgenticToolCallingModel is a model.BaseModel[*schema.AgenticMessage] that
 // returns a tool call on the first Generate, then a final answer on the second.
+//
+// mockAgenticToolCallingModel 是一个 model.BaseModel[*schema.AgenticMessage]，
+// 第一次 Generate 返回工具调用，第二次返回最终答案。
 type mockAgenticToolCallingModel struct {
 	toolCallName string
 	callCount    int32
@@ -1713,6 +1716,10 @@ func (m *mockAgenticToolCallingModel) Stream(ctx context.Context, input []*schem
 // collectAgenticToolEvents filters tool result events from the agentic iterator.
 // Agentic tool results have AgenticRole == AgenticRoleTypeUser and contain
 // FunctionToolResult content blocks.
+//
+// collectAgenticToolEvents 从 agentic 迭代器中过滤工具结果事件。
+// Agentic 工具结果的 AgenticRole == AgenticRoleTypeUser，且包含
+// FunctionToolResult 内容块。
 func collectAgenticToolEvents(it *AsyncIterator[*agenticAgentEvent]) []*agenticAgentEvent {
 	var toolEvents []*agenticAgentEvent
 	for {
@@ -1732,6 +1739,7 @@ func collectAgenticToolEvents(it *AsyncIterator[*agenticAgentEvent]) []*agenticA
 }
 
 // collectAgenticToolContent extracts text from agentic tool result events.
+// collectAgenticToolContent 从 agentic 工具结果事件中提取文本。
 func collectAgenticToolContent(events []*agenticAgentEvent) []string {
 	var contents []string
 	for _, ev := range events {
@@ -1779,6 +1787,10 @@ func newAgenticEventSenderToolWrapper() TypedChatModelAgentMiddleware[*schema.Ag
 // in typedToolInvokeEvent, typedToolStreamEvent, typedToolEnhancedInvokeEvent,
 // typedToolEnhancedStreamEvent, plus the helpers textToFunctionToolResultBlocks,
 // toolResultToBlocks, and derefString.
+//
+// TestAgenticEventSenderToolHandler 覆盖 typedToolInvokeEvent、typedToolStreamEvent、typedToolEnhancedInvokeEvent、
+// typedToolEnhancedStreamEvent 中的 *schema.AgenticMessage 分支，
+// 以及辅助函数 textToFunctionToolResultBlocks、toolResultToBlocks 和 derefString。
 func TestAgenticEventSenderToolHandler(t *testing.T) {
 	t.Run("Invokable", func(t *testing.T) {
 		ctx := context.Background()
@@ -1912,6 +1924,7 @@ func TestAgenticEventSenderToolHandler(t *testing.T) {
 		require.Equal(t, 1, len(toolEvents))
 
 		// Verify multimodal content
+		// 验证多模态内容
 		msg := toolEvents[0].Output.MessageOutput.Message
 		require.NotNil(t, msg)
 		require.Len(t, msg.ContentBlocks, 1)
@@ -1954,6 +1967,7 @@ func TestAgenticEventSenderToolHandler(t *testing.T) {
 		require.Equal(t, 1, len(toolEvents))
 
 		// Drain the stream and verify multimodal content
+		// 耗尽流并验证多模态内容
 		mo := toolEvents[0].Output.MessageOutput
 		require.True(t, mo.IsStreaming)
 		var allBlocks []*schema.FunctionToolResultContentBlock
@@ -2044,6 +2058,7 @@ func TestTypedToolEnhancedStreamEventAgenticMessageSetsStreamingMeta(t *testing.
 }
 
 // multimodalEnhancedInvokableTestTool returns a pre-built multimodal ToolResult.
+// multimodalEnhancedInvokableTestTool 返回预构建的多模态 ToolResult。
 type multimodalEnhancedInvokableTestTool struct {
 	name   string
 	result *schema.ToolResult
@@ -2063,6 +2078,7 @@ func (t *multimodalEnhancedInvokableTestTool) InvokableRun(_ context.Context, _ 
 }
 
 // multimodalEnhancedStreamableTestTool returns a pre-built multimodal ToolResult as a stream.
+// multimodalEnhancedStreamableTestTool 以流形式返回预构建的多模态 ToolResult。
 type multimodalEnhancedStreamableTestTool struct {
 	name   string
 	result *schema.ToolResult

@@ -30,6 +30,10 @@ import (
 // ---------------------------------------------------------------------------
 // Generic message construction helpers
 // ---------------------------------------------------------------------------
+//
+// ---------------------------------------------------------------------------
+// 通用消息构造辅助函数
+// ---------------------------------------------------------------------------
 
 type testToolCall struct {
 	ID        string
@@ -158,6 +162,10 @@ func getMsgContentG[M adk.MessageType](msg M) string {
 // ---------------------------------------------------------------------------
 // Part 1: Helper function tests
 // ---------------------------------------------------------------------------
+//
+// ---------------------------------------------------------------------------
+// 第 1 部分：辅助函数测试
+// ---------------------------------------------------------------------------
 
 func testHelperFunctions[M adk.MessageType](t *testing.T) {
 	t.Run("isAssistantMsg", func(t *testing.T) {
@@ -179,6 +187,7 @@ func testHelperFunctions[M adk.MessageType](t *testing.T) {
 		assert.True(t, isUserMsg(user))
 
 		// A user message that only has tool results should return false.
+		// 仅包含工具结果的用户消息应返回 false。
 		toolResultOnly := makeToolResultMsgG[M]("result", "call_1", "my_tool")
 		assert.False(t, isUserMsg(toolResultOnly))
 	})
@@ -206,10 +215,12 @@ func testHelperFunctions[M adk.MessageType](t *testing.T) {
 		assert.True(t, isToolResultOnlyMsg(trOnly))
 
 		// A normal user message is not a tool-result-only message.
+		// 普通用户消息不是仅含工具结果的消息。
 		user := makeUserMsgG[M]("hello")
 		assert.False(t, isToolResultOnlyMsg(user))
 
 		// For AgenticMessage, a mixed message (user text + tool result) should return false.
+		// 对于 AgenticMessage，混合消息（用户文本 + 工具结果）应返回 false。
 		var zero M
 		if _, ok := any(zero).(*schema.AgenticMessage); ok {
 			mixed := any(&schema.AgenticMessage{
@@ -253,6 +264,7 @@ func testHelperFunctions[M adk.MessageType](t *testing.T) {
 		assert.Equal(t, 1, got[1].BlockIndex)
 
 		// Empty assistant message returns nil.
+		// 空 assistant 消息返回 nil。
 		noTC := makeAssistantMsgG[M]("plain")
 		assert.Nil(t, getToolCallsGeneric(noTC))
 	})
@@ -269,6 +281,7 @@ func testHelperFunctions[M adk.MessageType](t *testing.T) {
 		assert.Equal(t, `{"new":"args"}`, got[0].Arguments)
 
 		// Verify AgenticMessage path writes to the ContentBlock directly.
+		// 验证 AgenticMessage 路径会直接写入 ContentBlock。
 		if am, ok := any(msg).(*schema.AgenticMessage); ok {
 			require.NotNil(t, am.ContentBlocks[0].FunctionToolCall)
 			assert.Equal(t, `{"new":"args"}`, am.ContentBlocks[0].FunctionToolCall.Arguments)
@@ -286,9 +299,11 @@ func testHelperFunctions[M adk.MessageType](t *testing.T) {
 		require.Len(t, copied, 2)
 
 		// Modify the copy's tool call arguments.
+		// 修改副本的工具调用参数。
 		setToolCallArguments(copied[0], 0, `{"modified":"true"}`)
 
 		// Original must be unchanged.
+		// 原始值必须保持不变。
 		origTCs := getToolCallsGeneric(original[0])
 		require.Len(t, origTCs, 1)
 		assert.Equal(t, `{"k":"v"}`, origTCs[0].Arguments, "original must not be affected by copy mutation")
@@ -301,11 +316,16 @@ func testHelperFunctions[M adk.MessageType](t *testing.T) {
 // ---------------------------------------------------------------------------
 // Part 2: Clear rewrite flow
 // ---------------------------------------------------------------------------
+//
+// ---------------------------------------------------------------------------
+// 第 2 部分：清除重写流程
+// ---------------------------------------------------------------------------
 
 func testClearFlowGeneric[M adk.MessageType](t *testing.T) {
 	ctx := context.Background()
 
 	// Token counter that always returns a high count to trigger clearing.
+	// 始终返回高计数的 token 计数器，用于触发清除。
 	highTokenCounter := func(_ context.Context, _ []M, _ []*schema.ToolInfo) (int64, error) {
 		return 999999, nil
 	}
@@ -313,6 +333,10 @@ func testClearFlowGeneric[M adk.MessageType](t *testing.T) {
 	// ClearRetentionSuffixLimit defaults to 1 in copyAndFillDefaults when set to 0,
 	// so we explicitly set it to 1. This means the last tool-call group (call_new)
 	// is retained and only the older group (call_old) is cleared.
+	//
+	// ClearRetentionSuffixLimit 设为 0 时会在 copyAndFillDefaults 中默认为 1，
+	// 因此这里显式设为 1。这意味着保留最后一个工具调用组（call_new），
+	// 只清除较旧的组（call_old）。
 	config := &TypedConfig[M]{
 		SkipTruncation:            true,
 		TokenCounter:              highTokenCounter,
@@ -324,6 +348,7 @@ func testClearFlowGeneric[M adk.MessageType](t *testing.T) {
 	require.NoError(t, err)
 
 	// Messages: system, user, assistant+toolcalls(old), tool_result(old), user, assistant+toolcalls(new)
+	// 消息：system、user、assistant+toolcalls(old)、tool_result(old)、user、assistant+toolcalls(new)
 	msgs := []M{
 		makeSystemMsgG[M]("you are helpful"),
 		makeUserMsgG[M]("what's the weather?"),
@@ -344,23 +369,34 @@ func testClearFlowGeneric[M adk.MessageType](t *testing.T) {
 
 	// The default ClearHandler preserves tool call arguments (sets them to the original).
 	// Verify they are unchanged.
+	//
+	// 默认 ClearHandler 会保留工具调用参数（将其设为原始值）。
+	// 验证它们未改变。
 	oldTCs := getToolCallsGeneric(resultState.Messages[2])
 	require.Len(t, oldTCs, 1)
 	assert.Equal(t, `{"location":"London"}`, oldTCs[0].Arguments, "default handler preserves tool call arguments")
 
 	// The old tool result (index 3) should have its content replaced with a placeholder.
 	// The placeholder text is locale-dependent, so just verify it changed from the original.
+	//
+	// 旧工具结果（索引 3）的内容应替换为占位符。
+	// 占位符文本依赖 locale，因此只验证它已不同于原始值。
 	oldResultContent := getMsgContentG(resultState.Messages[3])
 	assert.NotEqual(t, "Sunny and warm", oldResultContent, "old tool result content should be replaced with placeholder")
 
 	// The cleared flag should be set on the old assistant message.
+	// 应在旧 assistant 消息上设置 cleared 标记。
 	assert.True(t, getMsgClearedFlagGeneric(resultState.Messages[2]), "cleared flag should be set on old assistant msg")
 
 	// System message (index 0) should be untouched.
+	// system 消息（索引 0）应保持不变。
 	assert.Equal(t, "you are helpful", getMsgContentG(resultState.Messages[0]))
 
 	// Recent messages (index 4, 5) should not be affected: the new tool-call group
 	// is in the retention window.
+	//
+	// 最近的消息（索引 4、5）不应受影响：新的工具调用组
+	// 位于保留窗口内。
 	newTCs := getToolCallsGeneric(resultState.Messages[5])
 	require.Len(t, newTCs, 1)
 	assert.Equal(t, `{"temp":20}`, newTCs[0].Arguments, "recent tool calls must not be cleared")
@@ -369,15 +405,21 @@ func testClearFlowGeneric[M adk.MessageType](t *testing.T) {
 // ---------------------------------------------------------------------------
 // Part 3: Truncation flow
 // ---------------------------------------------------------------------------
+//
+// ---------------------------------------------------------------------------
+// 第 3 部分：截断流程
+// ---------------------------------------------------------------------------
 
 func testTruncationGeneric[M adk.MessageType](t *testing.T) {
 	ctx := context.Background()
 
 	callCount := 0
 	// Token counter returns decreasing counts as messages shrink.
+	// Token counter 会随着消息变少而返回递减的计数。
 	tokenCounter := func(_ context.Context, msgs []M, _ []*schema.ToolInfo) (int64, error) {
 		callCount++
 		// First call: over limit. After truncation (fewer msgs), under limit.
+		// 第一次调用：超过限制。截断后（消息更少），低于限制。
 		return int64(len(msgs)) * 100, nil
 	}
 
@@ -408,11 +450,20 @@ func testTruncationGeneric[M adk.MessageType](t *testing.T) {
 	// The middleware should return the state unchanged because clear is skipped
 	// (truncation in BeforeModelRewriteState is the clear phase, not the tool-output truncation).
 	// The messages are returned as-is since the clearing loop is the only message-removal mechanism.
+	//
+	// 由于 SkipClear 为 true，clear 路径会被完全跳过。
+	// 中间件应返回未改变的 state，因为 clear 被跳过了
+	// （BeforeModelRewriteState 中的截断属于 clear 阶段，不是工具输出截断）。
+	// 消息会原样返回，因为 clearing 循环是唯一的消息移除机制。
 	assert.Equal(t, len(msgs), len(resultState.Messages))
 }
 
 // ---------------------------------------------------------------------------
 // Part 4: ClearPostProcess callback
+// ---------------------------------------------------------------------------
+//
+// ---------------------------------------------------------------------------
+// 第 4 部分：ClearPostProcess 回调
 // ---------------------------------------------------------------------------
 
 func testClearPostProcessGeneric[M adk.MessageType](t *testing.T) {
@@ -426,6 +477,10 @@ func testClearPostProcessGeneric[M adk.MessageType](t *testing.T) {
 	// ClearRetentionSuffixLimit=0 defaults to 1 via copyAndFillDefaults.
 	// We need at least 2 tool-call groups so that the first one gets cleared
 	// while the second is retained by the suffix limit.
+	//
+	// ClearRetentionSuffixLimit=0 会通过 copyAndFillDefaults 默认设为 1。
+	// 需要至少 2 个工具调用组，这样第一个会被清理，
+	// 而第二个会因 suffix limit 被保留。
 	config := &TypedConfig[M]{
 		SkipTruncation:            true,
 		TokenCounter:              highTokenCounter,
@@ -462,6 +517,10 @@ func testClearPostProcessGeneric[M adk.MessageType](t *testing.T) {
 
 // ---------------------------------------------------------------------------
 // Part 5: AgenticMessage-specific coverage
+// ---------------------------------------------------------------------------
+//
+// ---------------------------------------------------------------------------
+// 第 5 部分：AgenticMessage 专属覆盖
 // ---------------------------------------------------------------------------
 
 func TestGetDefaultTokenCounter_AgenticMessage(t *testing.T) {
@@ -500,6 +559,7 @@ func TestGetDefaultTokenCounter_AgenticMessage(t *testing.T) {
 			},
 		},
 		nil, // nil message should be skipped
+		// 应跳过 nil message
 	}
 
 	tokens, err := counter(ctx, msgs, nil)
@@ -507,6 +567,7 @@ func TestGetDefaultTokenCounter_AgenticMessage(t *testing.T) {
 	assert.Greater(t, tokens, int64(0), "should count tokens from content blocks")
 
 	// Also test with tools
+	// 也测试 tools
 	tools := []*schema.ToolInfo{
 		{Name: "my_tool", Desc: "a test tool"},
 	}
@@ -545,6 +606,7 @@ func TestCopyAgenticMessages_DeepCopy(t *testing.T) {
 	require.Len(t, copied, 1)
 
 	// Mutate the copy and verify original is unchanged.
+	// 修改副本并验证原始值未改变。
 	copied[0].ContentBlocks[0].FunctionToolCall.Arguments = `{"modified":true}`
 	assert.Equal(t, `{"x":1}`, original[0].ContentBlocks[0].FunctionToolCall.Arguments,
 		"original FunctionToolCall.Arguments must not be affected")
@@ -621,8 +683,8 @@ func TestToolResultFromMsgGeneric_AgenticMessage(t *testing.T) {
 				{
 					Type: schema.ContentBlockTypeFunctionToolResult,
 					FunctionToolResult: &schema.FunctionToolResult{
-						CallID: "c1",
-						Name:   "tool1",
+						CallID:  "c1",
+						Name:    "tool1",
 						Content: nil,
 					},
 				},
@@ -664,6 +726,7 @@ func TestSetToolResultContent_AgenticMessage(t *testing.T) {
 		setToolResultContent(msg, newResult, true)
 
 		// Verify the block was updated
+		// 验证该 block 已更新
 		blocks := msg.ContentBlocks[0].FunctionToolResult.Content
 		require.Len(t, blocks, 1)
 		assert.Equal(t, "new content", blocks[0].Text.Text)
@@ -866,6 +929,10 @@ func TestMpcURLToString(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Top-level test
 // ---------------------------------------------------------------------------
+//
+// ---------------------------------------------------------------------------
+// 顶层测试
+// ---------------------------------------------------------------------------
 
 func TestReductionGeneric(t *testing.T) {
 	t.Run("Message", func(t *testing.T) {
@@ -886,6 +953,9 @@ func TestReductionGeneric(t *testing.T) {
 
 // testCopyNilMessage verifies that copyMessagesGeneric does not panic when
 // the input slice contains nil message elements (regression test).
+//
+// testCopyNilMessage 验证当输入切片包含 nil message 元素时，
+// copyMessagesGeneric 不会 panic（回归测试）。
 func testCopyNilMessage[M adk.MessageType](t *testing.T) {
 	var zero M
 	var msgs []M

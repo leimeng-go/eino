@@ -35,16 +35,20 @@ import (
 )
 
 // ContextMode defines the execution mode of a skill.
+// ContextMode 定义 skill 的执行模式。
 type ContextMode string
 
 const (
 	// ContextModeFork creates a new sub-agent without parent history
+	// ContextModeFork 创建一个不带父级历史的新子智能体
 	ContextModeFork ContextMode = "fork"
 	// ContextModeForkWithContext creates a new sub-agent with parent history
+	// ContextModeForkWithContext 创建一个带父级历史的新子智能体
 	ContextModeForkWithContext ContextMode = "fork_with_context"
 )
 
 // FrontMatter defines the YAML frontmatter schema parsed from a SKILL.md file.
+// FrontMatter 定义从 SKILL.md 文件解析出的 YAML frontmatter schema。
 type FrontMatter struct {
 	Name        string      `yaml:"name"`
 	Description string      `yaml:"description"`
@@ -54,58 +58,82 @@ type FrontMatter struct {
 }
 
 // Skill represents a skill loaded from a backend.
+// Skill 表示从 backend 加载的 skill。
 type Skill struct {
 	FrontMatter
 	// Content is the markdown body after the frontmatter contains the skill instructions of a SKILL.md file.
+	// Content 是 frontmatter 之后的 markdown 正文，包含 SKILL.md 文件的 skill 指令。
 	Content string
 	// BaseDirectory is the absolute directory path where the SKILL.md file is located (e.g., "/absolute/path/to/skills/my-skill").
+	// BaseDirectory 是 SKILL.md 文件所在的绝对目录路径（例如 "/absolute/path/to/skills/my-skill"）。
 	BaseDirectory string
 }
 
 // Backend loads skills and provides metadata for tool description rendering.
+// Backend 加载 skills，并提供用于渲染工具描述的元数据。
 type Backend interface {
 	List(ctx context.Context) ([]FrontMatter, error)
 	Get(ctx context.Context, name string) (Skill, error)
 }
 
 // TypedAgentHubOptions contains options passed to TypedAgentHub.Get when creating an agent for skill execution.
+// TypedAgentHubOptions 包含创建用于 skill 执行的智能体时传给 TypedAgentHub.Get 的选项。
 type TypedAgentHubOptions[M adk.MessageType] struct {
 	// Model is the resolved model instance when a skill specifies a "model" field in frontmatter.
 	// nil means the skill did not specify a model override; implementations should use their default.
+	//
+	// Model 是 skill 在 frontmatter 中指定 "model" 字段时解析出的模型实例。
+	// nil 表示该 skill 未指定模型覆盖；实现应使用其默认模型。
 	Model model.BaseModel[M]
 }
 
 // AgentHubOptions is a backward-compatible alias for TypedAgentHubOptions instantiated with *schema.Message.
+// AgentHubOptions 是用 *schema.Message 实例化的 TypedAgentHubOptions 的向后兼容别名。
 type AgentHubOptions = TypedAgentHubOptions[*schema.Message]
 
 // TypedAgentHub provides agent instances for context mode (fork/fork_with_context) execution.
+// TypedAgentHub 为 context mode（fork/fork_with_context）执行提供智能体实例。
 type TypedAgentHub[M adk.MessageType] interface {
 	// Get returns an Agent by name. When name is empty, implementations should return a default agent.
 	// The opts parameter carries skill-level overrides (e.g., model) resolved by the framework.
+	//
+	// Get 按名称返回 Agent。name 为空时，实现应返回默认智能体。
+	// opts 参数携带框架解析出的 skill 级覆盖项（例如 model）。
 	Get(ctx context.Context, name string, opts *TypedAgentHubOptions[M]) (adk.TypedAgent[M], error)
 }
 
 // AgentHub is a backward-compatible alias for TypedAgentHub instantiated with *schema.Message.
+// AgentHub 是用 *schema.Message 实例化的 TypedAgentHub 的向后兼容别名。
 type AgentHub = TypedAgentHub[*schema.Message]
 
 // TypedModelHub resolves model instances by name for skills that specify a "model" field in frontmatter.
+// TypedModelHub 为在 frontmatter 中指定 "model" 字段的 skills 按名称解析模型实例。
 type TypedModelHub[M adk.MessageType] interface {
 	Get(ctx context.Context, name string) (model.BaseModel[M], error)
 }
 
 // ModelHub is a backward-compatible alias for TypedModelHub instantiated with *schema.Message.
+// ModelHub 是用 *schema.Message 实例化的 TypedModelHub 的向后兼容别名。
 type ModelHub = TypedModelHub[*schema.Message]
 
 // SystemPromptFunc is a function that returns a custom system prompt.
 // The toolName parameter is the name of the skill tool (default: "skill").
+//
+// SystemPromptFunc 是返回自定义系统提示的函数。
+// toolName 参数是 skill 工具的名称（默认："skill"）。
 type SystemPromptFunc func(ctx context.Context, toolName string) string
 
 // ToolDescriptionFunc is a function that returns a custom tool description.
 // The skills parameter contains all available skill front matters.
+//
+// ToolDescriptionFunc 是返回自定义工具描述的函数。
+// skills 参数包含所有可用 skill 的 front matters。
 type ToolDescriptionFunc func(ctx context.Context, skills []FrontMatter) string
 
 // TypedSubAgentInput contains the context available when building the sub-agent's
 // initial messages in fork/fork_with_context mode.
+//
+// TypedSubAgentInput 包含在 fork/fork_with_context 模式下构建子智能体初始消息时可用的上下文。
 type TypedSubAgentInput[M adk.MessageType] struct {
 	Skill        Skill
 	Mode         ContextMode
@@ -116,10 +144,13 @@ type TypedSubAgentInput[M adk.MessageType] struct {
 }
 
 // SubAgentInput is a backward-compatible alias for TypedSubAgentInput instantiated with *schema.Message.
+// SubAgentInput 是用 *schema.Message 实例化的 TypedSubAgentInput 的向后兼容别名。
 type SubAgentInput = TypedSubAgentInput[*schema.Message]
 
 // TypedSubAgentOutput contains the sub-agent's execution results, available when
 // formatting the final tool response.
+//
+// TypedSubAgentOutput 包含子智能体的执行结果，可在格式化最终工具响应时使用。
 type TypedSubAgentOutput[M adk.MessageType] struct {
 	Skill        Skill
 	Mode         ContextMode
@@ -129,22 +160,35 @@ type TypedSubAgentOutput[M adk.MessageType] struct {
 }
 
 // SubAgentOutput is a backward-compatible alias for TypedSubAgentOutput instantiated with *schema.Message.
+// SubAgentOutput 是 TypedSubAgentOutput 以 *schema.Message 实例化后的向后兼容别名。
 type SubAgentOutput = TypedSubAgentOutput[*schema.Message]
 
 // TypedConfig is the configuration for the skill middleware.
+// TypedConfig 是 skill 中间件的配置。
 type TypedConfig[M adk.MessageType] struct {
 	// Backend is the backend for retrieving skills.
+	// Backend 是用于检索 skills 的后端。
 	Backend Backend
 	// SkillToolName is the custom name for the skill tool. If nil, the default name "skill" is used.
+	// SkillToolName 是 skill 工具的自定义名称。若为 nil，则使用默认名称 "skill"。
 	SkillToolName *string
 	// Deprecated: Use adk.SetLanguage(adk.LanguageChinese) instead to enable Chinese prompts globally.
 	// This field will be removed in a future version.
+	//
+	// Deprecated: 改用 adk.SetLanguage(adk.LanguageChinese) 全局启用中文提示。
+	// 该字段将在未来版本中移除。
 	UseChinese bool
 	// AgentHub provides agent instances for context mode (fork/fork_with_context) execution.
 	// Required when skills use "context: fork" or "context: fork_with_context" in frontmatter.
 	// The agent factory is retrieved by agent name (skill.Agent) from this hub.
 	// When skill.Agent is empty, AgentHub.Get is called with an empty string,
 	// allowing the hub implementation to return a default agent.
+	//
+	// AgentHub 为 context 模式（fork/fork_with_context）执行提供智能体实例。
+	// 当 skills 在 frontmatter 中使用 "context: fork" 或 "context: fork_with_context" 时必需。
+	// 会从该 hub 按智能体名称（skill.Agent）获取智能体工厂。
+	// 当 skill.Agent 为空时，会用空字符串调用 AgentHub.Get，
+	// 允许 hub 实现返回默认智能体。
 	AgentHub TypedAgentHub[M]
 	// ModelHub provides model instances for skills that specify a "model" field in frontmatter.
 	// Used in two scenarios:
@@ -152,41 +196,74 @@ type TypedConfig[M adk.MessageType] struct {
 	//   - Without context mode (inline): The model becomes active for subsequent ChatModel requests
 	// If nil, skills with model specification will be ignored in inline mode,
 	// or return an error in context mode.
+	//
+	// ModelHub 为在 frontmatter 中指定 "model" 字段的 skills 提供模型实例。
+	// 用于两种场景：
+	// - 带 context 模式（fork/fork_with_context）：模型会传给 AgentHub
+	// - 不带 context 模式（inline）：模型会对后续 ChatModel 请求生效
+	// 若为 nil，带模型指定的 skills 在 inline 模式下会被忽略，
+	// 在 context 模式下会返回错误。
 	ModelHub TypedModelHub[M]
 
 	// CustomSystemPrompt allows customizing the system prompt injected into the agent.
 	// If nil, the default system prompt is used.
 	// The function receives the skill tool name as a parameter.
+	//
+	// CustomSystemPrompt 允许自定义注入到智能体中的系统提示。
+	// 若为 nil，则使用默认系统提示。
+	// 该函数接收 skill 工具名称作为参数。
 	CustomSystemPrompt SystemPromptFunc
 	// CustomToolDescription allows customizing the tool description for the skill tool.
 	// If nil, the default tool description is used.
 	// The function receives all available skill front matters as a parameter.
+	//
+	// CustomToolDescription 允许自定义 skill 工具的工具描述。
+	// 若为 nil，则使用默认工具描述。
+	// 该函数接收所有可用的 skill front matters 作为参数。
 	CustomToolDescription ToolDescriptionFunc
 
 	// CustomToolParams customizes tool parameters for the skill tool.
 	// defaults is the default schema with only the required "skill" field.
 	// optional
+	//
+	// CustomToolParams 自定义 skill 工具的工具参数。
+	// defaults 是默认 schema，仅包含必需的 "skill" 字段。
+	// 可选
 	CustomToolParams func(ctx context.Context, defaults map[string]*schema.ParameterInfo) (map[string]*schema.ParameterInfo, error)
 
 	// BuildContent customizes the skill content generated for this invocation.
 	// rawArgs contains the original tool call arguments in JSON form.
 	// optional
+	//
+	// BuildContent 自定义本次调用生成的 skill 内容。
+	// rawArgs 包含原始工具调用参数的 JSON 形式。
+	// 可选
 	BuildContent func(ctx context.Context, skill Skill, rawArgs string) (string, error)
 
 	// BuildForkMessages customizes the messages passed to the forked sub-agent.
 	// When nil, fork uses [UserMessage(skillContent)] and fork_with_context uses
 	// [history..., ToolMessage(skillContent, toolCallID)].
 	// optional
+	//
+	// BuildForkMessages 自定义传递给 fork 后子智能体的消息。
+	// 为 nil 时，fork 使用 [UserMessage(skillContent)]，fork_with_context 使用
+	// [history..., ToolMessage(skillContent, toolCallID)]。
+	// 可选
 	BuildForkMessages func(ctx context.Context, in TypedSubAgentInput[M]) ([]M, error)
 
 	// FormatForkResult customizes the final text returned from the forked sub-agent results.
 	// When nil, assistant message contents emitted by the sub-agent are concatenated and returned
 	// in a default formatted string.
 	// optional
+	//
+	// FormatForkResult 自定义从 fork 后子智能体结果返回的最终文本。
+	// 为 nil 时，会拼接子智能体发出的 assistant 消息内容，并以默认格式字符串返回。
+	// 可选
 	FormatForkResult func(ctx context.Context, in TypedSubAgentOutput[M]) (string, error)
 }
 
 // Config is a backward-compatible alias for TypedConfig instantiated with *schema.Message.
+// Config 是 TypedConfig 以 *schema.Message 实例化后的向后兼容别名。
 type Config = TypedConfig[*schema.Message]
 
 // NewTyped creates a generic skill middleware handler for TypedChatModelAgent.
@@ -196,6 +273,12 @@ type Config = TypedConfig[*schema.Message]
 // via ModelHub only takes effect when M is *schema.Message (for other types it is a no-op).
 //
 // See NewMiddleware for full usage documentation.
+//
+// NewTyped 为 TypedChatModelAgent 创建通用 skill 中间件处理器。
+// 这是同时支持 *schema.Message 和 *schema.AgenticMessage 的通用构造函数。
+// 对于 *schema.AgenticMessage，工具执行与消息类型无关；通过 ModelHub 进行的模型覆盖
+// 仅在 M 为 *schema.Message 时生效（对其他类型为 no-op）。
+// 完整用法文档见 NewMiddleware。
 func NewTyped[M adk.MessageType](ctx context.Context, config *TypedConfig[M]) (adk.TypedChatModelAgentMiddleware[M], error) {
 	if config == nil {
 		return nil, fmt.Errorf("config is required")
@@ -262,6 +345,27 @@ func NewTyped[M adk.MessageType](ctx context.Context, config *TypedConfig[M]) (a
 //	    // ...
 //	    Handlers: []adk.ChatModelAgentMiddleware{handler},
 //	})
+//
+// NewMiddleware 为 ChatModelAgent 创建新的 skill 中间件处理器。
+// 该处理器提供一个 skill 工具，使智能体能够加载并执行
+// 定义在 SKILL.md 文件中的 skills。skills 可根据其
+// frontmatter 配置以不同模式运行：
+// - Inline mode（默认）：skill 内容直接作为工具结果返回
+// - Fork mode（context: fork）：fork 一个带干净 context 的新智能体，丢弃消息历史
+// - Fork with context mode（context: fork_with_context）：fork 一个携带消息历史的新智能体
+// 示例用法：
+// handler, err := skill.NewMiddleware(ctx, &skill.Config{
+// Backend:  backend,
+// AgentHub: myAgentHub,
+// ModelHub: myModelHub,
+// })
+// if err != nil {
+// return err
+// }
+// agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
+// ...
+// Handlers: []adk.ChatModelAgentMiddleware{handler},
+// })
 func NewMiddleware(ctx context.Context, config *Config) (adk.ChatModelAgentMiddleware, error) {
 	return NewTyped(ctx, config)
 }
@@ -307,6 +411,11 @@ const activeModelKey = "__skill_active_model__"
 //
 // Deprecated: Use NewMiddleware instead. New does not support fork mode execution
 // because AgentMiddleware cannot save message history for fork mode.
+//
+// New 创建新的 skill 中间件。
+// 它提供一个工具供智能体使用 skills。
+// Deprecated: 改用 NewMiddleware。New 不支持 fork 模式执行，
+// 因为 AgentMiddleware 无法为 fork 模式保存消息历史。
 func New(ctx context.Context, config *Config) (adk.AgentMiddleware, error) {
 	if config == nil {
 		return adk.AgentMiddleware{}, fmt.Errorf("config is required")
@@ -690,6 +799,11 @@ func (s *typedSkillTool[M]) getMessagesFromState(ctx context.Context) ([]M, erro
 		// agent state type (agenticState) is unexported from the adk package,
 		// making it inaccessible via compose.ProcessState from middleware packages.
 		// Agent mode (the default) works normally for AgenticMessage.
+		//
+		// AgenticMessage 不支持 Fork mode，因为内部
+		// 智能体状态类型（agenticState）未从 adk 包导出，
+		// 导致中间件包无法通过 compose.ProcessState 访问它。
+		// Agent mode（默认）对 AgenticMessage 可正常工作。
 		return nil, fmt.Errorf("fork mode is not supported for AgenticMessage; use agent mode instead")
 	}
 	return messages, nil

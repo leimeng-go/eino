@@ -149,6 +149,7 @@ func (t *taskCreateTool) InvokableRun(ctx context.Context, argumentsInJSON strin
 	}
 
 	//  Write highwatermark file first
+	// 先写入 highwatermark 文件
 	highwatermarkPath := filepath.Join(t.BaseDir, highWatermarkFileName)
 	err = t.Backend.Write(ctx, &WriteRequest{
 		FilePath: highwatermarkPath,

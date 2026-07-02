@@ -31,6 +31,7 @@ import (
 )
 
 // runSession CheckpointSchema: persisted via serialization.RunCtx (gob).
+// runSession CheckpointSchema：通过 serialization.RunCtx (gob) 持久化。
 type runSession struct {
 	Values    map[string]any
 	valuesMtx *sync.Mutex
@@ -42,16 +43,22 @@ type runSession struct {
 	// TypedEvents stores *[]*typedAgentEventWrapper[M] for M != *schema.Message.
 	// For M = *schema.Message, the existing Events field is used instead.
 	// The any type is required because Go does not support generic fields in non-generic structs.
+	//
+	// TypedEvents 为 M != *schema.Message 存储 *[]*typedAgentEventWrapper[M]。
+	// 对于 M = *schema.Message，则改用现有的 Events 字段。
+	// 需要 any 类型，因为 Go 不支持在非泛型结构体中使用泛型字段。
 	TypedEvents any
 }
 
 // laneEvents CheckpointSchema: persisted via serialization.RunCtx (gob).
+// laneEvents CheckpointSchema：通过 serialization.RunCtx (gob) 持久化。
 type laneEvents struct {
 	Events []*agentEventWrapper
 	Parent *laneEvents
 }
 
 // agentEventWrapper CheckpointSchema: persisted via serialization.RunCtx (gob).
+// agentEventWrapper CheckpointSchema：通过 serialization.RunCtx (gob) 持久化。
 type agentEventWrapper struct {
 	*AgentEvent
 	mu                  sync.Mutex
@@ -59,6 +66,9 @@ type agentEventWrapper struct {
 	// TS is the timestamp (in nanoseconds) when this event was created.
 	// It is primarily used by the laneEvents mechanism to order events
 	// from different agents in a multi-agent flow.
+	//
+	// TS 是该事件创建时的时间戳（纳秒）。
+	// 它主要由 laneEvents 机制用于在多智能体流程中对来自不同智能体的事件排序。
 	TS int64
 	// StreamErr stores the error message if the MessageStream contained an error.
 	// This field guards against multiple calls to getMessageFromWrappedEvent
@@ -66,6 +76,10 @@ type agentEventWrapper struct {
 	// Normally when StreamErr happens, the Agent will return with the error,
 	// unless retry is configured for the agent generating this stream, in which case
 	// this StreamErr will be of type WillRetryError (indicating retry is pending).
+	//
+	// 如果 MessageStream 包含错误，StreamErr 存储错误消息。
+	// 该字段用于防止在流已被消费且出错后多次调用 getMessageFromWrappedEvent。
+	// 通常发生 StreamErr 时，Agent 会带着该错误返回；除非为生成此流的智能体配置了重试，此时该 StreamErr 会是 WillRetryError 类型（表示重试待进行）。
 	StreamErr error
 }
 
@@ -79,6 +93,9 @@ type typedAgentEventWrapper[M MessageType] struct {
 
 // typedAgentEventWrapperForGob is a gob-serializable representation of typedAgentEventWrapper.
 // We encode the event and TS separately to avoid the sync.Mutex and non-exported fields.
+//
+// typedAgentEventWrapperForGob 是 typedAgentEventWrapper 的 gob 可序列化表示。
+// 我们将 event 和 TS 分开编码，以避开 sync.Mutex 和非导出字段。
 type typedAgentEventWrapperForGob[M MessageType] struct {
 	Event *TypedAgentEvent[M]
 	TS    int64
@@ -87,6 +104,7 @@ type typedAgentEventWrapperForGob[M MessageType] struct {
 func (e *typedAgentEventWrapper[M]) GobEncode() ([]byte, error) {
 	if e.event != nil && e.event.Output != nil && e.event.Output.MessageOutput != nil && e.event.Output.MessageOutput.IsStreaming {
 		// Materialize the stream before encoding.
+		// 编码前先将流物化。
 		if isNilMessage(e.concatenatedMessage) && e.StreamErr == nil {
 			e.consumeStream()
 		}
@@ -122,6 +140,9 @@ func (e *typedAgentEventWrapper[M]) GobDecode(b []byte) error {
 // directly) while typedAgentEventWrapper[M] is generic. They cannot be unified without
 // making the non-generic wrapper generic, which would cascade through the entire
 // non-generic event storage layer.
+//
+// consumeStream 会耗尽类型化消息流；成功时设置 concatenatedMessage，失败时设置 StreamErr。该流会被替换为可安全进行 gob 编码的物化版本。
+// NOTE: 此方法与 utils.go 中的 agentEventWrapper.consumeStream 类似。两种实现同时存在，是因为 agentEventWrapper 是非泛型的（直接使用 *schema.Message），而 typedAgentEventWrapper[M] 是泛型的。若不把非泛型 wrapper 改成泛型，就无法合并；而这会影响整个非泛型事件存储层。
 func (e *typedAgentEventWrapper[M]) consumeStream() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -176,6 +197,8 @@ func (a *agentEventWrapper) GobEncode() ([]byte, error) {
 		// ends with a non-EOF error (WillRetryError, ErrStreamCanceled) would
 		// cause MessageVariant.GobEncode to fail. consumeStream replaces the
 		// stream with an error-free, materialized version.
+		//
+		// 编码前先将流物化。未消费的流若以非 EOF 错误（WillRetryError、ErrStreamCanceled）结束，会导致 MessageVariant.GobEncode 失败。consumeStream 会将流替换为无错误的物化版本。
 		if a.concatenatedMessage == nil && a.StreamErr == nil {
 			a.consumeStream()
 		}
@@ -201,6 +224,7 @@ func newRunSession() *runSession {
 }
 
 // GetSessionValues returns all session key-value pairs for the current run.
+// GetSessionValues 返回当前运行的所有 session 键值对。
 func GetSessionValues(ctx context.Context) map[string]any {
 	session := getSession(ctx)
 	if session == nil {
@@ -211,6 +235,7 @@ func GetSessionValues(ctx context.Context) map[string]any {
 }
 
 // AddSessionValue sets a single session key-value pair for the current run.
+// AddSessionValue 为当前运行设置单个 session 键值对。
 func AddSessionValue(ctx context.Context, key string, value any) {
 	session := getSession(ctx)
 	if session == nil {
@@ -221,6 +246,7 @@ func AddSessionValue(ctx context.Context, key string, value any) {
 }
 
 // AddSessionValues sets multiple session key-value pairs for the current run.
+// AddSessionValues 为当前运行设置多个 session 键值对。
 func AddSessionValues(ctx context.Context, kvs map[string]any) {
 	session := getSession(ctx)
 	if session == nil {
@@ -231,6 +257,7 @@ func AddSessionValues(ctx context.Context, kvs map[string]any) {
 }
 
 // GetSessionValue retrieves a session value by key and reports whether it exists.
+// GetSessionValue 按 key 获取 session 值，并报告其是否存在。
 func GetSessionValue(ctx context.Context, key string) (any, bool) {
 	session := getSession(ctx)
 	if session == nil {
@@ -244,12 +271,16 @@ func (rs *runSession) addEvent(event *AgentEvent) {
 	wrapper := &agentEventWrapper{AgentEvent: event, TS: time.Now().UnixNano()}
 	// If LaneEvents is not nil, we are in a parallel lane.
 	// Append to the lane's local event slice (lock-free).
+	//
+	// 如果 LaneEvents 非 nil，说明我们在并行 lane 中。
+	// 追加到该 lane 的本地事件切片（无锁）。
 	if rs.LaneEvents != nil {
 		rs.LaneEvents.Events = append(rs.LaneEvents.Events, wrapper)
 		return
 	}
 
 	// Otherwise, we are on the main path. Append to the shared Events slice (with lock).
+	// 否则，我们在主路径上。追加到共享的 Events 切片（带锁）。
 	rs.mtx.Lock()
 	rs.Events = append(rs.Events, wrapper)
 	rs.mtx.Unlock()
@@ -257,6 +288,7 @@ func (rs *runSession) addEvent(event *AgentEvent) {
 
 func (rs *runSession) getEvents() []*agentEventWrapper {
 	// If there are no in-flight lane events, we can return the main slice directly.
+	// 如果没有进行中的 lane 事件，可以直接返回主切片。
 	if rs.LaneEvents == nil {
 		rs.mtx.Lock()
 		events := rs.Events
@@ -266,6 +298,9 @@ func (rs *runSession) getEvents() []*agentEventWrapper {
 
 	// If there are in-flight events, we must construct the full view.
 	// First, get the committed history from the main Events slice.
+	//
+	// 如果存在进行中的事件，必须构造完整视图。
+	// 首先，从主 Events 切片获取已提交的历史。
 	rs.mtx.Lock()
 	committedEvents := make([]*agentEventWrapper, len(rs.Events))
 	copy(committedEvents, rs.Events)
@@ -273,6 +308,9 @@ func (rs *runSession) getEvents() []*agentEventWrapper {
 
 	// Then, assemble the in-flight events by traversing the linked list.
 	// Reading the .Parent pointer is safe without a lock because the parent of a lane is immutable after creation.
+	//
+	// 然后，通过遍历链表组装进行中的事件。
+	// 无需加锁即可安全读取 .Parent 指针，因为 lane 的 parent 在创建后不可变。
 	var laneSlices [][]*agentEventWrapper
 	totalLaneSize := 0
 	for lane := rs.LaneEvents; lane != nil; lane = lane.Parent {
@@ -283,6 +321,7 @@ func (rs *runSession) getEvents() []*agentEventWrapper {
 	}
 
 	// Combine committed and in-flight history.
+	// 合并已提交和进行中的历史。
 	finalEvents := make([]*agentEventWrapper, 0, len(committedEvents)+totalLaneSize)
 	finalEvents = append(finalEvents, committedEvents...)
 	for i := len(laneSlices) - 1; i >= 0; i-- {
@@ -426,36 +465,44 @@ func joinRunCtxs(parentCtx context.Context, childCtxs ...context.Context) {
 		return
 	case 1:
 		// Optimization for the common case of a single branch.
+		// 针对单分支常见场景的优化。
 		newEvents := unwindLaneEvents(childCtxs...)
 		commitEvents(parentCtx, newEvents)
 		return
 	}
 
 	// 1. Collect all new events from the leaf nodes of each context's lane.
+	// 1. 从每个 context 的 lane 叶子节点收集所有新事件。
 	newEvents := unwindLaneEvents(childCtxs...)
 
 	// 2. Sort the collected events by their creation timestamp for chronological order.
+	// 2. 按创建时间戳对收集到的事件排序，以保持时间顺序。
 	sort.Slice(newEvents, func(i, j int) bool {
 		return newEvents[i].TS < newEvents[j].TS
 	})
 
 	// 3. Commit the sorted events to the parent.
+	// 3. 将排序后的事件提交到 parent。
 	commitEvents(parentCtx, newEvents)
 }
 
 // commitEvents appends a slice of new events to the correct parent lane or main event log.
+// commitEvents 将一组新事件追加到正确的 parent lane 或主事件日志。
 func commitEvents(ctx context.Context, newEvents []*agentEventWrapper) {
 	runCtx := getRunCtx(ctx)
 	if runCtx == nil || runCtx.Session == nil {
 		// Should not happen, but handle defensively.
+		// 不应发生，但做防御性处理。
 		return
 	}
 
 	// If the context we are committing to is itself a lane, append to its event slice.
+	// 如果要提交到的 context 本身就是 lane，则追加到它的事件切片。
 	if runCtx.Session.LaneEvents != nil {
 		runCtx.Session.LaneEvents.Events = append(runCtx.Session.LaneEvents.Events, newEvents...)
 	} else {
 		// Otherwise, commit to the main, shared Events slice with a lock.
+		// 否则，加锁后提交到主共享 Events 切片。
 		runCtx.Session.mtx.Lock()
 		runCtx.Session.Events = append(runCtx.Session.Events, newEvents...)
 		runCtx.Session.mtx.Unlock()
@@ -464,6 +511,8 @@ func commitEvents(ctx context.Context, newEvents []*agentEventWrapper) {
 
 // unwindLaneEvents traverses the LaneEvents of the given contexts and collects
 // all events from the leaf nodes.
+//
+// unwindLaneEvents 遍历给定 context 的 LaneEvents，并收集叶子节点中的所有事件。
 func unwindLaneEvents(ctxs ...context.Context) []*agentEventWrapper {
 	var allNewEvents []*agentEventWrapper
 	for _, ctx := range ctxs {
@@ -479,24 +528,32 @@ func forkRunCtx(ctx context.Context) context.Context {
 	parentRunCtx := getRunCtx(ctx)
 	if parentRunCtx == nil || parentRunCtx.Session == nil {
 		// Should not happen in a parallel workflow, but handle defensively.
+		// 在并行工作流中不应发生，但仍做防御性处理。
 		return ctx
 	}
 
 	// Create a new session for the child lane by manually copying the parent's session fields.
 	// This is crucial to ensure a new mutex is created and that the LaneEvents pointer is unique.
+	//
+	// 通过手动复制父 session 字段，为子 lane 创建新 session。
+	// 这很关键，可确保创建新的 mutex，并且 LaneEvents 指针唯一。
 	childSession := &runSession{
-		Events:    parentRunCtx.Session.Events, // Share the committed history
-		Values:    parentRunCtx.Session.Values, // Share the values map
+		Events: parentRunCtx.Session.Events, // Share the committed history
+		// 共享已提交的历史
+		Values: parentRunCtx.Session.Values, // Share the values map
+		// 共享 values map
 		valuesMtx: parentRunCtx.Session.valuesMtx,
 	}
 
 	// Fork the lane events within the new session struct.
+	// 在新的 session 结构中 fork lane events。
 	childSession.LaneEvents = &laneEvents{
 		Parent: parentRunCtx.Session.LaneEvents,
 		Events: make([]*agentEventWrapper, 0),
 	}
 
 	// Create a new runContext for the child lane, pointing to the new session.
+	// 为子 lane 创建新的 runContext，指向新的 session。
 	childRunCtx := &runContext{
 		RootInput: parentRunCtx.RootInput,
 		RunPath:   make([]RunStep, len(parentRunCtx.RunPath)),
@@ -510,10 +567,15 @@ func forkRunCtx(ctx context.Context) context.Context {
 // updateRunPathOnly creates a new context with an updated RunPath, but does NOT modify the Address.
 // This is used by sequential workflows to accumulate execution history for LLM context,
 // without incorrectly chaining the static addresses of peer agents.
+//
+// updateRunPathOnly 创建一个更新了 RunPath 的新 context，但不会修改 Address。
+// 顺序工作流使用它为 LLM context 累积执行历史，
+// 避免错误地串联同级智能体的静态地址。
 func updateRunPathOnly(ctx context.Context, agentNames ...string) context.Context {
 	runCtx := getRunCtx(ctx)
 	if runCtx == nil {
 		// This should not happen in a sequential workflow context, but handle defensively.
+		// 这在顺序工作流 context 中不应发生，但仍做防御性处理。
 		runCtx = &runContext{Session: newRunSession()}
 	} else {
 		runCtx = runCtx.deepCopy()
@@ -530,6 +592,11 @@ func updateRunPathOnly(ctx context.Context, agentNames ...string) context.Contex
 // when a customized agent with a multi-agents inside it is set as a subagent of another
 // multi-agents. In such cases, it's not expected to pass the outside run context to the
 // inside multi-agents, so this function helps isolate the contexts properly.
+//
+// ClearRunCtx 清除 multi-agents 的运行 context。
+// 当包含 multi-agents 的自定义智能体被设置为另一个 multi-agents 的子智能体时，这尤其有用。
+// 在这种情况下，不期望把外部运行 context 传给内部 multi-agents，
+// 因此此函数有助于正确隔离 context。
 func ClearRunCtx(ctx context.Context) context.Context {
 	return context.WithValue(ctx, runCtxKey{}, nil)
 }

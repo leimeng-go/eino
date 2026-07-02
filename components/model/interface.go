@@ -24,6 +24,9 @@ import (
 
 // messageType is the sealed type constraint for message types used in BaseModel.
 // Only *schema.Message and *schema.AgenticMessage satisfy this constraint.
+//
+// messageType 是 BaseModel 中消息类型使用的密封类型约束。
+// 只有 *schema.Message 和 *schema.AgenticMessage 满足此约束。
 type messageType interface {
 	*schema.Message | *schema.AgenticMessage
 }
@@ -33,6 +36,11 @@ type messageType interface {
 //   - [BaseModel.Generate]: blocks until the model returns a complete response.
 //   - [BaseModel.Stream]: returns a [schema.StreamReader] that yields message
 //     chunks incrementally as the model generates them.
+//
+// BaseModel 是按消息类型 M 参数化的泛型基础模型接口。
+// 它提供两种交互模式：
+// - [BaseModel.Generate]：阻塞直到模型返回完整响应。
+// - [BaseModel.Stream]：返回 [schema.StreamReader]，在模型生成过程中增量产出消息片段。
 type BaseModel[M messageType] interface {
 	Generate(ctx context.Context, input []M, opts ...Option) (M, error)
 	Stream(ctx context.Context, input []M, opts ...Option) (*schema.StreamReader[M], error)
@@ -77,12 +85,20 @@ type BaseChatModel = BaseModel[*schema.Message]
 // the same instance is used concurrently: one goroutine's tool list can
 // overwrite another's. Prefer [ToolCallingChatModel.WithTools], which returns
 // a new immutable instance and is safe for concurrent use.
+//
+// Deprecated: 请改用 [ToolCallingChatModel]。
+// ChatModel 通过 [ChatModel.BindTools] 扩展 [BaseChatModel] 以支持工具绑定。
+// BindTools 会原地修改实例，当同一实例被并发使用时会导致竞态：一个 goroutine 的工具列表可能覆盖另一个的。建议使用 [ToolCallingChatModel.WithTools]，它返回新的不可变实例，并且可安全并发使用。
 type ChatModel interface {
 	BaseChatModel
 
 	// BindTools bind tools to the model.
 	// BindTools before requesting ChatModel generally.
 	// notice the non-atomic problem of BindTools and Generate.
+	//
+	// BindTools 将工具绑定到模型。
+	// 通常在请求 ChatModel 之前调用 BindTools。
+	// 注意 BindTools 和 Generate 之间的非原子问题。
 	BindTools(tools []*schema.ToolInfo) error
 }
 
@@ -96,6 +112,12 @@ type ChatModel interface {
 //	base, _ := openai.NewChatModel(ctx, cfg)           // shared, no tools
 //	withSearch, _ := base.WithTools([]*schema.ToolInfo{searchTool})
 //	withCalc, _  := base.WithTools([]*schema.ToolInfo{calcTool})
+//
+// ToolCallingChatModel 扩展 [BaseChatModel]，提供安全的工具绑定。
+// 与已弃用的 [ChatModel.BindTools] 不同，[ToolCallingChatModel.WithTools] 不会修改接收者——它会返回一个绑定了给定工具的新实例。这样即可安全地在多个 goroutine 间共享基础模型实例，并派生出不同工具集的按请求变体：
+// base, _ := openai.NewChatModel(ctx, cfg)           // shared, no tools
+// withSearch, _ := base.WithTools([]*schema.ToolInfo{searchTool})
+// withCalc, _  := base.WithTools([]*schema.ToolInfo{calcTool})
 type ToolCallingChatModel interface {
 	BaseChatModel
 
@@ -106,4 +128,6 @@ type ToolCallingChatModel interface {
 // *schema.AgenticMessage. Unlike ToolCallingChatModel, agentic models do NOT
 // expose a WithTools method; tools are passed at request time via the
 // model.WithTools option, consistent with how ChatModelAgent binds tools.
+//
+// AgenticModel 是专用于 *schema.AgenticMessage 的 BaseModel 类型别名。不同于 ToolCallingChatModel，agentic models 不暴露 WithTools 方法；工具会通过 model.WithTools 选项在请求时传入，这与 ChatModelAgent 绑定工具的方式一致。
 type AgenticModel = BaseModel[*schema.AgenticMessage]

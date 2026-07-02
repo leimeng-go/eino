@@ -27,11 +27,13 @@ import (
 )
 
 // mockRunnerAgent is a simple implementation of the Agent interface for testing Runner
+// mockRunnerAgent 是用于测试 Runner 的 Agent 接口简单实现。
 type mockRunnerAgent struct {
 	name        string
 	description string
 	responses   []*AgentEvent
 	// Track calls to verify correct parameters were passed
+	// 跟踪调用以验证传入的参数是否正确。
 	callCount       int
 	lastInput       *AgentInput
 	enableStreaming bool
@@ -47,6 +49,7 @@ func (a *mockRunnerAgent) Description(_ context.Context) string {
 
 func (a *mockRunnerAgent) Run(_ context.Context, input *AgentInput, _ ...AgentRunOption) *AsyncIterator[*AgentEvent] {
 	// Record the call details for verification
+	// 记录调用详情以便验证。
 	a.callCount++
 	a.lastInput = input
 	a.enableStreaming = input.EnableStreaming
@@ -60,6 +63,7 @@ func (a *mockRunnerAgent) Run(_ context.Context, input *AgentInput, _ ...AgentRu
 			generator.Send(event)
 
 			// If the event has an Exit action, stop sending events
+			// 如果事件包含 Exit action，则停止发送事件。
 			if event.Action != nil && event.Action.Exit {
 				break
 			}
@@ -84,6 +88,7 @@ func TestNewRunner(t *testing.T) {
 	runner := NewRunner(ctx, config)
 
 	// Verify that a non-nil runner is returned
+	// 验证返回的 runner 非 nil。
 	assert.NotNil(t, runner)
 }
 
@@ -91,6 +96,7 @@ func TestRunner_Run(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a mock agent with predefined responses
+	// 创建一个带预定义响应的 mock agent。
 	mockAgent_ := newMockRunnerAgent("TestAgent", "Test agent for Runner", []*AgentEvent{
 		{
 			AgentName: "TestAgent",
@@ -104,22 +110,27 @@ func TestRunner_Run(t *testing.T) {
 	})
 
 	// Create a runner
+	// 创建 runner
 	runner := NewRunner(ctx, RunnerConfig{Agent: mockAgent_})
 
 	// Create test messages
+	// 创建测试消息
 	msgs := []Message{
 		schema.UserMessage("Hello, agent!"),
 	}
 
 	// Test Run method without streaming
+	// 测试不使用流式的 Run 方法
 	iterator := runner.Run(ctx, msgs)
 
 	// Verify that the agent's Run method was called with the correct parameters
+	// 验证智能体的 Run 方法使用了正确参数调用
 	assert.Equal(t, 1, mockAgent_.callCount)
 	assert.Equal(t, msgs, mockAgent_.lastInput.Messages)
 	assert.False(t, mockAgent_.enableStreaming)
 
 	// Verify that we can get the expected response from the iterator
+	// 验证可以从迭代器获取预期响应
 	event, ok := iterator.Next()
 	assert.True(t, ok)
 	assert.Equal(t, "TestAgent", event.AgentName)
@@ -129,6 +140,7 @@ func TestRunner_Run(t *testing.T) {
 	assert.Equal(t, "Response from test agent", event.Output.MessageOutput.Message.Content)
 
 	// Verify that the iterator is now closed
+	// 验证迭代器现在已关闭
 	_, ok = iterator.Next()
 	assert.False(t, ok)
 }
@@ -137,6 +149,7 @@ func TestRunner_Run_WithStreaming(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a mock agent with predefined responses
+	// 创建带有预定义响应的 mock 智能体
 	mockAgent_ := newMockRunnerAgent("TestAgent", "Test agent for Runner", []*AgentEvent{
 		{
 			AgentName: "TestAgent",
@@ -151,22 +164,27 @@ func TestRunner_Run_WithStreaming(t *testing.T) {
 	})
 
 	// Create a runner
+	// 创建 runner
 	runner := NewRunner(ctx, RunnerConfig{EnableStreaming: true, Agent: mockAgent_})
 
 	// Create test messages
+	// 创建测试消息
 	msgs := []Message{
 		schema.UserMessage("Hello, agent!"),
 	}
 
 	// Test Run method with streaming enabled
+	// 测试启用流式的 Run 方法
 	iterator := runner.Run(ctx, msgs)
 
 	// Verify that the agent's Run method was called with the correct parameters
+	// 验证智能体的 Run 方法使用了正确参数调用
 	assert.Equal(t, 1, mockAgent_.callCount)
 	assert.Equal(t, msgs, mockAgent_.lastInput.Messages)
 	assert.True(t, mockAgent_.enableStreaming)
 
 	// Verify that we can get the expected response from the iterator
+	// 验证可以从迭代器获取预期响应
 	event, ok := iterator.Next()
 	assert.True(t, ok)
 	assert.Equal(t, "TestAgent", event.AgentName)
@@ -175,6 +193,7 @@ func TestRunner_Run_WithStreaming(t *testing.T) {
 	assert.True(t, event.Output.MessageOutput.IsStreaming)
 
 	// Verify that the iterator is now closed
+	// 验证迭代器现在已关闭
 	_, ok = iterator.Next()
 	assert.False(t, ok)
 }
@@ -183,6 +202,7 @@ func TestRunner_Query(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a mock agent with predefined responses
+	// 创建带有预定义响应的 mock 智能体
 	mockAgent_ := newMockRunnerAgent("TestAgent", "Test agent for Runner", []*AgentEvent{
 		{
 			AgentName: "TestAgent",
@@ -196,18 +216,22 @@ func TestRunner_Query(t *testing.T) {
 	})
 
 	// Create a runner
+	// 创建 runner
 	runner := NewRunner(ctx, RunnerConfig{Agent: mockAgent_})
 
 	// Test Query method
+	// 测试 Query 方法
 	iterator := runner.Query(ctx, "Test query")
 
 	// Verify that the agent's Run method was called with the correct parameters
+	// 验证智能体的 Run 方法使用了正确参数调用
 	assert.Equal(t, 1, mockAgent_.callCount)
 	assert.Equal(t, 1, len(mockAgent_.lastInput.Messages))
 	assert.Equal(t, "Test query", mockAgent_.lastInput.Messages[0].Content)
 	assert.False(t, mockAgent_.enableStreaming)
 
 	// Verify that we can get the expected response from the iterator
+	// 验证可以从迭代器获取预期响应
 	event, ok := iterator.Next()
 	assert.True(t, ok)
 	assert.Equal(t, "TestAgent", event.AgentName)
@@ -217,6 +241,7 @@ func TestRunner_Query(t *testing.T) {
 	assert.Equal(t, "Response to query", event.Output.MessageOutput.Message.Content)
 
 	// Verify that the iterator is now closed
+	// 验证迭代器现在已关闭
 	_, ok = iterator.Next()
 	assert.False(t, ok)
 }
@@ -225,6 +250,7 @@ func TestRunner_Query_WithStreaming(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a mock agent with predefined responses
+	// 创建带有预定义响应的 mock 智能体
 	mockAgent_ := newMockRunnerAgent("TestAgent", "Test agent for Runner", []*AgentEvent{
 		{
 			AgentName: "TestAgent",
@@ -239,18 +265,22 @@ func TestRunner_Query_WithStreaming(t *testing.T) {
 	})
 
 	// Create a runner
+	// 创建 runner
 	runner := NewRunner(ctx, RunnerConfig{EnableStreaming: true, Agent: mockAgent_})
 
 	// Test Query method with streaming enabled
+	// 测试启用流式时的 Query 方法
 	iterator := runner.Query(ctx, "Test query")
 
 	// Verify that the agent's Run method was called with the correct parameters
+	// 验证 agent 的 Run 方法使用了正确参数调用
 	assert.Equal(t, 1, mockAgent_.callCount)
 	assert.Equal(t, 1, len(mockAgent_.lastInput.Messages))
 	assert.Equal(t, "Test query", mockAgent_.lastInput.Messages[0].Content)
 	assert.True(t, mockAgent_.enableStreaming)
 
 	// Verify that we can get the expected response from the iterator
+	// 验证可以从迭代器获取预期响应
 	event, ok := iterator.Next()
 	assert.True(t, ok)
 	assert.Equal(t, "TestAgent", event.AgentName)
@@ -259,6 +289,7 @@ func TestRunner_Query_WithStreaming(t *testing.T) {
 	assert.True(t, event.Output.MessageOutput.IsStreaming)
 
 	// Verify that the iterator is now closed
+	// 验证迭代器现在已关闭
 	_, ok = iterator.Next()
 	assert.False(t, ok)
 }

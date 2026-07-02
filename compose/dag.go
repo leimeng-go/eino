@@ -54,7 +54,8 @@ type dagChannel struct {
 	ControlPredecessors map[string]dependencyState
 	Values              map[string]any
 	DataPredecessors    map[string]bool // if all dependencies have been skipped, indirect dependencies won't effect.
-	Skipped             bool
+	// 如果所有依赖都已跳过，间接依赖不会生效。
+	Skipped bool
 
 	mergeConfig FanInMergeConfig
 }

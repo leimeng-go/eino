@@ -16,6 +16,8 @@
 
 // Package summarization provides a middleware that automatically summarizes
 // conversation history when token count exceeds the configured threshold.
+//
+// Package summarization 提供一个 middleware，当 token 数超过配置阈值时自动总结对话历史。
 package summarization
 
 import (
@@ -53,12 +55,18 @@ type CallbackFunc = TypedCallbackFunc[*schema.Message]
 
 // TypedConfig defines the configuration for the summarization middleware,
 // generic over message type M.
+//
+// TypedConfig 定义 summarization middleware 的配置，对消息类型 M 泛型化。
 type TypedConfig[M adk.MessageType] struct {
 	// Model is the chat model used to generate summaries.
+	// Model 是用于生成摘要的聊天模型。
 	Model model.BaseModel[M]
 
 	// ModelOptions specifies options passed to the model when generating summaries.
 	// Optional.
+	//
+	// ModelOptions 指定生成摘要时传给模型的选项。
+	// 可选。
 	ModelOptions []model.Option
 
 	// TokenCounter calculates the token count for given messages and tools.
@@ -71,10 +79,20 @@ type TypedConfig[M adk.MessageType] struct {
 	//
 	// Optional. Defaults to using the total tokens reported in the last assistant
 	// message as baseline, with incremental messages estimated at ~4 chars/token.
+	//
+	// TokenCounter 计算给定消息和工具的 token 数。
+	// 参数：
+	// - input：包含要统计 token 的消息和工具。
+	// 返回：
+	// - int：token 总数。
+	// 可选。默认使用最后一条 assistant 消息报告的总 token 数作为基线，并按约 4 字符/token 估算增量消息。
 	TokenCounter TypedTokenCounterFunc[M]
 
 	// Trigger specifies the conditions that activate summarization.
 	// Optional. Defaults to triggering when total tokens exceed 160k.
+	//
+	// Trigger 指定触发总结的条件。
+	// 可选。默认在总 token 数超过 160k 时触发。
 	Trigger *TriggerCondition
 
 	// EmitInternalEvents indicates whether internal events should be emitted during summarization,
@@ -86,18 +104,35 @@ type TypedConfig[M adk.MessageType] struct {
 	//   - ActionTypeAfterSummarize: emitted after summary generation completes
 	//
 	// Optional. Defaults to false.
+	//
+	// EmitInternalEvents 表示总结期间是否发出内部事件，允许外部观察者跟踪总结过程。
+	// 事件范围：
+	// - ActionTypeBeforeSummarize：调用模型生成摘要前发出
+	// - ActionTypeGenerateSummary：每次模型 generate 尝试后发出
+	// - ActionTypeAfterSummarize：摘要生成完成后发出
+	// 可选。默认为 false。
 	EmitInternalEvents bool
 
 	// UserInstruction serves as the user-level instruction to guide the model on how to summarize the context.
 	// It is appended to the message history as a User message.
 	// If provided, it overrides the default user summarization instruction.
 	// Optional.
+	//
+	// UserInstruction 作为用户级指令，用于指导模型如何总结上下文。
+	// 它会作为 User 消息追加到消息历史中。
+	// 如果提供，将覆盖默认的用户总结指令。
+	// 可选。
 	UserInstruction string
 
 	// TranscriptFilePath is the path to the file containing the full conversation history.
 	// It is appended to the summary to remind the model where to read the original context.
 	// This field takes effect only when Finalize is not set.
 	// Optional but strongly recommended.
+	//
+	// TranscriptFilePath 是包含完整对话历史的文件路径。
+	// 它会追加到摘要中，以提醒模型从哪里读取原始上下文。
+	// 仅当未设置 Finalize 时此字段生效。
+	// 可选，但强烈推荐。
 	TranscriptFilePath string
 
 	// GenModelInput allows full control over the summarization model input construction.
@@ -114,6 +149,16 @@ type TypedConfig[M adk.MessageType] struct {
 	// Typical model input order: systemInstruction -> contextMessages -> userInstruction.
 	//
 	// Optional.
+	//
+	// GenModelInput 允许完全控制总结模型输入的构造。
+	// 参数：
+	// - sysInstruction：定义模型角色的 System 消息。由 middleware 内部设置，不可配置。
+	// - userInstruction：包含任务指令的 User 消息。
+	// - originalMsgs：原始完整消息列表。
+	// 返回：
+	// - []M：构造出的模型输入消息。
+	// 典型模型输入顺序：systemInstruction -> contextMessages -> userInstruction。
+	// 可选。
 	GenModelInput TypedGenModelInputFunc[M]
 
 	// Finalize is called after summary generation.
@@ -129,6 +174,17 @@ type TypedConfig[M adk.MessageType] struct {
 	//   - []M: the new conversation history to replace the original messages.
 	//
 	// Optional.
+	//
+	// Finalize 在摘要生成后调用。
+	// 返回的消息会作为最终对话历史。
+	// 设置后，middleware 不会对摘要执行任何后处理。
+	// 使用 DefaultFinalize 可应用与默认路径相同的后处理。
+	// 参数：
+	// - originalMessages：总结前的原始对话消息。
+	// - summary：模型生成的摘要消息。
+	// 返回：
+	// - []M：用于替换原始消息的新对话历史。
+	// 可选。
 	Finalize TypedFinalizeFunc[M]
 
 	// Callback is called after Finalize, before exiting the middleware.
@@ -139,72 +195,118 @@ type TypedConfig[M adk.MessageType] struct {
 	//   - after: the agent state after summarization.
 	//
 	// Optional.
+	//
+	// Callback 在 Finalize 之后、退出 middleware 之前调用。
+	// 只读，请勿修改状态。
+	// 参数：
+	// - before：总结前的 agent state。
+	// - after：总结后的 agent state。
+	// 可选。
 	Callback TypedCallbackFunc[M]
 
 	// Retry configures retry behavior for summary generation on the primary model.
 	// Optional. Defaults to no retries.
+	//
+	// Retry 配置主模型生成摘要失败时的重试行为。
+	// 可选。默认不重试。
 	Retry *TypedRetryConfig[M]
 
 	// Failover configures fallback behavior when summary generation on the primary model fails.
 	// Optional.
+	//
+	// Failover 配置主模型生成摘要失败时的 fallback 行为。
+	// 可选。
 	Failover *TypedFailoverConfig[M]
 }
 
 // Config is a backward-compatible alias for TypedConfig specialized with *schema.Message.
+// Config 是专用于 *schema.Message 的 TypedConfig 的向后兼容别名。
 type Config = TypedConfig[*schema.Message]
 
 // TypedTokenCounterInput is the input for TypedTokenCounterFunc.
+// TypedTokenCounterInput 是 TypedTokenCounterFunc 的输入。
 type TypedTokenCounterInput[M adk.MessageType] struct {
 	// Messages is the list of messages to count tokens for.
+	// Messages 是要统计 token 的消息列表。
 	Messages []M
 	// Tools is the list of tools to count tokens for.
+	// Tools 是要统计 token 的工具列表。
 	Tools []*schema.ToolInfo
 }
 
 // TokenCounterInput is a backward-compatible alias for TypedTokenCounterInput specialized with *schema.Message.
+// TokenCounterInput 是专用于 *schema.Message 的 TypedTokenCounterInput 的向后兼容别名。
 type TokenCounterInput = TypedTokenCounterInput[*schema.Message]
 
 // TriggerCondition specifies when summarization should be activated.
 // Summarization triggers if ANY of the set conditions is met.
+//
+// TriggerCondition 指定何时触发摘要。
+// 只要满足任一已设置条件，就会触发摘要。
 type TriggerCondition struct {
 	// ContextTokens triggers summarization when total token count exceeds this threshold.
+	// ContextTokens 在总 token 数超过此阈值时触发摘要。
 	ContextTokens int
 	// ContextMessages triggers summarization when total messages count exceeds this threshold.
+	// ContextMessages 在消息总数超过此阈值时触发摘要。
 	ContextMessages int
 }
 
 type TypedRetryConfig[M adk.MessageType] struct {
 	// MaxRetries specifies the maximum number of retry attempts.
 	// Optional. Defaults to 3.
+	//
+	// MaxRetries 指定最大重试次数。
+	// 可选。默认值为 3。
 	MaxRetries *int
 
 	// ShouldRetry determines whether a failed summary generation attempt should be retried.
 	// It is called after each failed attempt with the model response and error.
 	// Optional. Defaults to retrying when err is non-nil.
+	//
+	// ShouldRetry 判断失败的摘要生成尝试是否应重试。
+	// 每次尝试失败后，会使用模型响应和错误调用它。
+	// 可选。默认在 err 非 nil 时重试。
 	ShouldRetry func(ctx context.Context, resp M, err error) bool
 
 	// BackoffFunc calculates the delay before the next retry attempt.
 	// The attempt parameter starts at 1 for the first retry.
 	// Optional. Defaults to a default exponential backoff with jitter.
+	//
+	// BackoffFunc 计算下一次重试前的延迟。
+	// attempt 参数从 1 开始，表示第一次重试。
+	// 可选。默认使用带 jitter 的指数退避。
 	BackoffFunc func(ctx context.Context, attempt int, resp M, err error) time.Duration
 }
 
 // RetryConfig is a backward-compatible alias for TypedRetryConfig specialized with *schema.Message.
+// RetryConfig 是专用于 *schema.Message 的 TypedRetryConfig 的向后兼容别名。
 type RetryConfig = TypedRetryConfig[*schema.Message]
 
 type TypedFailoverConfig[M adk.MessageType] struct {
 	// MaxRetries specifies the maximum number of failover attempts.
 	// Optional. Defaults to 3.
+	//
+	// MaxRetries 指定最大 failover 尝试次数。
+	// 可选。默认值为 3。
 	MaxRetries *int
 
 	// ShouldFailover determines whether another failover attempt should be made.
 	// It is called after each failover attempt with the model response and error.
 	// Optional. Defaults to failing over when err is non-nil.
+	//
+	// ShouldFailover 判断是否应进行另一次 failover 尝试。
+	// 每次 failover 尝试后，会使用模型响应和错误调用它。
+	// 可选。默认在 err 非 nil 时执行 failover。
 	ShouldFailover func(ctx context.Context, resp M, err error) bool
 
 	// BackoffFunc calculates the delay before the next failover attempt.
 	// The attempt parameter starts at 1 for the first failover attempt.
 	// Optional. Defaults to a default exponential backoff with jitter.
+	//
+	// BackoffFunc 计算下一次 failover 尝试前的延迟。
+	// attempt 参数从 1 开始，表示第一次 failover 尝试。
+	// 可选。默认使用带 jitter 的指数退避。
 	BackoffFunc func(ctx context.Context, attempt int, resp M, err error) time.Duration
 
 	// GetFailoverModel selects the model and input messages for the current failover attempt.
@@ -221,41 +323,66 @@ type TypedFailoverConfig[M adk.MessageType] struct {
 	//   - When provided, it must return a non-nil model and a non-empty input message list.
 	//
 	// Optional. Defaults to reusing the primary model with the default input messages.
+	//
+	// GetFailoverModel 为当前 failover 尝试选择模型和输入消息。
+	// 参数：
+	// - failoverCtx: 包含当前 failover 尝试的 context。
+	// 返回：
+	// - failoverModel: 本次 failover 尝试使用的模型。
+	// - failoverModelInputMsgs: 发送给 failoverModel 的输入消息。
+	// - failoverErr: 准备 failover 模型或输入时遇到的错误。
+	// 约束：
+	// - 如果提供，必须返回非 nil 模型和非空输入消息列表。
+	// 可选。默认复用主模型和默认输入消息。
 	GetFailoverModel TypedGetFailoverModelFunc[M]
 }
 
 // FailoverConfig is a backward-compatible alias for TypedFailoverConfig specialized with *schema.Message.
+// FailoverConfig 是专用于 *schema.Message 的 TypedFailoverConfig 的向后兼容别名。
 type FailoverConfig = TypedFailoverConfig[*schema.Message]
 
 // TypedFailoverContext contains the state for a failover attempt.
+// TypedFailoverContext 包含一次 failover 尝试的状态。
 type TypedFailoverContext[M adk.MessageType] struct {
 	// Attempt is the current failover attempt number, starting at 1.
+	// Attempt 是当前 failover 尝试编号，从 1 开始。
 	Attempt int
 
 	// SystemInstruction is the system instruction used for summary generation.
 	// It is set internally by the middleware and is not configurable.
+	//
+	// SystemInstruction 是用于生成摘要的系统指令。
+	// 它由 middleware 内部设置，不可配置。
 	SystemInstruction M
 
 	// UserInstruction is the user instruction used for summary generation.
+	// UserInstruction 是用于生成摘要的用户指令。
 	UserInstruction M
 
 	// OriginalMessages is the full original conversation before summarization.
+	// OriginalMessages 是摘要前的完整原始对话。
 	OriginalMessages []M
 
 	// LastModelResponse is the response returned by the previous attempt, if any.
+	// LastModelResponse 是上一次尝试返回的响应（如果有）。
 	LastModelResponse M
 
 	// LastErr is the error returned by the previous attempt, if any.
+	// LastErr 是上一次尝试返回的错误（如果有）。
 	LastErr error
 }
 
 // FailoverContext is a backward-compatible alias for TypedFailoverContext specialized with *schema.Message.
+// FailoverContext 是 TypedFailoverContext 的向后兼容别名，专用于 *schema.Message。
 type FailoverContext = TypedFailoverContext[*schema.Message]
 
 // NewTyped creates a generic summarization middleware that automatically summarizes
 // conversation history when trigger conditions are met.
 //
 // This is the generic constructor that supports both *schema.Message and *schema.AgenticMessage.
+//
+// NewTyped 创建一个泛型摘要 middleware，在满足触发条件时自动总结对话历史。
+// 这是支持 *schema.Message 和 *schema.AgenticMessage 的泛型构造函数。
 func NewTyped[M adk.MessageType](_ context.Context, cfg *TypedConfig[M]) (adk.TypedChatModelAgentMiddleware[M], error) {
 	if err := cfg.check(); err != nil {
 		return nil, err
@@ -269,6 +396,8 @@ func NewTyped[M adk.MessageType](_ context.Context, cfg *TypedConfig[M]) (adk.Ty
 
 // New creates a summarization middleware that automatically summarizes conversation history
 // when trigger conditions are met.
+//
+// New 创建一个摘要 middleware，在满足触发条件时自动总结对话历史。
 func New(ctx context.Context, cfg *Config) (adk.ChatModelAgentMiddleware, error) {
 	return NewTyped(ctx, cfg)
 }
@@ -959,6 +1088,10 @@ func (c *TriggerCondition) check() error {
 
 // ============================================================================
 // Generic helper functions
+// ============================================================================
+//
+// ============================================================================
+// 泛型辅助函数
 // ============================================================================
 
 func isSystemRole[M adk.MessageType](msg M) bool {

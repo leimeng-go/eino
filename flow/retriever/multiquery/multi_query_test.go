@@ -71,6 +71,7 @@ func TestMultiQueryRetriever(t *testing.T) {
 	ctx := context.Background()
 
 	// use default llm
+	// 使用默认 llm
 	mqr, err := NewRetriever(ctx, &Config{
 		RewriteLLM:    &mockModel{},
 		OrigRetriever: &mockRetriever{},
@@ -93,6 +94,7 @@ func TestMultiQueryRetriever(t *testing.T) {
 	}
 
 	// use custom
+	// 使用自定义
 	mqr, err = NewRetriever(ctx, &Config{
 		RewriteHandler: func(ctx context.Context, query string) ([]string, error) {
 			return []string{"1", "3", "5"}, nil

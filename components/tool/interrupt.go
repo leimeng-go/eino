@@ -41,6 +41,19 @@ import (
 //	    }
 //	    return doWork(args), nil
 //	}
+//
+// Interrupt 暂停工具执行，并通知编排层进行 checkpoint。工具之后可以携带可选数据恢复。
+// 参数：
+// - ctx: 传给 InvokableRun/StreamableRun 的 context
+// - info: 面向用户的中断原因信息（例如 "needs user confirmation"）
+// 返回一个应从 InvokableRun/StreamableRun 返回的 error。
+// 示例：
+// func (t *MyTool) InvokableRun(ctx context.Context, args string, opts ...Option) (string, error) {
+// if needsConfirmation(args) {
+// return "", tool.Interrupt(ctx, "Please confirm this action")
+// }
+// return doWork(args), nil
+// }
 func Interrupt(ctx context.Context, info any) error {
 	is, err := core.Interrupt(ctx, info, nil, nil)
 	if err != nil {
@@ -68,6 +81,22 @@ func Interrupt(ctx context.Context, info any) error {
 //	    // Resumed - continue from saved state
 //	    return continueFrom(state), nil
 //	}
+//
+// StatefulInterrupt 在保留状态的情况下暂停工具执行。当工具有必须在 resume 时恢复的内部状态时使用。
+// 参数：
+// - ctx: 传给 InvokableRun/StreamableRun 的 context
+// - info: 面向用户的中断信息
+// - state: 要持久化的内部状态（必须可被 gob 序列化）
+// 示例：
+// func (t *MyTool) InvokableRun(ctx context.Context, args string, opts ...Option) (string, error) {
+// wasInterrupted, hasState, state := tool.GetInterruptState[MyState](ctx)
+// if !wasInterrupted {
+// 首次运行 - 带状态中断
+// return "", tool.StatefulInterrupt(ctx, "processing", MyState{Step: 1})
+// }
+// 已恢复 - 从保存的状态继续
+// return continueFrom(state), nil
+// }
 func StatefulInterrupt(ctx context.Context, info any, state any) error {
 	is, err := core.Interrupt(ctx, info, state, nil)
 	if err != nil {
@@ -97,6 +126,24 @@ func StatefulInterrupt(ctx context.Context, info any, state any) error {
 //	    }
 //	    return result, nil
 //	}
+//
+// CompositeInterrupt 创建聚合多个子中断的 interrupt。当工具内部执行 graph 或其他可中断组件时使用。
+// 参数：
+// - ctx: 传给 InvokableRun/StreamableRun 的 context
+// - info: 此工具 interrupt 的面向用户信息
+// - state: 要为此工具持久化的内部状态
+// - errs: 来自子组件（graphs、其他工具等）的 interrupt errors
+// 示例：
+// func (t *MyTool) InvokableRun(ctx context.Context, args string, opts ...Option) (string, error) {
+// result, err := t.internalGraph.Invoke(ctx, input)
+// if err != nil {
+// if _, ok := tool.IsInterruptError(err); ok {
+// return "", tool.CompositeInterrupt(ctx, "graph interrupted", myState, err)
+// }
+// return "", err
+// }
+// return result, nil
+// }
 func CompositeInterrupt(ctx context.Context, info any, state any, errs ...error) error {
 	if len(errs) == 0 {
 		return StatefulInterrupt(ctx, info, state)
@@ -147,6 +194,22 @@ func CompositeInterrupt(ctx context.Context, info any, state any, errs ...error)
 //	    // First run
 //	    return "", tool.StatefulInterrupt(ctx, "need input", MyState{Step: 1})
 //	}
+//
+// GetInterruptState 检查工具之前是否被中断，并取回保存的状态。
+// 返回：
+// - wasInterrupted: 如果此工具属于上一次中断的一部分，则为 true
+// - hasState: 如果已保存状态且成功转换为类型 T，则为 true
+// - state: 保存的状态（hasState 为 false 时为零值）
+// 示例：
+// func (t *MyTool) InvokableRun(ctx context.Context, args string, opts ...Option) (string, error) {
+// wasInterrupted, hasState, state := tool.GetInterruptState[MyState](ctx)
+// if wasInterrupted && hasState {
+// 从保存的状态继续
+// return continueFrom(state), nil
+// }
+// 首次运行
+// return "", tool.StatefulInterrupt(ctx, "need input", MyState{Step: 1})
+// }
 func GetInterruptState[T any](ctx context.Context) (wasInterrupted bool, hasState bool, state T) {
 	return core.GetInterruptState[T](ctx)
 }
@@ -180,6 +243,31 @@ func GetInterruptState[T any](ctx context.Context) (wasInterrupted bool, hasStat
 //	    }
 //	    return "default result", nil
 //	}
+//
+// GetResumeContext 检查此工具是否为 resume 操作的明确目标。
+// 返回：
+// - isResumeTarget: 如果此工具被明确指定为 resume 目标，则为 true
+// - hasData: 如果提供了 resume 数据，则为 true
+// - data: resume 数据（hasData 为 false 时为零值）
+// 用于区分：
+// - 作为目标被恢复（应继续工作）
+// - 因兄弟节点被恢复而重新执行（应再次 interrupt）
+// 示例：
+// func (t *MyTool) InvokableRun(ctx context.Context, args string, opts ...Option) (string, error) {
+// wasInterrupted, _, _ := tool.GetInterruptState[any](ctx)
+// if !wasInterrupted {
+// return "", tool.Interrupt(ctx, "need confirmation")
+// }
+// isTarget, hasData, data := tool.GetResumeContext[string](ctx)
+// if !isTarget {
+// 还没轮到我们 - 再次 interrupt
+// return "", tool.Interrupt(ctx, nil)
+// }
+// if hasData {
+// return data, nil
+// }
+// return "default result", nil
+// }
 func GetResumeContext[T any](ctx context.Context) (isResumeTarget bool, hasData bool, data T) {
 	return core.GetResumeContext[T](ctx)
 }

@@ -15,6 +15,7 @@
  */
 
 // Package internal provides adk internal utils.
+// Package internal 提供 adk 内部工具。
 package internal
 
 import (
@@ -23,12 +24,15 @@ import (
 )
 
 // Language represents the language setting for the ADK built-in prompts.
+// Language 表示 ADK 内置提示的语言设置。
 type Language uint8
 
 const (
 	// LanguageEnglish represents English language.
+	// LanguageEnglish 表示英语。
 	LanguageEnglish Language = iota
 	// LanguageChinese represents Chinese language.
+	// LanguageChinese 表示中文。
 	LanguageChinese
 )
 
@@ -36,6 +40,9 @@ var language atomic.Value
 
 // SetLanguage sets the language for the ADK built-in prompts.
 // The default language is English if not explicitly set.
+//
+// SetLanguage 设置 ADK 内置提示的语言。
+// 如果未显式设置，默认语言为英语。
 func SetLanguage(lang Language) error {
 	if lang != LanguageEnglish &&
 		lang != LanguageChinese {
@@ -47,6 +54,9 @@ func SetLanguage(lang Language) error {
 
 // GetLanguage returns the current language setting for the ADK built-in prompts.
 // Returns LanguageEnglish if no language has been set.
+//
+// getLanguage 返回 ADK 内置提示的当前语言设置。
+// 如果未设置语言，则返回 LanguageEnglish。
 func getLanguage() Language {
 	if l, ok := language.Load().(Language); ok {
 		return l
@@ -55,6 +65,7 @@ func getLanguage() Language {
 }
 
 // I18nPrompts holds prompt strings for different languages.
+// I18nPrompts 保存不同语言的提示字符串。
 type I18nPrompts struct {
 	English string
 	Chinese string
@@ -62,6 +73,9 @@ type I18nPrompts struct {
 
 // SelectPrompt returns the appropriate prompt string based on the current language setting.
 // Returns an error if the current language is not supported.
+//
+// SelectPrompt 根据当前语言设置返回相应的提示字符串。
+// 如果当前语言不受支持，则返回错误。
 func SelectPrompt(prompts I18nPrompts) string {
 	lang := getLanguage()
 	switch lang {

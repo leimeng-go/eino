@@ -35,12 +35,16 @@ type fileEntry struct {
 
 // InMemoryBackend is an in-memory implementation of the Backend interface.
 // It stores files in a map and is safe for concurrent use.
+//
+// InMemoryBackend 是 Backend 接口的内存实现。
+// 它将文件存储在 map 中，并且可安全并发使用。
 type InMemoryBackend struct {
 	mu    sync.RWMutex
 	files map[string]*fileEntry
 }
 
 // NewInMemoryBackend creates a new in-memory backend.
+// NewInMemoryBackend 创建新的内存后端。
 func NewInMemoryBackend() *InMemoryBackend {
 	return &InMemoryBackend{
 		files: make(map[string]*fileEntry),
@@ -48,11 +52,13 @@ func NewInMemoryBackend() *InMemoryBackend {
 }
 
 // LsInfo lists file information under the given path.
+// LsInfo 列出给定路径下的文件信息。
 func (b *InMemoryBackend) LsInfo(ctx context.Context, req *LsInfoRequest) ([]FileInfo, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
 	// Normalize path
+	// 规范化路径
 	path := normalizePath(req.Path)
 
 	var result []FileInfo
@@ -63,13 +69,16 @@ func (b *InMemoryBackend) LsInfo(ctx context.Context, req *LsInfoRequest) ([]Fil
 		normalizedFilePath := normalizePath(filePath)
 
 		// Check if file is under the given path
+		// 检查文件是否位于给定路径下
 		if path == "/" || strings.HasPrefix(normalizedFilePath, path+"/") || normalizedFilePath == path {
 			// For directory listing, we want to show immediate children
+			// 对于目录列表，我们希望显示直接子项
 			relativePath := strings.TrimPrefix(normalizedFilePath, path)
 			relativePath = strings.TrimPrefix(relativePath, "/")
 
 			if relativePath == "" {
 				// The path itself is a file
+				// 路径本身是一个文件
 				if !seen[normalizedFilePath] {
 					result = append(result, FileInfo{
 						Path:       filepath.Base(normalizedFilePath),
@@ -83,6 +92,7 @@ func (b *InMemoryBackend) LsInfo(ctx context.Context, req *LsInfoRequest) ([]Fil
 			}
 
 			// Get the first segment (immediate child)
+			// 获取第一个片段（直接子项）
 			parts := strings.SplitN(relativePath, "/", 2)
 			if len(parts) > 0 {
 				childPath := path
@@ -133,6 +143,7 @@ func mustParseTime(s string) time.Time {
 }
 
 // Read reads file content with offset and limit.
+// Read 按 offset 和 limit 读取文件内容。
 func (b *InMemoryBackend) Read(ctx context.Context, req *ReadRequest) (*FileContent, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
@@ -145,6 +156,7 @@ func (b *InMemoryBackend) Read(ctx context.Context, req *ReadRequest) (*FileCont
 	}
 
 	// Convert 1-based offset to 0-based index; values < 1 default to line 1
+	// 将从 1 开始的 offset 转为从 0 开始的索引；小于 1 的值默认从第 1 行开始
 	offset := req.Offset - 1
 	if offset < 0 {
 		offset = 0
@@ -154,11 +166,13 @@ func (b *InMemoryBackend) Read(ctx context.Context, req *ReadRequest) (*FileCont
 	content := entry.content
 
 	// Fast path: no offset and no limit — return as-is
+	// 快速路径：无 offset 且无 limit —— 原样返回
 	if offset == 0 && limit <= 0 {
 		return &FileContent{Content: content}, nil
 	}
 
 	// Fast path: no offset, content fits within limit — return as-is
+	// 快速路径：无 offset，内容在 limit 内 —— 原样返回
 	if offset == 0 {
 		lineCount := strings.Count(content, "\n") + 1
 		if lineCount <= limit {
@@ -167,37 +181,44 @@ func (b *InMemoryBackend) Read(ctx context.Context, req *ReadRequest) (*FileCont
 	}
 
 	// Skip `offset` lines by scanning for newlines directly
+	// 通过直接扫描换行符跳过 `offset` 行
 	start := 0
 	for i := 0; i < offset; i++ {
 		idx := strings.IndexByte(content[start:], '\n')
 		if idx == -1 {
 			// offset exceeds total lines
+			// offset 超过总行数
 			return &FileContent{}, nil
 		}
 		start += idx + 1
 	}
 
 	// No limit: return everything from start
+	// 无 limit：返回从起始位置开始的全部内容
 	if limit <= 0 {
 		return &FileContent{Content: content[start:]}, nil
 	}
 
 	// Find the end position after `limit` lines
+	// 查找 `limit` 行后的结束位置
 	end := start
 	for i := 0; i < limit; i++ {
 		idx := strings.IndexByte(content[end:], '\n')
 		if idx == -1 {
 			// Reached the end of content
+			// 已到达内容末尾
 			return &FileContent{Content: content[start:]}, nil
 		}
 		end += idx + 1
 	}
 
 	// Trim the trailing newline from the last included line
+	// 去掉最后一个包含行的尾随换行符
 	return &FileContent{Content: content[start : end-1]}, nil
 }
 
 // GrepRaw returns matches for the given pattern.
+// GrepRaw 返回给定 pattern 的匹配项。
 func (b *InMemoryBackend) GrepRaw(ctx context.Context, req *GrepRequest) ([]GrepMatch, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
@@ -407,6 +428,7 @@ func (b *InMemoryBackend) filterByFileType(files []string, fileType string) []st
 }
 
 // matchFileType checks if the file extension matches the given file type.
+// matchFileType 检查文件扩展名是否匹配给定文件类型。
 func matchFileType(ext, fileType string) bool {
 	typeMap := map[string][]string{
 		"ada":          {"adb", "ads"},
@@ -496,6 +518,7 @@ func matchFileType(ext, fileType string) bool {
 }
 
 // applyContext adds context lines around matches.
+// applyContext 在匹配项周围添加上下文行。
 func (b *InMemoryBackend) applyContext(matches []GrepMatch, req *GrepRequest) []GrepMatch {
 	if len(matches) == 0 {
 		return matches
@@ -516,6 +539,7 @@ func (b *InMemoryBackend) applyContext(matches []GrepMatch, req *GrepRequest) []
 	}
 
 	// Group matches by file path for efficient processing
+	// 按文件路径对匹配项分组以便高效处理
 	matchesByFile := make(map[string][]GrepMatch)
 	fileOrder := make([]string, 0)
 	seenFiles := make(map[string]bool)
@@ -531,16 +555,19 @@ func (b *InMemoryBackend) applyContext(matches []GrepMatch, req *GrepRequest) []
 	var result []GrepMatch
 
 	// Process each file once
+	// 每个文件只处理一次
 	for _, filePath := range fileOrder {
 		fileMatches := matchesByFile[filePath]
 
 		// Get file content once per file
+		// 每个文件只获取一次文件内容
 		b.mu.RLock()
 		entry, exists := b.files[filePath]
 		b.mu.RUnlock()
 
 		if !exists {
 			// If file doesn't exist, keep original matches
+			// 如果文件不存在，保留原始匹配项
 			result = append(result, fileMatches...)
 			continue
 		}
@@ -549,6 +576,7 @@ func (b *InMemoryBackend) applyContext(matches []GrepMatch, req *GrepRequest) []
 		processedLines := make(map[int]bool)
 
 		// Process all matches for this file
+		// 处理此文件的所有匹配项
 		for _, match := range fileMatches {
 			startLine := match.Line - beforeLines
 			if startLine < 1 {
@@ -577,6 +605,7 @@ func (b *InMemoryBackend) applyContext(matches []GrepMatch, req *GrepRequest) []
 }
 
 // GlobInfo returns file info entries matching the glob pattern.
+// GlobInfo 返回匹配 glob pattern 的文件信息条目。
 func (b *InMemoryBackend) GlobInfo(ctx context.Context, req *GlobInfoRequest) ([]FileInfo, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
@@ -627,6 +656,7 @@ func (b *InMemoryBackend) GlobInfo(ctx context.Context, req *GlobInfoRequest) ([
 }
 
 // Write creates or overwrites file content.
+// Write 创建或覆盖文件内容。
 func (b *InMemoryBackend) Write(ctx context.Context, req *WriteRequest) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -641,6 +671,7 @@ func (b *InMemoryBackend) Write(ctx context.Context, req *WriteRequest) error {
 }
 
 // Edit replaces string occurrences in a file.
+// Edit 替换文件中的字符串匹配项。
 func (b *InMemoryBackend) Edit(ctx context.Context, req *EditRequest) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -665,6 +696,7 @@ func (b *InMemoryBackend) Edit(ctx context.Context, req *EditRequest) error {
 		firstIndex := strings.Index(content, req.OldString)
 		if firstIndex != -1 {
 			// Check if there's another occurrence after the first one
+			// 检查第一个匹配项之后是否还有其他匹配项
 			if strings.Contains(content[firstIndex+len(req.OldString):], req.OldString) {
 				return fmt.Errorf("multiple occurrences of oldString found in file %s, but ReplaceAll is false", filePath)
 			}
@@ -687,12 +719,14 @@ func (b *InMemoryBackend) Edit(ctx context.Context, req *EditRequest) error {
 }
 
 // normalizePath normalizes a file path by ensuring it starts with "/" and removing trailing slashes.
+// normalizePath 通过确保路径以 "/" 开头并移除末尾斜杠来规范化文件路径。
 func normalizePath(path string) string {
 	if path == "" {
 		return "/"
 	}
 
 	// Ensure path starts with "/"
+	// 确保路径以 "/" 开头
 	if !strings.HasPrefix(path, "/") {
 		path = "/" + path
 	}

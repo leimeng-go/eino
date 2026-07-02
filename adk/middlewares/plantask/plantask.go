@@ -26,6 +26,7 @@ import (
 )
 
 // Config is the configuration for the tool search middleware.
+// Config 是工具搜索中间件的配置。
 type Config struct {
 	Backend Backend
 	BaseDir string
@@ -36,6 +37,10 @@ type Config struct {
 // allowing agents to create and manage structured task lists during coding sessions.
 //
 // This is the generic constructor that supports both *schema.Message and *schema.AgenticMessage.
+//
+// NewTyped 创建一个新的 plantask 中间件，为智能体提供任务管理工具。
+// 它会将 TaskCreate、TaskGet、TaskUpdate 和 TaskList 工具添加到智能体的工具集中，使智能体能在编码会话期间创建和管理结构化任务列表。
+// 这是支持 *schema.Message 和 *schema.AgenticMessage 的泛型构造函数。
 func NewTyped[M adk.MessageType](_ context.Context, config *Config) (adk.TypedChatModelAgentMiddleware[M], error) {
 	if config == nil {
 		return nil, fmt.Errorf("config is required")
@@ -53,6 +58,9 @@ func NewTyped[M adk.MessageType](_ context.Context, config *Config) (adk.TypedCh
 // New creates a new plantask middleware that provides task management tools for agents.
 // It adds TaskCreate, TaskGet, TaskUpdate, and TaskList tools to the agent's tool set,
 // allowing agents to create and manage structured task lists during coding sessions.
+//
+// New 创建一个新的 plantask 中间件，为智能体提供任务管理工具。
+// 它会将 TaskCreate、TaskGet、TaskUpdate 和 TaskList 工具添加到智能体的工具集中，使智能体能在编码会话期间创建和管理结构化任务列表。
 func New(ctx context.Context, config *Config) (adk.ChatModelAgentMiddleware, error) {
 	return NewTyped[*schema.Message](ctx, config)
 }

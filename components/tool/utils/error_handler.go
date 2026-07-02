@@ -25,6 +25,7 @@ import (
 )
 
 // ErrorHandler converts a tool error into a string response.
+// ErrorHandler 将工具错误转换为字符串响应。
 type ErrorHandler func(context.Context, error) string
 
 // WrapToolWithErrorHandler wraps any BaseTool with custom error handling.
@@ -39,6 +40,17 @@ type ErrorHandler func(context.Context, error) string
 //
 // Returns:
 //   - A wrapped BaseTool that handles errors internally based on its capabilities
+//
+// WrapToolWithErrorHandler 使用自定义错误处理包装任意 BaseTool。
+// 此函数会检测工具类型（InvokableTool、StreamableTool 或两者兼具），
+// 并应用相应的错误处理包装器。
+// 当被包装的工具返回错误时，会调用错误处理函数 'h'
+// 将错误转换为字符串结果，包装器不会返回错误。
+// 参数：
+// - t：要包装的原始 BaseTool
+// - h：将错误转换为字符串的函数
+// 返回：
+// - 一个根据自身能力在内部处理错误的被包装 BaseTool
 func WrapToolWithErrorHandler(t tool.BaseTool, h ErrorHandler) tool.BaseTool {
 	ih := &infoHelper{info: t.Info}
 	var s tool.StreamableTool
@@ -78,6 +90,15 @@ func WrapToolWithErrorHandler(t tool.BaseTool, h ErrorHandler) tool.BaseTool {
 //
 // Returns:
 //   - A wrapped InvokableTool that handles errors internally
+//
+// WrapInvokableToolWithErrorHandler 使用自定义错误处理包装 InvokableTool。
+// 当被包装的工具返回错误时，会调用错误处理函数 'h'
+// 将错误转换为字符串结果，包装器不会返回错误。
+// 参数：
+// - tool：要包装的原始 InvokableTool
+// - h：将错误转换为字符串的函数
+// 返回：
+// - 一个在内部处理错误的被包装 InvokableTool
 func WrapInvokableToolWithErrorHandler(t tool.InvokableTool, h ErrorHandler) tool.InvokableTool {
 	return &errorWrapper{
 		infoHelper: &infoHelper{info: t.Info},
@@ -99,6 +120,16 @@ func WrapInvokableToolWithErrorHandler(t tool.InvokableTool, h ErrorHandler) too
 //
 // Returns:
 //   - A wrapped StreamableTool that handles errors internally
+//
+// WrapStreamableToolWithErrorHandler 使用自定义错误处理包装 StreamableTool。
+// 当被包装的工具返回错误时，会调用错误处理函数 'h'
+// 将错误转换为字符串结果，并作为单元素流返回，
+// 包装器不会返回错误。
+// 参数：
+// - tool：要包装的原始 StreamableTool
+// - h：将错误转换为字符串的函数
+// 返回：
+// - 一个在内部处理错误的被包装 StreamableTool
 func WrapStreamableToolWithErrorHandler(t tool.StreamableTool, h ErrorHandler) tool.StreamableTool {
 	return &streamErrorWrapper{
 		infoHelper: &infoHelper{info: t.Info},

@@ -43,4 +43,18 @@
 // backend metadata are available via [schema.Document].MetaData.
 //
 // See https://www.cloudwego.io/docs/eino/core_modules/components/retriever_guide/
+//
+// Package retriever 定义 Retriever 组件接口，用于根据查询从文档存储中获取相关文档。
+// # 概览
+// Retriever 是 RAG (Retrieval-Augmented Generation) 管道的读取路径。给定查询字符串，它会从底层存储（向量数据库、关键词索引等）返回最相关的 [schema.Document] 值。
+// 具体实现（VikingDB、Milvus、Elasticsearch、…）位于 eino-ext:
+// github.com/cloudwego/eino-ext/components/retriever/
+// # 与 Indexer 的关系
+// [Indexer] 和 Retriever 互为补充：
+// - Indexer 将文档（及其向量）写入存储
+// - Retriever 将它们读回
+// 当两者都使用 [embedding.Embedder] 时，必须使用同一个模型——向量维度必须匹配，否则相似度分数将没有意义。
+// # 结果排序
+// 结果按相关性分数降序排列。分数和其他后端元数据可通过 [schema.Document].MetaData 获取。
+// 参见 https://www.cloudwego.io/docs/eino/core_modules/components/retriever_guide/
 package retriever

@@ -1969,6 +1969,7 @@ func TestReductionMiddlewareEnhancedTrunc(t *testing.T) {
 
 	t.Run("enhanced invokable - offload without backend returns error", func(t *testing.T) {
 		// config.Backend must be non-nil to pass New(), but the per-tool cfg.Backend is nil.
+		// config.Backend 必须非 nil 才能通过 New()，但每个工具的 cfg.Backend 为 nil。
 		configBackend := filesystem.NewInMemoryBackend()
 		config := &Config{
 			Backend: configBackend,
@@ -2057,6 +2058,7 @@ func TestReductionMiddlewareEnhancedTrunc(t *testing.T) {
 					SkipTruncation: false,
 					TruncHandler: func(_ context.Context, detail *ToolDetail) (*TruncResult, error) {
 						// Consume the "analysis" copy; the returned reader should still have the full stream.
+						// 消费 "analysis" 副本；返回的 reader 仍应包含完整流。
 						parts, needProcess, err := getJointToolResult(detail)
 						assert.NoError(t, err)
 						assert.True(t, needProcess)
@@ -2221,6 +2223,7 @@ func TestReductionMiddlewareEnhancedTrunc(t *testing.T) {
 
 	t.Run("enhanced streamable - offload without backend returns error", func(t *testing.T) {
 		// config.Backend must be non-nil to pass New(), but the per-tool cfg.Backend is nil.
+		// config.Backend 必须非 nil 才能通过 New()，但每个工具的 cfg.Backend 为 nil。
 		configBackend := filesystem.NewInMemoryBackend()
 		config := &Config{
 			Backend: configBackend,

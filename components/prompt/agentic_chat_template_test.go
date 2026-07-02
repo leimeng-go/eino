@@ -68,6 +68,7 @@ func TestDefaultAgenticTemplate_IsCallbacksEnabled(t *testing.T) {
 func TestDefaultAgenticTemplate_Format(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// Mock callback handler
+		// 模拟回调处理器
 		cb := callbacks.NewHandlerBuilder().
 			OnStartFn(func(ctx context.Context, info *callbacks.RunInfo, input callbacks.CallbackInput) context.Context {
 				assert.Equal(t, "Default", info.Type)
@@ -104,6 +105,7 @@ func TestDefaultAgenticTemplate_Format(t *testing.T) {
 		at := FromAgenticMessages(schema.FString, mockTpl)
 
 		// Mock callback handler to verify OnError
+		// 模拟回调处理器以验证 OnError
 		cb := callbacks.NewHandlerBuilder().
 			OnErrorFn(func(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
 				assert.Equal(t, mockErr, err)

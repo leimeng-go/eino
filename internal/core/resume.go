@@ -25,6 +25,13 @@ import "context"
 //   - wasInterrupted (bool): True if the node was part of a previous interruption, regardless of whether state was provided.
 //   - state (T): The typed state object, if it was provided and matches type `T`.
 //   - hasState (bool): True if state was provided during the original interrupt and successfully cast to type `T`.
+//
+// GetInterruptState 提供一种类型安全的方式，用于检查并获取上一次中断持久化的状态。
+// 它是组件理解自身历史状态时应使用的主要函数。
+// 它返回三个值：
+// - wasInterrupted (bool)：如果该节点曾属于上一次中断的一部分，则为 true，无论是否提供了状态。
+// - state (T)：已提供且类型匹配 `T` 时的类型化状态对象。
+// - hasState (bool)：如果原始中断时提供了状态，并成功转换为类型 `T`，则为 true。
 func GetInterruptState[T any](ctx context.Context) (wasInterrupted bool, hasState bool, state T) {
 	rCtx, ok := getRunCtx(ctx)
 	if !ok || rCtx.interruptState == nil {
@@ -83,6 +90,37 @@ func GetInterruptState[T any](ctx context.Context) (wasInterrupted bool, hasStat
 //  2. Act as a Conduit: After checking for itself, its primary role is to re-execute its children,
 //     allowing the resume context to flow down to them. It must not consume a resume signal
 //     intended for one of its descendants.
+//
+// GetResumeContext 检查当前组件是否为恢复操作的目标，
+// 并获取用户为此次恢复提供的任何数据。
+// 此函数通常在组件已通过调用 GetInterruptState 确认自身处于恢复状态之后调用。
+// 它返回三个值：
+// - isResumeTarget：布尔值；如果当前组件的地址或其任一后代地址被 Resume() 或 ResumeWithData() 显式指定为目标，则为 true。
+// 这允许复合组件（例如包含嵌套图的工具）知道自己应执行子组件以到达实际恢复目标。
+// - hasData：布尔值；如果为此特定组件提供了数据（即非 nil），则为 true。
+// - data：用户提供的类型化数据。
+// ### 如何使用此函数：决策框架
+// 正确的使用模式取决于应用期望的恢复策略。
+// #### 策略 1：隐式 "Resume All"
+// 在某些用例中，任何恢复操作都意味着所有中断点都应继续执行。
+// 例如，应用的 UI 只为一组中断提供一个 "Continue" 按钮。
+// 在此模型中，组件通常只需使用 `GetInterruptState` 查看 `wasInterrupted` 是否为 true，然后继续其逻辑，因为它可以假定自己是预期目标。
+// 它仍可调用 `GetResumeContext` 检查可选数据，但 `isResumeFlow` 标记不那么关键。
+// #### 策略 2：显式 "Targeted Resume"（最常见）
+// 对于存在多个独立中断点且必须分别恢复的应用，区分正在恢复的是哪个点至关重要。
+// 这是 `isResumeTarget` 标记的主要用例。
+// - 如果 `isResumeTarget` 为 `true`：你的组件（或其某个后代）是目标。
+// 如果 `hasData` 为 true，你就是直接目标，应消费该数据。
+// 如果 `hasData` 为 false，则某个后代是目标——执行你的子组件以到达它。
+// - 如果 `isResumeTarget` 为 `false`：你及你的后代都不是目标。你必须
+// 重新中断（例如返回 `StatefulInterrupt(...)`）以保留你的状态。
+// ### 复合组件指南
+// 复合组件（如 `Graph` 或其他包含子流程的 `Runnable`）具有双重角色：
+// 1. 检查自身是否为目标：复合组件本身也可以是恢复操作的目标，
+// 例如用于修改其内部状态。它可以调用 `GetResumeContext`
+// 检查是否有发往自身地址的数据。
+// 2. 作为通道：完成自身检查后，它的主要职责是重新执行子组件，
+// 让恢复 context 向下流动。它不得消费本应发往某个后代的恢复信号。
 func GetResumeContext[T any](ctx context.Context) (isResumeTarget bool, hasData bool, data T) {
 	rCtx, ok := getRunCtx(ctx)
 	if !ok {
@@ -95,8 +133,10 @@ func GetResumeContext[T any](ctx context.Context) (isResumeTarget bool, hasData 
 	}
 
 	// It is a resume flow, now check for data
+	// 这是一个恢复流，现在检查数据
 	if rCtx.resumeData == nil {
 		return // hasData is false
+		// hasData 为 false
 	}
 
 	data, hasData = rCtx.resumeData.(T)

@@ -25,13 +25,22 @@ import (
 )
 
 // Config configures the parent retriever.
+// Config 配置父文档检索器。
 type Config struct {
 	// Retriever specifies the original retriever used to retrieve documents.
 	// For example: a vector database retriever like Milvus, or a full-text search retriever like Elasticsearch.
+	//
+	// Retriever 指定用于检索文档的原始检索器。
+	// 例如：像 Milvus 这样的向量数据库检索器，或像 Elasticsearch 这样的全文搜索检索器。
 	Retriever retriever.Retriever
 	// ParentIDKey specifies the key used in the sub-document metadata to store the parent document ID.
 	// Documents without this key will be removed from the recall results.
 	// For example: if ParentIDKey is "parent_id", it will look for metadata like:
+	// {"parent_id": "original_doc_123"}
+	//
+	// ParentIDKey 指定子文档 metadata 中用于存储父文档 ID 的键。
+	// 没有该键的文档会从召回结果中移除。
+	// 例如：如果 ParentIDKey 为 "parent_id"，则会查找如下 metadata：
 	// {"parent_id": "original_doc_123"}
 	ParentIDKey string
 	// OrigDocGetter specifies the method for getting original documents by ids from the sub-document metadata.
@@ -44,6 +53,16 @@ type Config struct {
 	//
 	// For example: if sub-documents with parent IDs ["doc_1", "doc_2"] are retrieved,
 	// OrigDocGetter will be called to fetch the original documents with these IDs.
+	//
+	// OrigDocGetter 指定根据子文档 metadata 中的 ids 获取原始文档的方法。
+	// 参数：
+	// - ctx：操作的 context
+	// - ids：要检索的父文档 ID 切片
+	// 返回：
+	// - []*schema.Document：检索到的父文档切片
+	// - error：检索过程中遇到的任何错误
+	// 例如：如果检索到父 ID 为 ["doc_1", "doc_2"] 的子文档，
+	// 则会调用 OrigDocGetter 获取这些 ID 对应的原始文档。
 	OrigDocGetter func(ctx context.Context, ids []string) ([]*schema.Document, error)
 }
 
@@ -67,6 +86,22 @@ type Config struct {
 // Returns:
 //   - retriever.Retriever: the created parent retriever
 //   - error: any error encountered during creation
+//
+// NewRetriever 创建一个新的父文档检索器，用于根据子文档搜索结果检索原始文档。
+// 参数：
+// - ctx：操作的 context
+// - config：父文档检索器的配置
+// 用法示例：
+// retriever, err := NewRetriever(ctx, &Config{
+// Retriever: milvusRetriever,
+// ParentIDKey: "source_doc_id",
+// OrigDocGetter: func(ctx context.Context, ids []string) ([]*schema.Document, error) {
+// return documentStore.GetByIDs(ctx, ids)
+// },
+// })
+// 返回：
+// - retriever.Retriever：创建的父文档检索器
+// - error：创建过程中遇到的任何错误
 func NewRetriever(ctx context.Context, config *Config) (retriever.Retriever, error) {
 	if config.Retriever == nil {
 		return nil, fmt.Errorf("retriever is required")

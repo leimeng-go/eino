@@ -43,9 +43,11 @@ type toolsNodeOptions struct {
 }
 
 // ToolsNodeOption is the option func type for ToolsNode.
+// ToolsNodeOption 是 ToolsNode 的选项函数类型。
 type ToolsNodeOption func(o *toolsNodeOptions)
 
 // WithToolOption adds tool options to the ToolsNode.
+// WithToolOption 为 ToolsNode 添加工具选项。
 func WithToolOption(opts ...tool.Option) ToolsNodeOption {
 	return func(o *toolsNodeOptions) {
 		o.ToolOptions = append(o.ToolOptions, opts...)
@@ -53,6 +55,7 @@ func WithToolOption(opts ...tool.Option) ToolsNodeOption {
 }
 
 // WithToolList sets the tool list for the ToolsNode.
+// WithToolList 设置 ToolsNode 的工具列表。
 func WithToolList(tool ...tool.BaseTool) ToolsNodeOption {
 	return func(o *toolsNodeOptions) {
 		o.ToolList = tool
@@ -62,6 +65,10 @@ func WithToolList(tool ...tool.BaseTool) ToolsNodeOption {
 // WithToolAliases sets the tool aliases for the ToolsNode call option.
 // When used with WithToolList, it overrides the global alias configuration for the dynamic tool list.
 // When used alone (without WithToolList), it replaces the global alias configuration while keeping the original tool list.
+//
+// WithToolAliases 设置 ToolsNode 调用选项的工具别名。
+// 与 WithToolList 一起使用时，它会覆盖动态工具列表的全局别名配置。
+// 单独使用（不带 WithToolList）时，它会保留原工具列表并替换全局别名配置。
 func WithToolAliases(toolAliases map[string]ToolAliasConfig) ToolsNodeOption {
 	return func(o *toolsNodeOptions) {
 		o.ToolAliases = toolAliases
@@ -76,6 +83,13 @@ func WithToolAliases(toolAliases map[string]ToolAliasConfig) ToolsNodeOption {
 //
 // Input: An AssistantMessage containing ToolCalls
 // Output: An array of ToolMessage where the order of elements corresponds to the order of ToolCalls in the input
+//
+// ToolsNode 表示图中能够执行工具的节点。
+// Graph Node 接口定义如下：
+// Invoke(ctx context.Context, input *schema.Message, opts ...ToolsNodeOption) ([]*schema.Message, error)
+// Stream(ctx context.Context, input *schema.Message, opts ...ToolsNodeOption) (*schema.StreamReader[[]*schema.Message], error)
+// 输入：包含 ToolCalls 的 AssistantMessage
+// 输出：ToolMessage 数组，元素顺序与输入中 ToolCalls 的顺序对应
 type ToolsNode struct {
 	tuple                             *toolsTuple
 	tools                             []tool.BaseTool
@@ -90,47 +104,66 @@ type ToolsNode struct {
 }
 
 // ToolInput represents the input parameters for a tool call execution.
+// ToolInput 表示执行工具调用的输入参数。
 type ToolInput struct {
 	// Name is the name of the tool to be executed.
+	// Name 是要执行的工具名称。
 	Name string
 	// Arguments contains the arguments for the tool call.
+	// Arguments 包含工具调用的参数。
 	Arguments string
 	// CallID is the unique identifier for this tool call.
+	// CallID 是此工具调用的唯一标识符。
 	CallID string
 	// CallOptions contains tool options for the execution.
+	// CallOptions 包含执行所用的工具选项。
 	CallOptions []tool.Option
 }
 
 // ToolOutput represents the result of a non-streaming tool call execution.
+// ToolOutput 表示非流式工具调用执行的结果。
 type ToolOutput struct {
 	// Result contains the string output from the tool execution.
+	// Result 包含工具执行返回的字符串输出。
 	Result string
 }
 
 // StreamToolOutput represents the result of a streaming tool call execution.
+// StreamToolOutput 表示流式工具调用执行的结果。
 type StreamToolOutput struct {
 	// Result is a stream reader that provides access to the tool's streaming output.
+	// Result 是流读取器，用于访问工具的流式输出。
 	Result *schema.StreamReader[string]
 }
 
 // EnhancedInvokableToolOutput represents the result of a non-streaming enhanced tool call execution.
 // It supports returning structured multimodal content (text, images, audio, video, files) from tools.
+//
+// EnhancedInvokableToolOutput 表示非流式增强工具调用执行的结果。
+// 它支持工具返回结构化多模态内容（text、images、audio、video、files）。
 type EnhancedInvokableToolOutput struct {
 	// Result contains the structured multimodal output from the tool execution.
+	// Result 包含工具执行返回的结构化多模态输出。
 	Result *schema.ToolResult
 }
 
 // EnhancedStreamableToolOutput represents the result of a streaming enhanced tool call execution.
 // It provides a stream reader for accessing multimodal content progressively.
+//
+// EnhancedStreamableToolOutput 表示流式增强工具调用执行的结果。
+// 它提供流读取器，用于渐进式访问多模态内容。
 type EnhancedStreamableToolOutput struct {
 	// Result is a stream reader that provides access to the tool's streaming multimodal output.
+	// Result 是流读取器，用于访问工具的流式多模态输出。
 	Result *schema.StreamReader[*schema.ToolResult]
 }
 
 // InvokableToolEndpoint is the function signature for non-streaming tool calls.
+// InvokableToolEndpoint 是非流式工具调用的函数签名。
 type InvokableToolEndpoint func(ctx context.Context, input *ToolInput) (*ToolOutput, error)
 
 // StreamableToolEndpoint is the function signature for streaming tool calls.
+// StreamableToolEndpoint 是流式工具调用的函数签名。
 type StreamableToolEndpoint func(ctx context.Context, input *ToolInput) (*StreamToolOutput, error)
 
 type EnhancedInvokableToolEndpoint func(ctx context.Context, input *ToolInput) (*EnhancedInvokableToolOutput, error)
@@ -139,10 +172,16 @@ type EnhancedStreamableToolEndpoint func(ctx context.Context, input *ToolInput) 
 
 // InvokableToolMiddleware is a function that wraps InvokableToolEndpoint to add custom processing logic.
 // It can be used to intercept, modify, or enhance tool call execution for non-streaming tools.
+//
+// InvokableToolMiddleware 是包装 InvokableToolEndpoint 以添加自定义处理逻辑的函数。
+// 它可用于拦截、修改或增强非流式工具的工具调用执行。
 type InvokableToolMiddleware func(InvokableToolEndpoint) InvokableToolEndpoint
 
 // StreamableToolMiddleware is a function that wraps StreamableToolEndpoint to add custom processing logic.
 // It can be used to intercept, modify, or enhance tool call execution for streaming tools.
+//
+// StreamableToolMiddleware 是包装 StreamableToolEndpoint 以添加自定义处理逻辑的函数。
+// 它可用于拦截、修改或增强流式工具的工具调用执行。
 type StreamableToolMiddleware func(StreamableToolEndpoint) StreamableToolEndpoint
 
 type EnhancedInvokableToolMiddleware func(EnhancedInvokableToolEndpoint) EnhancedInvokableToolEndpoint
@@ -150,39 +189,62 @@ type EnhancedInvokableToolMiddleware func(EnhancedInvokableToolEndpoint) Enhance
 type EnhancedStreamableToolMiddleware func(EnhancedStreamableToolEndpoint) EnhancedStreamableToolEndpoint
 
 // ToolMiddleware groups middleware hooks for invokable and streamable tool calls.
+// ToolMiddleware 将可调用和可流式工具调用的 middleware hooks 分组。
 type ToolMiddleware struct {
 	// Invokable contains middleware function for non-streaming tool calls.
 	// Note: This middleware only applies to tools that implement the InvokableTool interface.
+	//
+	// Invokable 包含非流式工具调用的 middleware function。
+	// 注意：此 middleware 仅适用于实现 InvokableTool interface 的工具。
 	Invokable InvokableToolMiddleware
 
 	// Streamable contains middleware function for streaming tool calls.
 	// Note: This middleware only applies to tools that implement the StreamableTool interface.
+	//
+	// Streamable 包含流式工具调用的 middleware function。
+	// 注意：此 middleware 仅适用于实现 StreamableTool interface 的工具。
 	Streamable StreamableToolMiddleware
 
 	// EnhancedInvokable contains middleware function for non-streaming enhanced tool calls.
 	// Note: This middleware only applies to tools that implement the EnhancedInvokableTool interface.
+	//
+	// EnhancedInvokable 包含非流式增强工具调用的 middleware function。
+	// 注意：此 middleware 仅适用于实现 EnhancedInvokableTool interface 的工具。
 	EnhancedInvokable EnhancedInvokableToolMiddleware
 
 	// EnhancedStreamable contains middleware function for streaming enhanced tool calls.
 	// Note: This middleware only applies to tools that implement the EnhancedStreamableTool interface.
+	//
+	// EnhancedStreamable 包含用于流式增强工具调用的中间件函数。
+	// 注意：此中间件仅适用于实现 EnhancedStreamableTool 接口的工具。
 	EnhancedStreamable EnhancedStreamableToolMiddleware
 }
 
 // ToolAliasConfig configures name and argument aliases for a single tool.
+// ToolAliasConfig 配置单个工具的名称和参数别名。
 type ToolAliasConfig struct {
 	// NameAliases are alternative names for this tool.
 	// If the model returns any of these names, it will be resolved to the canonical tool name.
+	//
+	// NameAliases 是此工具的替代名称。
+	// 如果模型返回其中任一名称，会解析为规范工具名称。
 	NameAliases []string
 
 	// ArgumentsAliases maps canonical argument keys to their alias lists.
 	// key=canonical, value=[]alias. Applied to top-level JSON keys before tool execution.
 	// Example: {"query": ["q", "search_term"], "limit": ["max_results", "count"]}
+	//
+	// ArgumentsAliases 将规范参数键映射到其别名列表。
+	// key=canonical，value=[]alias。在工具执行前应用于顶层 JSON 键。
+	// 示例：{"query": ["q", "search_term"], "limit": ["max_results", "count"]}
 	ArgumentsAliases map[string][]string
 }
 
 // ToolsNodeConfig is the config for ToolsNode.
+// ToolsNodeConfig 是 ToolsNode 的配置。
 type ToolsNodeConfig struct {
 	// Tools specify the list of tools can be called which are BaseTool but must implement InvokableTool or StreamableTool.
+	// Tools 指定可调用的工具列表，这些工具是 BaseTool，但必须实现 InvokableTool 或 StreamableTool。
 	Tools []tool.BaseTool
 
 	// ToolAliases configures name and argument aliases for tools.
@@ -190,6 +252,12 @@ type ToolsNodeConfig struct {
 	// This field is optional. When provided, tool name aliases will be resolved during tool dispatch,
 	// and argument aliases will be remapped before ToolArgumentsHandler (if configured) and tool execution.
 	// Execution order: ArgumentsAliases remapping → ToolArgumentsHandler → tool execution
+	//
+	// ToolAliases 配置工具的名称和参数别名。
+	// 键为规范工具名称，值定义其别名。
+	// 此字段可选。提供后，工具分发时会解析工具名称别名，
+	// 并在 ToolArgumentsHandler（如已配置）和工具执行前重映射参数别名。
+	// 执行顺序：ArgumentsAliases 重映射 → ToolArgumentsHandler → 工具执行
 	ToolAliases map[string]ToolAliasConfig
 
 	// UnknownToolsHandler handles tool calls for non-existent tools when LLM hallucinates.
@@ -203,11 +271,27 @@ type ToolsNodeConfig struct {
 	// Returns:
 	//   - string: The response to be returned as if the tool was executed
 	//   - error: Any error that occurred during handling
+	//
+	// UnknownToolsHandler 处理 LLM 产生幻觉时对不存在工具的工具调用。
+	// 此字段可选。未设置时，调用不存在的工具会导致错误。
+	// 提供后，如果 LLM 尝试调用 Tools 列表中不存在的工具，
+	// 将调用此处理器而不是返回错误，从而优雅处理幻觉工具。
+	// 参数：
+	// - ctx：工具调用的 context
+	// - name：不存在工具的名称
+	// - input：llm 生成的工具调用输入
+	// 返回：
+	// - string：像工具已执行一样返回的响应
+	// - error：处理期间发生的任何错误
 	UnknownToolsHandler func(ctx context.Context, name, input string) (string, error)
 
 	// ExecuteSequentially determines whether tool calls should be executed sequentially (in order) or in parallel.
 	// When set to true, tool calls will be executed one after another in the order they appear in the input message.
 	// When set to false (default), tool calls will be executed in parallel.
+	//
+	// ExecuteSequentially 决定工具调用应按顺序串行执行还是并行执行。
+	// 设为 true 时，工具调用会按其在输入消息中出现的顺序逐个执行。
+	// 设为 false（默认）时，工具调用会并行执行。
 	ExecuteSequentially bool
 
 	// ToolArgumentsHandler allows handling of tool arguments before execution.
@@ -219,12 +303,27 @@ type ToolsNodeConfig struct {
 	// Returns:
 	//   - string: The processed arguments string to be used for tool execution
 	//   - error: Any error that occurred during preprocessing
+	//
+	// ToolArgumentsHandler 允许在执行前处理工具参数。
+	// 提供后，将为每个工具调用调用此函数以处理参数。
+	// 参数：
+	// - ctx：工具调用的 context
+	// - name：被调用工具的名称
+	// - arguments：工具的原始参数字符串
+	// 返回：
+	// - string：用于工具执行的处理后参数字符串
+	// - error：预处理期间发生的任何错误
 	ToolArgumentsHandler func(ctx context.Context, name, arguments string) (string, error)
 
 	// ToolCallMiddlewares configures middleware for tool calls.
 	// Each element can contain Invokable and/or Streamable middleware.
 	// Invokable middleware only applies to tools implementing InvokableTool interface.
 	// Streamable middleware only applies to tools implementing StreamableTool interface.
+	//
+	// ToolCallMiddlewares 配置工具调用的中间件。
+	// 每个元素可包含 Invokable 和/或 Streamable 中间件。
+	// Invokable 中间件仅适用于实现 InvokableTool 接口的工具。
+	// Streamable 中间件仅适用于实现 StreamableTool 接口的工具。
 	ToolCallMiddlewares []ToolMiddleware
 }
 
@@ -235,6 +334,13 @@ type ToolsNodeConfig struct {
 //		Tools: []tool.BaseTool{invokableTool1, streamableTool2},
 //	}
 //	toolsNode, err := NewToolNode(ctx, conf)
+//
+// NewToolNode 创建新的 ToolsNode。
+// 例如：
+// conf := &ToolsNodeConfig{
+// Tools: []tool.BaseTool{invokableTool1, streamableTool2},
+// }
+// toolsNode, err := NewToolNode(ctx, conf)
 func NewToolNode(ctx context.Context, conf *ToolsNodeConfig) (*ToolsNode, error) {
 	var middlewares []InvokableToolMiddleware
 	var streamMiddlewares []StreamableToolMiddleware
@@ -284,20 +390,26 @@ func NewToolNode(ctx context.Context, conf *ToolsNodeConfig) (*ToolsNode, error)
 }
 
 // ToolsInterruptAndRerunExtra carries interrupt metadata for ToolsNode reruns.
+// ToolsInterruptAndRerunExtra 携带 ToolsNode 重新运行的中断元数据。
 type ToolsInterruptAndRerunExtra struct {
 	// ToolCalls contains all tool calls from the original assistant message.
+	// ToolCalls 包含原始 assistant 消息中的所有工具调用。
 	ToolCalls []schema.ToolCall
 
 	// ExecutedTools maps tool call IDs to their string output for successfully executed standard tools.
+	// ExecutedTools 将工具调用 ID 映射到已成功执行的标准工具的字符串输出。
 	ExecutedTools map[string]string
 
 	// ExecutedEnhancedTools maps tool call IDs to their structured multimodal output for successfully executed enhanced tools.
+	// ExecutedEnhancedTools 将工具调用 ID 映射到已成功执行的增强工具的结构化多模态输出。
 	ExecutedEnhancedTools map[string]*schema.ToolResult
 
 	// RerunTools contains the IDs of tool calls that need to be re-executed.
+	// RerunTools 包含需要重新执行的工具调用 ID。
 	RerunTools []string
 
 	// RerunExtraMap stores additional metadata for each tool call that needs rerun, keyed by tool call ID.
+	// RerunExtraMap 存储每个需要重新运行的工具调用的附加元数据，以工具调用 ID 为键。
 	RerunExtraMap map[string]any
 }
 
@@ -322,15 +434,23 @@ type toolsTuple struct {
 	enhancedStreamableEndpoints []EnhancedStreamableToolEndpoint
 	// argsAliasMap stores reverse argument alias mappings for each tool.
 	// key: canonical tool name, value: map[aliasKey]canonicalKey (alias → canonical direction)
+	//
+	// argsAliasMap 存储每个工具的反向参数别名映射。
+	// key：规范工具名称，value：map[aliasKey]canonicalKey（alias → canonical 方向）
 	argsAliasMap map[string]map[string]string
 	// canonicalNames stores the canonical name for each tool index
+	// canonicalNames 存储每个工具索引对应的规范名称
 	canonicalNames []string
 	// toolInfos stores the ToolInfo for each tool index, used for alias validation
+	// toolInfos 存储每个工具索引对应的 ToolInfo，用于别名校验
 	toolInfos []*schema.ToolInfo
 }
 
 // remapArgs replaces alias keys in the JSON arguments string with canonical keys.
 // aliasMap: alias → canonical mapping
+//
+// remapArgs 将 JSON 参数字符串中的别名键替换为规范键。
+// aliasMap: alias → canonical 映射
 func remapArgs(args string, aliasMap map[string]string) (string, error) {
 	if len(aliasMap) == 0 {
 		return args, nil
@@ -352,6 +472,10 @@ func remapArgs(args string, aliasMap map[string]string) (string, error) {
 			// Only replace if canonical key doesn't exist.
 			// If both alias and canonical are present (e.g. {"q":"a","query":"b"}),
 			// the alias key is kept as-is and passed through as an unknown field.
+			//
+			// 仅在规范键不存在时替换。
+			// 如果别名和规范键同时存在（例如 {"q":"a","query":"b"}），
+			// 别名键会保持原样，并作为未知字段传递。
 			if _, exists := m[canonical]; !exists {
 				m[canonical] = v
 				delete(m, alias)
@@ -411,6 +535,7 @@ func (t *toolsTuple) applyAliasConfigs(aliasConfigs map[string]ToolAliasConfig) 
 }
 
 // applyNameAliases validates and registers name aliases for a single tool into the indexes map.
+// applyNameAliases 校验单个工具的名称别名，并注册到 indexes map 中。
 func (t *toolsTuple) applyNameAliases(toolName string, toolIdx int, nameAliases []string) error {
 	for _, alias := range nameAliases {
 		if strings.TrimSpace(alias) == "" {
@@ -432,6 +557,7 @@ func (t *toolsTuple) applyNameAliases(toolName string, toolIdx int, nameAliases 
 }
 
 // applyArgsAliases validates argument aliases against the tool schema and builds a reverse alias map for a single tool.
+// applyArgsAliases 根据工具 schema 校验参数别名，并为单个工具构建反向别名 map。
 func (t *toolsTuple) applyArgsAliases(toolName string, toolIdx int, argumentsAliases map[string][]string) error {
 	if len(argumentsAliases) == 0 {
 		return nil
@@ -838,9 +964,11 @@ func (tn *ToolsNode) genToolCallTasks(ctx context.Context, tuple *toolsTuple,
 			}
 
 			// Get canonical tool name for looking up argument aliases
+			// 获取规范工具名称，用于查找参数别名
 			canonicalToolName := tuple.canonicalNames[index]
 
 			// Process argument aliases remapping
+			// 处理参数别名重映射
 			args := toolCall.Function.Arguments
 			if aliasMap, hasAliases := tuple.argsAliasMap[canonicalToolName]; hasAliases {
 				remappedArgs, err := remapArgs(args, aliasMap)
@@ -1017,6 +1145,7 @@ func parallelRunToolCall(ctx context.Context,
 }
 
 // buildTupleFromOpts rebuilds a toolsTuple when call options override tools or aliases.
+// buildTupleFromOpts 在调用选项覆盖工具或别名时重建 toolsTuple。
 func (tn *ToolsNode) buildTupleFromOpts(ctx context.Context, opt *toolsNodeOptions) (*toolsTuple, error) {
 	tools := opt.ToolList
 	if tools == nil {
@@ -1043,6 +1172,9 @@ func (tn *ToolsNode) buildTupleFromOpts(ctx context.Context, opt *toolsNodeOptio
 
 // Invoke calls the tools and collects the results of invokable tools.
 // it's parallel if there are multiple tool calls in the input message.
+//
+// Invoke 调用工具并收集可调用工具的结果。
+// 如果输入消息中有多个工具调用，则并行执行。
 func (tn *ToolsNode) Invoke(ctx context.Context, input *schema.Message,
 	opts ...ToolsNodeOption) ([]*schema.Message, error) {
 
@@ -1145,6 +1277,9 @@ func (tn *ToolsNode) Invoke(ctx context.Context, input *schema.Message,
 
 // Stream calls the tools and collects the results of stream readers.
 // it's parallel if there are multiple tool calls in the input message.
+//
+// Stream 调用工具并收集流读取器的结果。
+// 如果输入消息中有多个工具调用，则并行执行。
 func (tn *ToolsNode) Stream(ctx context.Context, input *schema.Message,
 	opts ...ToolsNodeOption) (*schema.StreamReader[[]*schema.Message], error) {
 
@@ -1196,6 +1331,7 @@ func (tn *ToolsNode) Stream(ctx context.Context, input *schema.Message,
 	}
 	var errs []error
 	// check rerun
+	// 检查重新运行
 	for i := 0; i < n; i++ {
 		if tasks[i].err != nil {
 			info, ok := IsInterruptRerunError(tasks[i].err)
@@ -1217,6 +1353,7 @@ func (tn *ToolsNode) Stream(ctx context.Context, input *schema.Message,
 
 	if len(errs) > 0 {
 		// concat and save tool output
+		// 拼接并保存工具输出
 		for _, t := range tasks {
 			if t.executed {
 				if t.useEnhanced {
@@ -1241,6 +1378,7 @@ func (tn *ToolsNode) Stream(ctx context.Context, input *schema.Message,
 	}
 
 	// common return
+	// 通用返回
 	sOutput := make([]*schema.StreamReader[[]*schema.Message], n)
 	for i := 0; i < n; i++ {
 		index := i
@@ -1271,6 +1409,7 @@ func (tn *ToolsNode) Stream(ctx context.Context, input *schema.Message,
 }
 
 // GetType returns the component type string for the Tools node.
+// GetType 返回 Tools 节点的组件类型字符串。
 func (tn *ToolsNode) GetType() string {
 	return ""
 }
@@ -1295,6 +1434,7 @@ func setToolCallInfo(ctx context.Context, toolCallInfo *toolCallInfo) context.Co
 }
 
 // GetToolCallID gets the current tool call id from the context.
+// GetToolCallID 从 context 中获取当前工具调用 id。
 func GetToolCallID(ctx context.Context) string {
 	v := ctx.Value(toolCallInfoKey{})
 	if v == nil {

@@ -34,6 +34,7 @@ import (
 )
 
 // NewChain create a chain with input/output type.
+// NewChain 创建具有输入/输出类型的链。
 func NewChain[I, O any](opts ...NewGraphOption) *Chain[I, O] {
 	ch := &Chain[I, O]{
 		gg: NewGraph[I, O](opts...),
@@ -69,6 +70,29 @@ func NewChain[I, O any](opts ...NewGraphOption) *Chain[I, O] {
 // // or in another chain:
 // chain2 := NewChain[inputType, outputType]()
 // chain2.AppendGraph(chain1)
+//
+// Chain 是组件组成的链。
+// Chain 节点可以是 parallel / branch / sequence 组件。
+// Chain 设计为使用 builder 模式（使用前应先 Compile()）。
+// 其接口是 `Chain style`，可像这样使用：`chain.AppendXX(...).AppendXX(...)`
+// 常规用法：
+// 1. 创建具有输入/输出类型的链：`chain := NewChain[inputType, outputType]()`
+// 2. 向可链式列表添加组件：
+// 2.1 添加组件：`chain.AppendChatTemplate(...).AppendChatModel(...).AppendToolsNode(...)`
+// 2.2 如需添加 parallel 或 branch 节点：`chain.AppendParallel()`、`chain.AppendBranch()`
+// 3. 编译：`r, err := c.Compile()`
+// 4. 运行：
+// 4.1 `one input & one output` 使用 `r.Invoke(ctx, input)`
+// 4.2 `one input & multi output chunk` 使用 `r.Stream(ctx, input)`
+// 4.3 `multi input chunk & one output` 使用 `r.Collect(ctx, inputReader)`
+// 4.4 `multi input chunk & multi output chunk` 使用 `r.Transform(ctx, inputReader)`
+// 在图或其他链中使用：
+// chain1 := NewChain[inputType, outputType]()
+// graph := NewGraph[](runTypePregel)
+// graph.AddGraph("key", chain1) // chain 是 AnyGraph 实现
+// 或在另一条链中：
+// chain2 := NewChain[inputType, outputType]()
+// chain2.AppendGraph(chain1)
 type Chain[I, O any] struct {
 	err error
 
@@ -82,9 +106,11 @@ type Chain[I, O any] struct {
 }
 
 // ErrChainCompiled is returned when attempting to modify a chain after it has been compiled
+// ErrChainCompiled 在尝试修改已编译的链时返回
 var ErrChainCompiled = errors.New("chain has been compiled, cannot be modified")
 
 // implements AnyGraph.
+// 实现 AnyGraph。
 func (c *Chain[I, O]) compile(ctx context.Context, option *graphCompileOptions) (*composableRunnable, error) {
 	if err := c.addEndIfNeeded(); err != nil {
 		return nil, err
@@ -95,6 +121,9 @@ func (c *Chain[I, O]) compile(ctx context.Context, option *graphCompileOptions) 
 
 // addEndIfNeeded add END edge of the chain/graph.
 // only run once when compiling.
+//
+// addEndIfNeeded 添加链/图的 END 边。
+// 编译时只运行一次。
 func (c *Chain[I, O]) addEndIfNeeded() error {
 	if c.hasEnd {
 		return nil
@@ -126,18 +155,27 @@ func (c *Chain[I, O]) getGenericHelper() *genericHelper {
 
 // inputType returns the input type of the chain.
 // implements AnyGraph.
+//
+// inputType 返回链的输入类型。
+// 实现 AnyGraph。
 func (c *Chain[I, O]) inputType() reflect.Type {
 	return generic.TypeOf[I]()
 }
 
 // outputType returns the output type of the chain.
 // implements AnyGraph.
+//
+// outputType 返回链的输出类型。
+// 实现 AnyGraph。
 func (c *Chain[I, O]) outputType() reflect.Type {
 	return generic.TypeOf[O]()
 }
 
 // compositeType returns the composite type of the chain.
 // implements AnyGraph.
+//
+// compositeType 返回链的组合类型。
+// 实现 AnyGraph。
 func (c *Chain[I, O]) component() component {
 	return c.gg.component()
 }
@@ -154,6 +192,17 @@ func (c *Chain[I, O]) component() component {
 //		r.Stream(ctx, input) // ping => stream out
 //		r.Collect(ctx, inputReader) // stream in => pong
 //		r.Transform(ctx, inputReader) // stream in => stream out
+//
+// 编译为 Runnable。
+// Runnable 可直接使用。
+// 例如：
+// chain := NewChain[string, string]()
+// r, err := chain.Compile()
+// if err != nil {}
+// r.Invoke(ctx, input) // ping => pong
+// r.Stream(ctx, input) // ping => stream out
+// r.Collect(ctx, inputReader) // stream in => pong
+// r.Transform(ctx, inputReader) // stream in => stream out
 func (c *Chain[I, O]) Compile(ctx context.Context, opts ...GraphCompileOption) (Runnable[I, O], error) {
 	if err := c.addEndIfNeeded(); err != nil {
 		return nil, err
@@ -168,6 +217,12 @@ func (c *Chain[I, O]) Compile(ctx context.Context, opts ...GraphCompileOption) (
 //	model, err := openai.NewChatModel(ctx, config)
 //	if err != nil {...}
 //	chain.AppendChatModel(model)
+//
+// AppendChatModel 向 Chain 添加一个 ChatModel 节点。
+// 例如：
+// model, err := openai.NewChatModel(ctx, config)
+// if err != nil {...}
+// chain.AppendChatModel(model)
 func (c *Chain[I, O]) AppendChatModel(node model.BaseChatModel, opts ...GraphAddNodeOpt) *Chain[I, O] {
 	gNode, options := toChatModelNode(node, opts...)
 	c.addNode(gNode, options)
@@ -180,6 +235,12 @@ func (c *Chain[I, O]) AppendChatModel(node model.BaseChatModel, opts ...GraphAdd
 //	model, err := openai.NewAgenticModel(ctx, config)
 //	if err != nil {...}
 //	chain.AppendAgenticModel(model)
+//
+// AppendAgenticModel 向 Chain 添加一个 agentic.Model 节点。
+// 例如：
+// model, err := openai.NewAgenticModel(ctx, config)
+// if err != nil {...}
+// chain.AppendAgenticModel(model)
 func (c *Chain[I, O]) AppendAgenticModel(node model.AgenticModel, opts ...GraphAddNodeOpt) *Chain[I, O] {
 	gNode, options := toAgenticModelNode(node, opts...)
 	c.addNode(gNode, options)
@@ -195,6 +256,14 @@ func (c *Chain[I, O]) AppendAgenticModel(node model.AgenticModel, opts ...GraphA
 //	})
 //
 //	chain.AppendChatTemplate(chatTemplate)
+//
+// AppendChatTemplate 向 Chain 添加一个 ChatTemplate 节点。
+// 例如：
+// chatTemplate, err := prompt.FromMessages(schema.FString, &schema.Message{
+// Role:    schema.System,
+// Content: "You are acting as a {role}.",
+// })
+// chain.AppendChatTemplate(chatTemplate)
 func (c *Chain[I, O]) AppendChatTemplate(node prompt.ChatTemplate, opts ...GraphAddNodeOpt) *Chain[I, O] {
 	gNode, options := toChatTemplateNode(node, opts...)
 	c.addNode(gNode, options)
@@ -207,6 +276,11 @@ func (c *Chain[I, O]) AppendChatTemplate(node prompt.ChatTemplate, opts ...Graph
 //	chatTemplate, err := prompt.FromAgenticMessages(schema.FString, &schema.AgenticMessage{})
 //
 //	chain.AppendAgenticChatTemplate(chatTemplate)
+//
+// AppendAgenticChatTemplate 向 Chain 添加一个 prompt.AgenticChatTemplate 节点。
+// 例如：
+// chatTemplate, err := prompt.FromAgenticMessages(schema.FString, &schema.AgenticMessage{})
+// chain.AppendAgenticChatTemplate(chatTemplate)
 func (c *Chain[I, O]) AppendAgenticChatTemplate(node prompt.AgenticChatTemplate, opts ...GraphAddNodeOpt) *Chain[I, O] {
 	gNode, options := toAgenticChatTemplateNode(node, opts...)
 	c.addNode(gNode, options)
@@ -221,6 +295,13 @@ func (c *Chain[I, O]) AppendAgenticChatTemplate(node prompt.AgenticChatTemplate,
 //	})
 //
 //	chain.AppendToolsNode(toolsNode)
+//
+// AppendToolsNode 向 Chain 添加一个 ToolsNode 节点。
+// 例如：
+// toolsNode, err := compose.NewToolNode(ctx, &compose.ToolsNodeConfig{
+// Tools: []tools.BaseTool{...},
+// })
+// chain.AppendToolsNode(toolsNode)
 func (c *Chain[I, O]) AppendToolsNode(node *ToolsNode, opts ...GraphAddNodeOpt) *Chain[I, O] {
 	gNode, options := toToolsNode(node, opts...)
 	c.addNode(gNode, options)
@@ -235,6 +316,13 @@ func (c *Chain[I, O]) AppendToolsNode(node *ToolsNode, opts ...GraphAddNodeOpt) 
 //	})
 //
 //	chain.AppendAgenticToolsNode(toolsNode)
+//
+// AppendAgenticToolsNode 向 Chain 添加一个 AgenticToolsNode 节点。
+// 例如：
+// toolsNode, err := compose.NewAgenticToolsNode(ctx, &compose.ToolsNodeConfig{
+// Tools: []tools.BaseTool{...},
+// })
+// chain.AppendAgenticToolsNode(toolsNode)
 func (c *Chain[I, O]) AppendAgenticToolsNode(node *AgenticToolsNode, opts ...GraphAddNodeOpt) *Chain[I, O] {
 	gNode, options := toAgenticToolsNode(node, opts...)
 	c.addNode(gNode, options)
@@ -247,6 +335,11 @@ func (c *Chain[I, O]) AppendAgenticToolsNode(node *AgenticToolsNode, opts ...Gra
 //	markdownSplitter, err := markdown.NewHeaderSplitter(ctx, &markdown.HeaderSplitterConfig{})
 //
 //	chain.AppendDocumentTransformer(markdownSplitter)
+//
+// AppendDocumentTransformer 向 Chain 添加一个 DocumentTransformer 节点。
+// 例如：
+// markdownSplitter, err := markdown.NewHeaderSplitter(ctx, &markdown.HeaderSplitterConfig{})
+// chain.AppendDocumentTransformer(markdownSplitter)
 func (c *Chain[I, O]) AppendDocumentTransformer(node document.Transformer, opts ...GraphAddNodeOpt) *Chain[I, O] {
 	gNode, options := toDocumentTransformerNode(node, opts...)
 	c.addNode(gNode, options)
@@ -263,6 +356,15 @@ func (c *Chain[I, O]) AppendDocumentTransformer(node document.Transformer, opts 
 // Note:
 // to create a Lambda node, you need to use `compose.AnyLambda` or `compose.InvokableLambda` or `compose.StreamableLambda` or `compose.TransformableLambda`.
 // if you want this node has real stream output, you need to use `compose.StreamableLambda` or `compose.TransformableLambda`, for example.
+//
+// AppendLambda 向 Chain 添加一个 Lambda 节点。
+// Lambda 是可用于实现自定义逻辑的节点。
+// 例如：
+// lambdaNode := compose.InvokableLambda(func(ctx context.Context, docs []*schema.Document) (string, error) {...})
+// chain.AppendLambda(lambdaNode)
+// 注意：
+// 要创建 Lambda 节点，需要使用 `compose.AnyLambda`、`compose.InvokableLambda`、`compose.StreamableLambda` 或 `compose.TransformableLambda`。
+// 如果希望该节点有真正的流式输出，需要使用 `compose.StreamableLambda` 或 `compose.TransformableLambda`。
 func (c *Chain[I, O]) AppendLambda(node *Lambda, opts ...GraphAddNodeOpt) *Chain[I, O] {
 	gNode, options := toLambdaNode(node, opts...)
 	c.addNode(gNode, options)
@@ -275,6 +377,12 @@ func (c *Chain[I, O]) AppendLambda(node *Lambda, opts ...GraphAddNodeOpt) *Chain
 //	embedder, err := openai.NewEmbedder(ctx, config)
 //	if err != nil {...}
 //	chain.AppendEmbedding(embedder)
+//
+// AppendEmbedding 向 Chain 添加一个 Embedding 节点。
+// 例如：
+// embedder, err := openai.NewEmbedder(ctx, config)
+// if err != nil {...}
+// chain.AppendEmbedding(embedder)
 func (c *Chain[I, O]) AppendEmbedding(node embedding.Embedder, opts ...GraphAddNodeOpt) *Chain[I, O] {
 	gNode, options := toEmbeddingNode(node, opts...)
 	c.addNode(gNode, options)
@@ -294,6 +402,17 @@ func (c *Chain[I, O]) AppendEmbedding(node embedding.Embedder, opts ...GraphAddN
 //		retriever, err := fornaxknowledge.NewKnowledgeRetriever(ctx, config)
 //		if err != nil {...}
 //		chain.AppendRetriever(retriever)
+//
+// AppendRetriever 向 Chain 添加一个 Retriever 节点。
+// 例如：
+// retriever, err := vectorstore.NewRetriever(ctx, config)
+// if err != nil {...}
+// chain.AppendRetriever(retriever)
+// 或使用 fornax knowledge 作为 retriever：
+// config := fornaxknowledge.Config{...}
+// retriever, err := fornaxknowledge.NewKnowledgeRetriever(ctx, config)
+// if err != nil {...}
+// chain.AppendRetriever(retriever)
 func (c *Chain[I, O]) AppendRetriever(node retriever.Retriever, opts ...GraphAddNodeOpt) *Chain[I, O] {
 	gNode, options := toRetrieverNode(node, opts...)
 	c.addNode(gNode, options)
@@ -306,6 +425,12 @@ func (c *Chain[I, O]) AppendRetriever(node retriever.Retriever, opts ...GraphAdd
 //	loader, err := file.NewFileLoader(ctx, &file.FileLoaderConfig{})
 //	if err != nil {...}
 //	chain.AppendLoader(loader)
+//
+// AppendLoader 向 Chain 添加一个 Loader 节点。
+// 例如：
+// loader, err := file.NewFileLoader(ctx, &file.FileLoaderConfig{})
+// if err != nil {...}
+// chain.AppendLoader(loader)
 func (c *Chain[I, O]) AppendLoader(node document.Loader, opts ...GraphAddNodeOpt) *Chain[I, O] {
 	gNode, options := toLoaderNode(node, opts...)
 	c.addNode(gNode, options)
@@ -324,6 +449,16 @@ func (c *Chain[I, O]) AppendLoader(node document.Loader, opts ...GraphAddNodeOpt
 //	if err != nil {...}
 //
 //	chain.AppendIndexer(indexer)
+//
+// AppendIndexer 向 Chain 添加一个 Indexer 节点。
+// Indexer 是可存储文档的节点。
+// 例如：
+// vectorStoreImpl, err := vikingdb.NewVectorStorer(ctx, vikingdbConfig) // in components/vectorstore/vikingdb/vectorstore.go
+// if err != nil {...}
+// config := vectorstore.IndexerConfig{VectorStore: vectorStoreImpl}
+// indexer, err := vectorstore.NewIndexer(ctx, config)
+// if err != nil {...}
+// chain.AppendIndexer(indexer)
 func (c *Chain[I, O]) AppendIndexer(node indexer.Indexer, opts ...GraphAddNodeOpt) *Chain[I, O] {
 	gNode, options := toIndexerNode(node, opts...)
 	c.addNode(gNode, options)
@@ -339,6 +474,15 @@ func (c *Chain[I, O]) AppendIndexer(node indexer.Indexer, opts ...GraphAddNodeOp
 //	cb.AddChatTemplate("chat_template_key_01", chatTemplate)
 //	cb.AddChatTemplate("chat_template_key_02", chatTemplate2)
 //	chain.AppendBranch(cb)
+//
+// AppendBranch 向 Chain 添加一个条件分支。
+// ChainBranch 中的每个分支都可以是 AnyGraph。
+// 所有分支都应指向 END，或汇聚到 Chain 中的另一个节点。
+// 例如：
+// cb := compose.NewChainBranch(conditionFunc)
+// cb.AddChatTemplate("chat_template_key_01", chatTemplate)
+// cb.AddChatTemplate("chat_template_key_02", chatTemplate2)
+// chain.AppendBranch(cb)
 func (c *Chain[I, O]) AppendBranch(b *ChainBranch) *Chain[I, O] {
 	if b == nil {
 		c.reportError(fmt.Errorf("append branch invalid, branch is nil"))
@@ -362,6 +506,7 @@ func (c *Chain[I, O]) AppendBranch(b *ChainBranch) *Chain[I, O] {
 
 	var startNode string
 	if len(c.preNodeKeys) == 0 { // branch appended directly to START
+		// branch 直接追加到 START
 		startNode = START
 	} else if len(c.preNodeKeys) == 1 {
 		startNode = c.preNodeKeys[0]
@@ -456,6 +601,14 @@ func (c *Chain[I, O]) AppendBranch(b *ChainBranch) *Chain[I, O] {
 //	chain.AppendParallel(parallel) // => multiple concurrent nodes are added to the Chain
 //
 //	The next node in the chain is either an END, or a node which accepts a map[string]any, where keys are `openai` `maas` as specified above.
+//
+// AppendParallel 向 Chain 添加一个 Parallel 结构（多个并发节点）。
+// 例如：
+// parallel := compose.NewParallel()
+// parallel.AddChatModel("openai", model1) // => "openai": *schema.Message{}
+// parallel.AddChatModel("maas", model2) // => "maas": *schema.Message{}
+// chain.AppendParallel(parallel) // => multiple concurrent nodes are added to the Chain
+// Chain 中的下一个节点要么是 END，要么是一个接受 map[string]any 的节点，其中 key 为上面指定的 `openai` `maas`。
 func (c *Chain[I, O]) AppendParallel(p *Parallel) *Chain[I, O] {
 	if p == nil {
 		c.reportError(fmt.Errorf("append parallel invalid, parallel is nil"))
@@ -474,6 +627,7 @@ func (c *Chain[I, O]) AppendParallel(p *Parallel) *Chain[I, O] {
 
 	var startNode string
 	if len(c.preNodeKeys) == 0 { // parallel appended directly to START
+		// parallel 直接追加到 START
 		startNode = START
 	} else if len(c.preNodeKeys) == 1 {
 		startNode = c.preNodeKeys[0]
@@ -519,6 +673,12 @@ func (c *Chain[I, O]) AppendParallel(p *Parallel) *Chain[I, O] {
 //
 //	graph := compose.NewGraph[string, string]()
 //	chain.AppendGraph(graph)
+//
+// AppendGraph 向 Chain 添加一个 AnyGraph 节点。
+// AnyGraph 可以是 Chain 或 Graph。
+// 例如：
+// graph := compose.NewGraph[string, string]()
+// chain.AppendGraph(graph)
 func (c *Chain[I, O]) AppendGraph(node AnyGraph, opts ...GraphAddNodeOpt) *Chain[I, O] {
 	gNode, options := toAnyGraphNode(node, opts...)
 	c.addNode(gNode, options)
@@ -530,6 +690,11 @@ func (c *Chain[I, O]) AppendGraph(node AnyGraph, opts ...GraphAddNodeOpt) *Chain
 // e.g.
 //
 //	chain.AppendPassthrough()
+//
+// AppendPassthrough 向 Chain 添加一个 Passthrough 节点。
+// 可用于连接多个 ChainBranch 或 Parallel。
+// 例如：
+// chain.AppendPassthrough()
 func (c *Chain[I, O]) AppendPassthrough(opts ...GraphAddNodeOpt) *Chain[I, O] {
 	gNode, options := toPassthroughNode(opts...)
 	c.addNode(gNode, options)
@@ -541,6 +706,12 @@ func (c *Chain[I, O]) AppendPassthrough(opts ...GraphAddNodeOpt) *Chain[I, O] {
 // chain key is: node_idx => eg: node_0 => represent the first node of the chain (idx start from 0)
 // if has parallel: node_idx_parallel_idx => eg: node_0_parallel_1 => represent the first node of the chain, and is a parallel node, and the second node of the parallel
 // if has branch: node_idx_branch_key => eg: node_1_branch_customkey => represent the second node of the chain, and is a branch node, and the 'customkey' is the key of the branch
+//
+// nextIdx。
+// 获取 Chain 的下一个 idx。
+// chain key 为：node_idx => 例如：node_0 => 表示 Chain 的第一个节点（idx 从 0 开始）
+// 如果有 parallel：node_idx_parallel_idx => 例如：node_0_parallel_1 => 表示 Chain 的第一个节点，同时是 parallel 节点，且是 parallel 的第二个节点
+// 如果有 branch：node_idx_branch_key => 例如：node_1_branch_customkey => 表示 Chain 的第二个节点，同时是 branch 节点，且 'customkey' 是 branch 的 key
 func (c *Chain[I, O]) nextNodeKey() string {
 	idx := c.nodeIdx
 	c.nodeIdx++
@@ -549,6 +720,9 @@ func (c *Chain[I, O]) nextNodeKey() string {
 
 // reportError.
 // save the first error in the chain.
+//
+// reportError。
+// 保存链中的第一个错误。
 func (c *Chain[I, O]) reportError(err error) {
 	if c.err == nil {
 		c.err = err
@@ -557,6 +731,9 @@ func (c *Chain[I, O]) reportError(err error) {
 
 // addNode.
 // add a node to the chain.
+//
+// addNode。
+// 向链中添加一个节点。
 func (c *Chain[I, O]) addNode(node *graphNode, options *graphAddNodeOpts) {
 	if c.err != nil {
 		return

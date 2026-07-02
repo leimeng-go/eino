@@ -16,4 +16,6 @@
 
 // Package parent provides a retriever that maps sub-document results
 // back to their original parent documents.
+//
+// Package parent 提供一个检索器，用于将子文档结果映射回其原始父文档。
 package parent

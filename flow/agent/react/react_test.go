@@ -100,6 +100,7 @@ func TestReact(t *testing.T) {
 	}
 
 	// test return directly
+	// 测试直接返回
 	times = 0
 	a, err = NewAgent(ctx, &AgentConfig{
 		Model: cm,
@@ -137,11 +138,18 @@ func TestReactWithMessageRewriterAndModifier(t *testing.T) {
 	// This test simulates a single Generate call with a long history.
 	// The MessageRewriter should shorten the history.
 	// The MessageModifier should add a system prompt.
+	//
+	// 此测试模拟一次带长历史的 Generate 调用。
+	// MessageRewriter 应缩短历史。
+	// MessageModifier 应添加系统提示。
 
 	cm.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(func(ctx context.Context, input []*schema.Message, opts ...model.Option) (*schema.Message, error) {
 			// Check messages passed to the model.
 			// Expected: [system prompt, user: "message 2", assistant: "response 2"]
+			//
+			// 检查传给模型的消息。
+			// 预期：[system prompt, user: "message 2", assistant: "response 2"]
 			assert.Len(t, input, 3)
 			assert.Equal(t, schema.System, input[0].Role)
 			assert.Equal(t, "system prompt", input[0].Content)
@@ -157,7 +165,9 @@ func TestReactWithMessageRewriterAndModifier(t *testing.T) {
 		ToolCallingModel: cm,
 		MessageRewriter: func(ctx context.Context, messages []*schema.Message) []*schema.Message {
 			// Keep only the last 2 messages if history is longer.
+			// 如果历史较长，仅保留最后 2 条消息。
 			assert.Len(t, messages, 4) // user1, assistant1, user2, assistant2
+			// user1, assistant1, user2, assistant2
 			if len(messages) > 2 {
 				return messages[len(messages)-2:]
 			}
@@ -165,9 +175,12 @@ func TestReactWithMessageRewriterAndModifier(t *testing.T) {
 		},
 		MessageModifier: func(ctx context.Context, messages []*schema.Message) []*schema.Message {
 			// messages should be the result from rewriter
+			// messages 应为 rewriter 的结果
 			assert.Len(t, messages, 2) // user2, assistant2
+			// user2, assistant2
 
 			// Add a system prompt
+			// 添加系统提示
 			res := make([]*schema.Message, 0, len(messages)+1)
 			res = append(res, schema.SystemMessage("system prompt"))
 			res = append(res, messages...)
@@ -177,6 +190,7 @@ func TestReactWithMessageRewriterAndModifier(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Simulate a conversation history
+	// 模拟对话历史
 	history := []*schema.Message{
 		schema.UserMessage("message 1"),
 		schema.AssistantMessage("response 1", nil),
@@ -185,6 +199,7 @@ func TestReactWithMessageRewriterAndModifier(t *testing.T) {
 	}
 
 	// Run the react agent
+	// 运行 react 智能体
 	finalMsg, err := ra.Generate(ctx, history)
 	assert.NoError(t, err)
 	assert.Equal(t, "final response", finalMsg.Content)
@@ -243,6 +258,7 @@ func TestReactStream(t *testing.T) {
 					nil)
 				return sr, nil
 			} else if times == 4 { // parallel tool call
+				// 并行工具调用
 				sw.Send(schema.AssistantMessage("hello max",
 					[]schema.ToolCall{
 						{
@@ -317,6 +333,7 @@ func TestReactStream(t *testing.T) {
 	assert.NoError(t, err)
 
 	// test return directly
+	// 测试直接返回
 	a, err = NewAgent(ctx, &AgentConfig{
 		Model: cm,
 		ToolsConfig: compose.ToolsNodeConfig{
@@ -325,6 +342,7 @@ func TestReactStream(t *testing.T) {
 
 		MaxStep:            40,
 		ToolReturnDirectly: map[string]struct{}{info.Name: {}}, // one of the two tools is return directly
+		// 两个工具中有一个直接返回
 	})
 	assert.Nil(t, err)
 
@@ -365,6 +383,7 @@ func TestReactStream(t *testing.T) {
 	t.Log(msg.Content)
 
 	// return directly tool call within parallel tool calls
+	// 并行工具调用中的直接返回工具调用
 	out, err = a.Stream(ctx, []*schema.Message{
 		{
 			Role:    schema.User,
@@ -672,11 +691,13 @@ func TestWithTools(t *testing.T) {
 		}).AnyTimes()
 
 	// Test WithTools function
+	// 测试 WithTools 函数
 	toolOptions, err := WithTools(ctx, fakeTool, fakeStreamTool)
 	assert.NoError(t, err)
 	assert.Len(t, toolOptions, 2, "WithTools should return exactly 2 options")
 
 	// Create agent without tools in config
+	// 创建配置中不含工具的智能体
 	a, err := NewAgent(ctx, &AgentConfig{
 		ToolCallingModel: cm,
 		MaxStep:          10,
@@ -684,6 +705,7 @@ func TestWithTools(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test Generate with WithTools options
+	// 测试带 WithTools 选项的 Generate
 	times = 0
 	msg, err := a.Generate(ctx, []*schema.Message{
 		schema.UserMessage("test generate with tools"),
@@ -692,6 +714,7 @@ func TestWithTools(t *testing.T) {
 	assert.Equal(t, "done", msg.Content)
 
 	// Test Stream with WithTools options
+	// 测试带 WithTools 选项的 Stream
 	times = 0
 	stream, err := a.Stream(ctx, []*schema.Message{
 		schema.UserMessage("test stream with tools"),
@@ -717,6 +740,7 @@ func TestWithTools(t *testing.T) {
 	assert.Equal(t, "stream done", concatMsg.Content)
 
 	// Test error case - tool Info() returns error
+	// 测试错误场景 - 工具 Info() 返回错误
 	errorTool := &errorToolForTest{}
 	_, err = WithTools(ctx, errorTool)
 	assert.Error(t, err)
@@ -724,6 +748,7 @@ func TestWithTools(t *testing.T) {
 }
 
 // Helper tool for testing error cases
+// 用于测试错误场景的辅助工具
 type errorToolForTest struct{}
 
 func (t *errorToolForTest) Info(_ context.Context) (*schema.ToolInfo, error) {

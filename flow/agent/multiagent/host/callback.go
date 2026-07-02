@@ -28,17 +28,20 @@ import (
 )
 
 // MultiAgentCallback is the callback interface for host multi-agent.
+// MultiAgentCallback 是 host 多智能体的回调接口。
 type MultiAgentCallback interface {
 	OnHandOff(ctx context.Context, info *HandOffInfo) context.Context
 }
 
 // HandOffInfo is the info which will be passed to MultiAgentCallback.OnHandOff, representing a hand off event.
+// HandOffInfo 是传递给 MultiAgentCallback.OnHandOff 的信息，表示一次 hand off 事件。
 type HandOffInfo struct {
 	ToAgentName string
 	Argument    string
 }
 
 // ConvertCallbackHandlers converts []host.MultiAgentCallback to callbacks.Handler.
+// ConvertCallbackHandlers 将 []host.MultiAgentCallback 转换为 callbacks.Handler。
 func ConvertCallbackHandlers(handlers ...MultiAgentCallback) callbacks.Handler {
 	onChatModelEnd := func(ctx context.Context, info *callbacks.RunInfo, output *model.CallbackOutput) context.Context {
 		msg := output.Message
@@ -89,6 +92,7 @@ func ConvertCallbackHandlers(handlers ...MultiAgentCallback) callbacks.Handler {
 }
 
 // convertCallbacks reads graph call options, extract host.MultiAgentCallback and convert it to callbacks.Handler.
+// convertCallbacks 读取图调用选项，提取 host.MultiAgentCallback 并将其转换为 callbacks.Handler。
 func convertCallbacks(opts ...agent.AgentOption) callbacks.Handler {
 	agentOptions := agent.GetImplSpecificOptions(&options{}, opts...)
 	if len(agentOptions.agentCallbacks) == 0 {

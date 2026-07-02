@@ -16,6 +16,9 @@
 
 // Package utils provides helper utilities for retriever flows, including
 // concurrent retrieval with callback instrumentation.
+//
+// Package utils 提供 retriever flows 的辅助工具，包括
+// 带回调埋点的并发检索。
 package utils
 
 import (
@@ -31,6 +34,9 @@ import (
 
 // RetrieveTask is a task for retrieving documents.
 // RetrieveTask represents a single retrieval job with its result or error.
+//
+// RetrieveTask 是用于检索文档的任务。
+// RetrieveTask 表示单个检索任务及其结果或错误。
 type RetrieveTask struct {
 	Name            string
 	Retriever       retriever.Retriever
@@ -41,6 +47,7 @@ type RetrieveTask struct {
 }
 
 // ConcurrentRetrieveWithCallback concurrently retrieves documents with callback.
+// ConcurrentRetrieveWithCallback 使用回调并发检索文档。
 func ConcurrentRetrieveWithCallback(ctx context.Context, tasks []*RetrieveTask) {
 	wg := sync.WaitGroup{}
 	for i := range tasks {

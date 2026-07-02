@@ -30,11 +30,13 @@ import (
 )
 
 // WithToolOptions returns an agent option that specifies tool.Option for the tools in agent.
+// WithToolOptions 返回一个智能体 option，用于为智能体中的工具指定 tool.Option。
 func WithToolOptions(opts ...tool.Option) agent.AgentOption {
 	return agent.WithComposeOptions(compose.WithToolsNodeOption(compose.WithToolOption(opts...)))
 }
 
 // WithChatModelOptions returns an agent option that specifies model.Option for the chat model in agent.
+// WithChatModelOptions 返回一个智能体 option，用于为智能体中的聊天模型指定 model.Option。
 func WithChatModelOptions(opts ...model.Option) agent.AgentOption {
 	return agent.WithComposeOptions(compose.WithChatModelOption(opts...))
 }
@@ -42,6 +44,10 @@ func WithChatModelOptions(opts ...model.Option) agent.AgentOption {
 // WithToolList returns an agent option that specifies compose.ToolsNodeOption for ToolsNode in agent.
 // If you also need to pass ToolInfo to the chat model, use WithTools instead.
 // Deprecated: This changes tool list for ToolsNode ONLY.
+//
+// WithToolList 返回一个智能体 option，用于为智能体中的 ToolsNode 指定 compose.ToolsNodeOption。
+// 如果还需要将 ToolInfo 传给聊天模型，请使用 WithTools。
+// Deprecated: 这只会更改 ToolsNode 的工具列表。
 func WithToolList(tools ...tool.BaseTool) agent.AgentOption {
 	return agent.WithComposeOptions(compose.WithToolsNodeOption(compose.WithToolList(tools...)))
 }
@@ -89,6 +95,42 @@ func WithToolList(tools ...tool.BaseTool) agent.AgentOption {
 // Notes:
 //   - The function always returns exactly 2 options when successful
 //   - Both returned options should be applied to the agent for proper tool functionality
+//
+// WithTools 是一个便捷函数，用工具列表配置 React 智能体。
+// 它执行两个核心操作：
+// 1. 提取工具信息，使聊天模型了解可用工具
+// 2. 注册实际的工具实现以供执行
+// 参数：
+// - ctx: 操作的 context，在调用每个工具的 Info() 时使用
+// - tools: 可变参数工具列表，必须实现 InvokableTool 或 StreamableTool 接口
+// 返回：
+// - []agent.AgentOption: 一个正好包含 2 个智能体 option 的切片：
+// - Option 1: 通过 model.WithTools(toolInfos) 为聊天模型配置工具 schema
+// - Option 2: 通过 compose.WithToolList(tools...) 注册工具实现
+// - error: 如果任意工具的 Info() 方法失败，则返回错误
+// 用法示例：
+// ctx := context.Background()
+// agentOptions, err := WithTools(ctx, myTool1, myTool2, myTool3)
+// if err != nil {
+// return fmt.Errorf("failed to configure tools: %w", err)
+// }
+// agent, err := react.NewAgent(ctx, &react.AgentConfig{
+// ToolCallingModel: myModel,
+// other config...
+// })
+// if err != nil {
+// return fmt.Errorf("failed to create agent: %w", err)
+// }
+// Use the tool options with Generate or Stream methods
+// msg, err := agent.Generate(ctx, messages, agentOptions...)
+// or
+// stream, err := agent.Stream(ctx, messages, agentOptions...)
+// 与相关函数对比：
+// - WithToolList: 只注册工具实现，不配置聊天模型
+// - WithTools: 完整设置，同时处理聊天模型配置和工具注册
+// 说明：
+// - 成功时该函数总是正好返回 2 个 option
+// - 应将两个返回的 option 都应用到智能体，才能保证工具功能正常
 func WithTools(ctx context.Context, tools ...tool.BaseTool) ([]agent.AgentOption, error) {
 	toolInfos := make([]*schema.ToolInfo, 0, len(tools))
 	for _, tl := range tools {
@@ -108,12 +150,18 @@ func WithTools(ctx context.Context, tools ...tool.BaseTool) ([]agent.AgentOption
 
 // Iterator provides a lightweight FIFO stream of values and errors
 // produced during agent execution.
+//
+// Iterator 提供一个轻量级 FIFO 流，用于传递智能体执行期间
+// 产生的值和错误。
 type Iterator[T any] struct {
 	ch *internal.UnboundedChan[item[T]]
 }
 
 // Next retrieves the next value from the iterator.
 // It returns the zero value and false when the stream is exhausted.
+//
+// Next 从 iterator 中获取下一个值。
+// 当流耗尽时，返回零值和 false。
 func (iter *Iterator[T]) Next() (T, bool, error) {
 	ch := iter.ch
 	if ch == nil {
@@ -132,11 +180,15 @@ func (iter *Iterator[T]) Next() (T, bool, error) {
 
 // MessageFuture exposes asynchronous accessors for messages produced
 // by Generate and Stream calls.
+//
+// MessageFuture 提供对 Generate 和 Stream 调用产生的消息的异步访问方法。
 type MessageFuture interface {
 	// GetMessages returns an iterator for retrieving messages generated during "agent.Generate" calls.
+	// GetMessages 返回一个 iterator，用于获取 "agent.Generate" 调用期间生成的消息。
 	GetMessages() *Iterator[*schema.Message]
 
 	// GetMessageStreams returns an iterator for retrieving streaming messages generated during "agent.Stream" calls.
+	// GetMessageStreams 返回一个 iterator，用于获取 "agent.Stream" 调用期间生成的流式消息。
 	GetMessageStreams() *Iterator[*schema.StreamReader[*schema.Message]]
 }
 
@@ -148,6 +200,13 @@ type MessageFuture interface {
 // embedded as a subgraph within another graph. Graph callbacks are filtered using
 // the address in the context: only callbacks whose address contains a runnable segment
 // matching the agent's configured graph name are processed.
+//
+// WithMessageFuture 返回一个智能体 option 和一个 MessageFuture 接口实例。
+// 该 option 配置智能体收集执行期间生成的消息，
+// 而 MessageFuture 接口允许用户异步获取这些消息。
+// 无论智能体被直接使用，还是作为子图嵌入到另一个图中，
+// 该函数都能正常工作。Graph 回调会使用 context 中的地址进行过滤：
+// 只处理其地址包含与智能体配置的 graph 名称匹配的 runnable 段的回调。
 func WithMessageFuture() (agent.AgentOption, MessageFuture) {
 	h := &cbHandler{started: make(chan struct{}), graphName: GraphName}
 
@@ -264,6 +323,13 @@ func (h *cbHandler) GetMessageStreams() *Iterator[*schema.StreamReader[*schema.M
 // two React agents at different nesting depths (e.g., an outer agent whose tool invokes
 // another React agent) will never interfere with each other even if they share the same
 // graph name.
+//
+// isOwnGraph 报告该回调是否针对 React 智能体自身的图被调用。
+// 第一次 onGraphStart 调用记录 h.ownAddress 后，后续调用会将
+// 当前 context 地址与该精确记录的地址进行比较。这能正确处理嵌套 React
+// 智能体：每个 cbHandler 实例都会记录自己唯一的完整地址路径，因此
+// 位于不同嵌套深度的两个 React 智能体（例如外层智能体的工具调用了
+// 另一个 React 智能体）即使共享相同的 graph 名称，也不会相互干扰。
 func (h *cbHandler) isOwnGraph(ctx context.Context) bool {
 	if !h.ownClaimed {
 		return false
@@ -275,6 +341,10 @@ func (h *cbHandler) isOwnGraph(ctx context.Context) bool {
 // to record this handler's address on first invocation. It returns true if the handler
 // has not yet been initialised, records the current address, and returns false on all
 // subsequent calls.
+//
+// claimOwnership 仅由 onGraphStart / onGraphStartWithStreamInput 调用，
+// 用于在首次调用时记录此处理器的地址。如果处理器尚未初始化，它返回 true，
+// 记录当前地址，并在所有后续调用中返回 false。
 func (h *cbHandler) claimOwnership(ctx context.Context) bool {
 	if h.ownClaimed {
 		return false

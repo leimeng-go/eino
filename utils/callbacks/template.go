@@ -15,6 +15,7 @@
  */
 
 // Package callbacks provides ready-to-use callback handler templates for components.
+// Package callbacks 提供可直接使用的组件回调处理器模板。
 package callbacks
 
 import (
@@ -38,6 +39,11 @@ import (
 // This builder can be used to configure and build a component template handler,
 // which can handle callback events for different components with its own struct definition,
 // and fallbackTemplate can be used to handle scenarios where none of the cases are hit as a fallback.
+//
+// NewHandlerHelper 创建一个新的组件模板处理器构建器。
+// 该构建器可用于配置并构建组件模板处理器，
+// 它能通过自身的结构体定义处理不同组件的回调事件，
+// fallbackTemplate 可作为兜底，用于处理未命中任何 case 的场景。
 func NewHandlerHelper() *HandlerHelper {
 	return &HandlerHelper{
 		composeTemplates: map[components.Component]callbacks.Handler{},
@@ -54,6 +60,15 @@ func NewHandlerHelper() *HandlerHelper {
 //		Handler()
 //
 // then use the handler with runnable.Invoke(ctx, input, compose.WithCallbacks(handler))
+//
+// HandlerHelper 是用于创建 callbacks.Handler 的构建器，可为不同组件类型指定处理器。
+// 使用 callbacks.NewHandlerHelper() 创建处理器。
+// 例如：
+// helper := template.NewHandlerHelper().
+// ChatModel(&model.IndexerCallbackHandler{}).
+// Prompt(&prompt.IndexerCallbackHandler{}).
+// Handler()
+// 然后通过 runnable.Invoke(ctx, input, compose.WithCallbacks(handler)) 使用该处理器
 type HandlerHelper struct {
 	promptHandler           *PromptCallbackHandler
 	chatModelHandler        *ModelCallbackHandler
@@ -73,107 +88,125 @@ type HandlerHelper struct {
 }
 
 // Handler returns the callbacks.Handler created by HandlerHelper.
+// Handler 返回由 HandlerHelper 创建的 callbacks.Handler。
 func (c *HandlerHelper) Handler() callbacks.Handler {
 	return &handlerTemplate{c}
 }
 
 // Prompt sets the prompt handler for the handler helper, which will be called when the prompt component is executed.
+// Prompt 为 handler helper 设置提示处理器，在执行提示组件时会调用它。
 func (c *HandlerHelper) Prompt(handler *PromptCallbackHandler) *HandlerHelper {
 	c.promptHandler = handler
 	return c
 }
 
 // ChatModel sets the chat model handler for the handler helper, which will be called when the chat model component is executed.
+// ChatModel 为 handler helper 设置聊天模型处理器，在执行聊天模型组件时会调用它。
 func (c *HandlerHelper) ChatModel(handler *ModelCallbackHandler) *HandlerHelper {
 	c.chatModelHandler = handler
 	return c
 }
 
 // Embedding sets the embedding handler for the handler helper, which will be called when the embedding component is executed.
+// Embedding 为 handler helper 设置嵌入处理器，在执行嵌入组件时会调用它。
 func (c *HandlerHelper) Embedding(handler *EmbeddingCallbackHandler) *HandlerHelper {
 	c.embeddingHandler = handler
 	return c
 }
 
 // Indexer sets the indexer handler for the handler helper, which will be called when the indexer component is executed.
+// Indexer 为 handler helper 设置索引器处理器，在执行索引器组件时会调用它。
 func (c *HandlerHelper) Indexer(handler *IndexerCallbackHandler) *HandlerHelper {
 	c.indexerHandler = handler
 	return c
 }
 
 // Retriever sets the retriever handler for the handler helper, which will be called when the retriever component is executed.
+// Retriever 为 handler helper 设置检索器处理器，在执行检索器组件时会调用它。
 func (c *HandlerHelper) Retriever(handler *RetrieverCallbackHandler) *HandlerHelper {
 	c.retrieverHandler = handler
 	return c
 }
 
 // Loader sets the loader handler for the handler helper, which will be called when the loader component is executed.
+// Loader 为 handler helper 设置加载器处理器，在执行加载器组件时会调用它。
 func (c *HandlerHelper) Loader(handler *LoaderCallbackHandler) *HandlerHelper {
 	c.loaderHandler = handler
 	return c
 }
 
 // Transformer sets the transformer handler for the handler helper, which will be called when the transformer component is executed.
+// Transformer 为 handler helper 设置转换器处理器，在执行转换器组件时会调用它。
 func (c *HandlerHelper) Transformer(handler *TransformerCallbackHandler) *HandlerHelper {
 	c.transformerHandler = handler
 	return c
 }
 
 // Tool sets the tool handler for the handler helper, which will be called when the tool component is executed.
+// Tool 为 handler helper 设置工具处理器，在执行工具组件时会调用它。
 func (c *HandlerHelper) Tool(handler *ToolCallbackHandler) *HandlerHelper {
 	c.toolHandler = handler
 	return c
 }
 
 // ToolsNode sets the tools node handler for the handler helper, which will be called when the tools node is executed.
+// ToolsNode 为 handler helper 设置工具节点处理器，在执行工具节点时会调用它。
 func (c *HandlerHelper) ToolsNode(handler *ToolsNodeCallbackHandlers) *HandlerHelper {
 	c.toolsNodeHandler = handler
 	return c
 }
 
 // AgenticPrompt sets the agentic prompt handler for the handler helper, which will be called when the agentic prompt component is executed.
+// AgenticPrompt 为 handler helper 设置 agentic 提示处理器，在执行 agentic 提示组件时会调用它。
 func (c *HandlerHelper) AgenticPrompt(handler *AgenticPromptCallbackHandler) *HandlerHelper {
 	c.agenticPromptHandler = handler
 	return c
 }
 
 // AgenticModel sets the agentic chat model handler for the handler helper, which will be called when the agentic chat model component is executed.
+// AgenticModel 为 handler helper 设置 agentic 聊天模型处理器，在执行 agentic 聊天模型组件时会调用它。
 func (c *HandlerHelper) AgenticModel(handler *AgenticModelCallbackHandler) *HandlerHelper {
 	c.agenticModelHandler = handler
 	return c
 }
 
 // AgenticToolsNode sets the agentic tools node handler for the handler helper, which will be called when the agentic tools node is executed.
+// AgenticToolsNode 为 handler helper 设置 agentic 工具节点处理器，在执行 agentic 工具节点时会调用它。
 func (c *HandlerHelper) AgenticToolsNode(handler *AgenticToolsNodeCallbackHandlers) *HandlerHelper {
 	c.agenticToolsNodeHandler = handler
 	return c
 }
 
 // Agent sets the agent handler for the handler helper, which will be called when the agent is executed.
+// Agent 为 handler helper 设置智能体处理器，在执行智能体时会调用它。
 func (c *HandlerHelper) Agent(handler *AgentCallbackHandler) *HandlerHelper {
 	c.agentHandler = handler
 	return c
 }
 
 // AgenticAgent sets the agentic agent callback handler for the handler helper, which will be called when an agentic agent is executed.
+// AgenticAgent 为 handler helper 设置 agentic 智能体回调处理器，在执行 agentic 智能体时会调用它。
 func (c *HandlerHelper) AgenticAgent(handler *AgenticAgentCallbackHandler) *HandlerHelper {
 	c.agenticAgentHandler = handler
 	return c
 }
 
 // Graph sets the graph handler for the handler helper, which will be called when the graph is executed.
+// Graph 为 handler helper 设置图处理器，在执行图时会调用它。
 func (c *HandlerHelper) Graph(handler callbacks.Handler) *HandlerHelper {
 	c.composeTemplates[compose.ComponentOfGraph] = handler
 	return c
 }
 
 // Chain sets the chain handler for the handler helper, which will be called when the chain is executed.
+// Chain 为 handler helper 设置链处理器，在执行链时会调用它。
 func (c *HandlerHelper) Chain(handler callbacks.Handler) *HandlerHelper {
 	c.composeTemplates[compose.ComponentOfChain] = handler
 	return c
 }
 
 // Lambda sets the lambda handler for the handler helper, which will be called when the lambda is executed.
+// Lambda 设置 handler helper 的 lambda 处理器，该处理器会在 lambda 执行时被调用。
 func (c *HandlerHelper) Lambda(handler callbacks.Handler) *HandlerHelper {
 	c.composeTemplates[compose.ComponentOfLambda] = handler
 	return c
@@ -185,6 +218,9 @@ type handlerTemplate struct {
 
 // OnStart is the callback function for the start event of a component.
 // implement the callbacks Handler interface.
+//
+// OnStart 是组件 start 事件的回调函数。
+// 实现 callbacks Handler 接口。
 func (c *handlerTemplate) OnStart(ctx context.Context, info *callbacks.RunInfo, input callbacks.CallbackInput) context.Context {
 	switch info.Component {
 	case components.ComponentOfPrompt:
@@ -226,6 +262,9 @@ func (c *handlerTemplate) OnStart(ctx context.Context, info *callbacks.RunInfo, 
 
 // OnEnd is the callback function for the end event of a component.
 // implement the callbacks Handler interface.
+//
+// OnEnd 是组件 end 事件的回调函数。
+// 实现 callbacks Handler 接口。
 func (c *handlerTemplate) OnEnd(ctx context.Context, info *callbacks.RunInfo, output callbacks.CallbackOutput) context.Context {
 	switch info.Component {
 	case components.ComponentOfPrompt:
@@ -267,6 +306,9 @@ func (c *handlerTemplate) OnEnd(ctx context.Context, info *callbacks.RunInfo, ou
 
 // OnError is the callback function for the error event of a component.
 // implement the callbacks Handler interface.
+//
+// OnError 是组件 error 事件的回调函数。
+// 实现 callbacks Handler 接口。
 func (c *handlerTemplate) OnError(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
 	switch info.Component {
 	case components.ComponentOfPrompt:
@@ -304,9 +346,13 @@ func (c *handlerTemplate) OnError(ctx context.Context, info *callbacks.RunInfo, 
 
 // OnStartWithStreamInput is the callback function for the start event of a component with stream input.
 // implement the callbacks Handler interface.
+//
+// OnStartWithStreamInput 是带流输入组件的 start 事件回调函数。
+// 实现 callbacks Handler 接口。
 func (c *handlerTemplate) OnStartWithStreamInput(ctx context.Context, info *callbacks.RunInfo, input *schema.StreamReader[callbacks.CallbackInput]) context.Context {
 	switch info.Component {
 	// currently no components.Component receive stream as input
+	// 当前没有 components.Component 接收流作为输入
 	case compose.ComponentOfGraph,
 		compose.ComponentOfChain,
 		compose.ComponentOfLambda:
@@ -318,6 +364,9 @@ func (c *handlerTemplate) OnStartWithStreamInput(ctx context.Context, info *call
 
 // OnEndWithStreamOutput is the callback function for the end event of a component with stream output.
 // implement the callbacks Handler interface.
+//
+// OnEndWithStreamOutput 是带流输出组件的 end 事件回调函数。
+// 实现 callbacks Handler 接口。
 func (c *handlerTemplate) OnEndWithStreamOutput(ctx context.Context, info *callbacks.RunInfo, output *schema.StreamReader[callbacks.CallbackOutput]) context.Context {
 	switch info.Component {
 	case components.ComponentOfChatModel:
@@ -437,6 +486,7 @@ func (c *handlerTemplate) Needed(ctx context.Context, info *callbacks.RunInfo, t
 }
 
 // LoaderCallbackHandler is the handler for the loader callback.
+// LoaderCallbackHandler 是 loader 回调的处理器。
 type LoaderCallbackHandler struct {
 	OnStart func(ctx context.Context, runInfo *callbacks.RunInfo, input *document.LoaderCallbackInput) context.Context
 	OnEnd   func(ctx context.Context, runInfo *callbacks.RunInfo, output *document.LoaderCallbackOutput) context.Context
@@ -444,6 +494,7 @@ type LoaderCallbackHandler struct {
 }
 
 // Needed checks if the callback handler is needed for the given timing.
+// Needed 检查给定 timing 是否需要该回调处理器。
 func (ch *LoaderCallbackHandler) Needed(ctx context.Context, runInfo *callbacks.RunInfo, timing callbacks.CallbackTiming) bool {
 	switch timing {
 	case callbacks.TimingOnStart:
@@ -458,6 +509,7 @@ func (ch *LoaderCallbackHandler) Needed(ctx context.Context, runInfo *callbacks.
 }
 
 // TransformerCallbackHandler is the handler for the transformer callback.
+// TransformerCallbackHandler 是 transformer 回调的处理器。
 type TransformerCallbackHandler struct {
 	OnStart func(ctx context.Context, runInfo *callbacks.RunInfo, input *document.TransformerCallbackInput) context.Context
 	OnEnd   func(ctx context.Context, runInfo *callbacks.RunInfo, output *document.TransformerCallbackOutput) context.Context
@@ -465,6 +517,7 @@ type TransformerCallbackHandler struct {
 }
 
 // Needed checks if the callback handler is needed for the given timing.
+// Needed 检查给定 timing 是否需要该回调处理器。
 func (ch *TransformerCallbackHandler) Needed(ctx context.Context, runInfo *callbacks.RunInfo, timing callbacks.CallbackTiming) bool {
 	switch timing {
 	case callbacks.TimingOnStart:
@@ -479,6 +532,7 @@ func (ch *TransformerCallbackHandler) Needed(ctx context.Context, runInfo *callb
 }
 
 // EmbeddingCallbackHandler is the handler for the embedding callback.
+// EmbeddingCallbackHandler 是嵌入回调的处理器。
 type EmbeddingCallbackHandler struct {
 	OnStart func(ctx context.Context, runInfo *callbacks.RunInfo, input *embedding.CallbackInput) context.Context
 	OnEnd   func(ctx context.Context, runInfo *callbacks.RunInfo, output *embedding.CallbackOutput) context.Context
@@ -486,6 +540,7 @@ type EmbeddingCallbackHandler struct {
 }
 
 // Needed checks if the callback handler is needed for the given timing.
+// Needed 检查给定 timing 是否需要该回调处理器。
 func (ch *EmbeddingCallbackHandler) Needed(ctx context.Context, runInfo *callbacks.RunInfo, timing callbacks.CallbackTiming) bool {
 	switch timing {
 	case callbacks.TimingOnStart:
@@ -500,6 +555,7 @@ func (ch *EmbeddingCallbackHandler) Needed(ctx context.Context, runInfo *callbac
 }
 
 // IndexerCallbackHandler is the handler for the indexer callback.
+// IndexerCallbackHandler 是索引器回调的处理器。
 type IndexerCallbackHandler struct {
 	OnStart func(ctx context.Context, runInfo *callbacks.RunInfo, input *indexer.CallbackInput) context.Context
 	OnEnd   func(ctx context.Context, runInfo *callbacks.RunInfo, output *indexer.CallbackOutput) context.Context
@@ -507,6 +563,7 @@ type IndexerCallbackHandler struct {
 }
 
 // Needed checks if the callback handler is needed for the given timing.
+// Needed 检查给定 timing 是否需要该回调处理器。
 func (ch *IndexerCallbackHandler) Needed(ctx context.Context, runInfo *callbacks.RunInfo, timing callbacks.CallbackTiming) bool {
 	switch timing {
 	case callbacks.TimingOnStart:
@@ -521,6 +578,7 @@ func (ch *IndexerCallbackHandler) Needed(ctx context.Context, runInfo *callbacks
 }
 
 // ModelCallbackHandler is the handler for the model callback.
+// ModelCallbackHandler 是 model 回调的处理器。
 type ModelCallbackHandler struct {
 	OnStart               func(ctx context.Context, runInfo *callbacks.RunInfo, input *model.CallbackInput) context.Context
 	OnEnd                 func(ctx context.Context, runInfo *callbacks.RunInfo, output *model.CallbackOutput) context.Context
@@ -529,6 +587,7 @@ type ModelCallbackHandler struct {
 }
 
 // Needed checks if the callback handler is needed for the given timing.
+// Needed 检查给定 timing 是否需要该回调处理器。
 func (ch *ModelCallbackHandler) Needed(ctx context.Context, runInfo *callbacks.RunInfo, timing callbacks.CallbackTiming) bool {
 	switch timing {
 	case callbacks.TimingOnStart:
@@ -545,16 +604,21 @@ func (ch *ModelCallbackHandler) Needed(ctx context.Context, runInfo *callbacks.R
 }
 
 // PromptCallbackHandler is the handler for the callback.
+// PromptCallbackHandler 是回调的处理器。
 type PromptCallbackHandler struct {
 	// OnStart is the callback function for the start of the callback.
+	// OnStart 是回调开始时的回调函数。
 	OnStart func(ctx context.Context, runInfo *callbacks.RunInfo, input *prompt.CallbackInput) context.Context
 	// OnEnd is the callback function for the end of the callback.
+	// OnEnd 是回调结束时的回调函数。
 	OnEnd func(ctx context.Context, runInfo *callbacks.RunInfo, output *prompt.CallbackOutput) context.Context
 	// OnError is the callback function for the error of the callback.
+	// OnError 是 callback 出错时的回调函数。
 	OnError func(ctx context.Context, runInfo *callbacks.RunInfo, err error) context.Context
 }
 
 // Needed checks if the callback handler is needed for the given timing.
+// Needed 检查在给定 timing 下是否需要该回调处理器。
 func (ch *PromptCallbackHandler) Needed(ctx context.Context, runInfo *callbacks.RunInfo, timing callbacks.CallbackTiming) bool {
 	switch timing {
 	case callbacks.TimingOnStart:
@@ -569,16 +633,21 @@ func (ch *PromptCallbackHandler) Needed(ctx context.Context, runInfo *callbacks.
 }
 
 // RetrieverCallbackHandler is the handler for the retriever callback.
+// RetrieverCallbackHandler 是 retriever 回调的处理器。
 type RetrieverCallbackHandler struct {
 	// OnStart is the callback function for the start of the retriever.
+	// OnStart 是 retriever 启动时的回调函数。
 	OnStart func(ctx context.Context, runInfo *callbacks.RunInfo, input *retriever.CallbackInput) context.Context
 	// OnEnd is the callback function for the end of the retriever.
+	// OnEnd 是 retriever 结束时的回调函数。
 	OnEnd func(ctx context.Context, runInfo *callbacks.RunInfo, output *retriever.CallbackOutput) context.Context
 	// OnError is the callback function for the error of the retriever.
+	// OnError 是 retriever 出错时的回调函数。
 	OnError func(ctx context.Context, runInfo *callbacks.RunInfo, err error) context.Context
 }
 
 // Needed checks if the callback handler is needed for the given timing.
+// Needed 检查在给定 timing 下是否需要该回调处理器。
 func (ch *RetrieverCallbackHandler) Needed(ctx context.Context, runInfo *callbacks.RunInfo, timing callbacks.CallbackTiming) bool {
 	switch timing {
 	case callbacks.TimingOnStart:
@@ -593,6 +662,7 @@ func (ch *RetrieverCallbackHandler) Needed(ctx context.Context, runInfo *callbac
 }
 
 // ToolCallbackHandler is the handler for the tool callback.
+// ToolCallbackHandler 是工具回调的处理器。
 type ToolCallbackHandler struct {
 	OnStart               func(ctx context.Context, info *callbacks.RunInfo, input *tool.CallbackInput) context.Context
 	OnEnd                 func(ctx context.Context, info *callbacks.RunInfo, output *tool.CallbackOutput) context.Context
@@ -601,6 +671,7 @@ type ToolCallbackHandler struct {
 }
 
 // Needed checks if the callback handler is needed for the given timing.
+// Needed 检查在给定 timing 下是否需要该回调处理器。
 func (ch *ToolCallbackHandler) Needed(ctx context.Context, runInfo *callbacks.RunInfo, timing callbacks.CallbackTiming) bool {
 	switch timing {
 	case callbacks.TimingOnStart:
@@ -618,6 +689,8 @@ func (ch *ToolCallbackHandler) Needed(ctx context.Context, runInfo *callbacks.Ru
 
 // ToolsNodeCallbackHandlers defines optional callbacks for the Tools node
 // lifecycle events.
+//
+// ToolsNodeCallbackHandlers 定义 Tools 节点生命周期事件的可选回调。
 type ToolsNodeCallbackHandlers struct {
 	OnStart               func(ctx context.Context, info *callbacks.RunInfo, input *schema.Message) context.Context
 	OnEnd                 func(ctx context.Context, info *callbacks.RunInfo, input []*schema.Message) context.Context
@@ -626,6 +699,7 @@ type ToolsNodeCallbackHandlers struct {
 }
 
 // Needed reports whether a handler is registered for the given timing.
+// Needed 报告在给定 timing 下是否注册了处理器。
 func (ch *ToolsNodeCallbackHandlers) Needed(ctx context.Context, runInfo *callbacks.RunInfo, timing callbacks.CallbackTiming) bool {
 	switch timing {
 	case callbacks.TimingOnStart:
@@ -661,11 +735,17 @@ func convToolsNodeCallbackOutput(src callbacks.CallbackInput) []*schema.Message 
 
 // AgentCallbackHandler handles callbacks for agents using *schema.Message.
 // Use ComponentOfAgent to filter callback events to agent-related events.
+//
+// AgentCallbackHandler 处理使用 *schema.Message 的智能体回调。
+// 使用 ComponentOfAgent 过滤与智能体相关的回调事件。
 type AgentCallbackHandler struct {
 	// OnStart is called when an agent run begins. Return a modified context to propagate values.
+	// OnStart 在智能体运行开始时调用。返回修改后的 context 以传播值。
 	OnStart func(ctx context.Context, info *callbacks.RunInfo, input *adk.AgentCallbackInput) context.Context
 	// OnEnd is called when an agent run completes. The output's Events iterator should be
 	// consumed asynchronously to avoid blocking.
+	//
+	// OnEnd 在智能体运行完成时调用。output 的 Events 迭代器应异步消费以避免阻塞。
 	OnEnd func(ctx context.Context, info *callbacks.RunInfo, output *adk.AgentCallbackOutput) context.Context
 }
 
@@ -682,11 +762,17 @@ func (ch *AgentCallbackHandler) Needed(ctx context.Context, info *callbacks.RunI
 
 // AgenticAgentCallbackHandler handles callbacks for agentic agents using *schema.AgenticMessage.
 // Use ComponentOfAgenticAgent to filter callback events to agentic-agent-related events.
+//
+// AgenticAgentCallbackHandler 处理使用 *schema.AgenticMessage 的 agentic agents 回调。
+// 使用 ComponentOfAgenticAgent 过滤与 agentic-agent 相关的回调事件。
 type AgenticAgentCallbackHandler struct {
 	// OnStart is called when an agentic agent run begins. Return a modified context to propagate values.
+	// OnStart 在 agentic agent 运行开始时调用。返回修改后的 context 以传播值。
 	OnStart func(ctx context.Context, info *callbacks.RunInfo, input *adk.TypedAgentCallbackInput[*schema.AgenticMessage]) context.Context
 	// OnEnd is called when an agentic agent run completes. The output's Events iterator should be
 	// consumed asynchronously to avoid blocking.
+	//
+	// OnEnd 在 agentic agent 运行完成时调用。output 的 Events 迭代器应异步消费以避免阻塞。
 	OnEnd func(ctx context.Context, info *callbacks.RunInfo, output *adk.TypedAgentCallbackOutput[*schema.AgenticMessage]) context.Context
 }
 
@@ -702,16 +788,21 @@ func (ch *AgenticAgentCallbackHandler) Needed(ctx context.Context, info *callbac
 }
 
 // AgenticPromptCallbackHandler is the handler for the agentic prompt callback.
+// AgenticPromptCallbackHandler 是 agentic prompt 回调的处理器。
 type AgenticPromptCallbackHandler struct {
 	// OnStart is the callback function for the start of the agentic prompt.
+	// OnStart 是 agentic prompt 启动时的回调函数。
 	OnStart func(ctx context.Context, runInfo *callbacks.RunInfo, input *prompt.CallbackInput) context.Context
 	// OnEnd is the callback function for the end of the agentic prompt.
+	// OnEnd 是 agentic prompt 结束时的回调函数。
 	OnEnd func(ctx context.Context, runInfo *callbacks.RunInfo, output *prompt.CallbackOutput) context.Context
 	// OnError is the callback function for the error of the agentic prompt.
+	// OnError 是 agentic prompt 出错时的回调函数。
 	OnError func(ctx context.Context, runInfo *callbacks.RunInfo, err error) context.Context
 }
 
 // Needed checks if the callback handler is needed for the given timing.
+// Needed 检查给定 timing 是否需要该回调处理器。
 func (ch *AgenticPromptCallbackHandler) Needed(ctx context.Context, runInfo *callbacks.RunInfo, timing callbacks.CallbackTiming) bool {
 	switch timing {
 	case callbacks.TimingOnStart:
@@ -726,6 +817,7 @@ func (ch *AgenticPromptCallbackHandler) Needed(ctx context.Context, runInfo *cal
 }
 
 // AgenticModelCallbackHandler is the handler for the agentic chat model callback.
+// AgenticModelCallbackHandler 是 agentic chat model 回调的处理器。
 type AgenticModelCallbackHandler struct {
 	OnStart               func(ctx context.Context, runInfo *callbacks.RunInfo, input *model.AgenticCallbackInput) context.Context
 	OnEnd                 func(ctx context.Context, runInfo *callbacks.RunInfo, output *model.AgenticCallbackOutput) context.Context
@@ -734,6 +826,7 @@ type AgenticModelCallbackHandler struct {
 }
 
 // Needed checks if the callback handler is needed for the given timing.
+// Needed 检查给定 timing 是否需要该回调处理器。
 func (ch *AgenticModelCallbackHandler) Needed(ctx context.Context, runInfo *callbacks.RunInfo, timing callbacks.CallbackTiming) bool {
 	switch timing {
 	case callbacks.TimingOnStart:
@@ -751,6 +844,8 @@ func (ch *AgenticModelCallbackHandler) Needed(ctx context.Context, runInfo *call
 
 // AgenticToolsNodeCallbackHandlers defines optional callbacks for the Agentic Tools node
 // lifecycle events.
+//
+// AgenticToolsNodeCallbackHandlers 定义 Agentic Tools 节点生命周期事件的可选回调。
 type AgenticToolsNodeCallbackHandlers struct {
 	OnStart               func(ctx context.Context, info *callbacks.RunInfo, input *schema.AgenticMessage) context.Context
 	OnEnd                 func(ctx context.Context, info *callbacks.RunInfo, input []*schema.AgenticMessage) context.Context
@@ -759,6 +854,7 @@ type AgenticToolsNodeCallbackHandlers struct {
 }
 
 // Needed reports whether a handler is registered for the given timing.
+// Needed 报告给定 timing 是否注册了处理器。
 func (ch *AgenticToolsNodeCallbackHandlers) Needed(ctx context.Context, runInfo *callbacks.RunInfo, timing callbacks.CallbackTiming) bool {
 	switch timing {
 	case callbacks.TimingOnStart:

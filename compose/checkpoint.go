@@ -45,6 +45,18 @@ func init() {
 // Returns:
 // - error: An error if registration fails (e.g., if the type is already registered)
 // Deprecated: RegisterSerializableType is deprecated. Use schema.RegisterName[T](name) instead.
+//
+// RegisterSerializableType 为 eino 序列化注册自定义类型。
+// 这使 eino 能正确序列化和反序列化自定义类型。
+// 自定义接口和结构体都需要使用此函数注册。
+// 类型只需注册一次，指针和其他引用会自动处理。
+// 所有内置 eino 类型均已注册。
+// 参数：
+// - name：被注册类型的唯一标识符（不应以 "_eino" 开头）
+// - T：表示要注册类型的泛型类型参数
+// 返回：
+// - error：注册失败时的错误（例如类型已注册）
+// 已废弃：RegisterSerializableType 已废弃。请改用 schema.RegisterName[T](name)。
 func RegisterSerializableType[T any](name string) (err error) {
 	return serialization.GenericRegister[T](name)
 }
@@ -57,6 +69,7 @@ type Serializer interface {
 }
 
 // WithCheckPointStore sets the checkpoint store implementation for a graph.
+// WithCheckPointStore 为图设置检查点存储实现。
 func WithCheckPointStore(store CheckPointStore) GraphCompileOption {
 	return func(o *graphCompileOptions) {
 		o.checkPointStore = store
@@ -64,6 +77,7 @@ func WithCheckPointStore(store CheckPointStore) GraphCompileOption {
 }
 
 // WithSerializer sets the serializer used to persist checkpoint state.
+// WithSerializer 设置用于持久化检查点状态的序列化器。
 func WithSerializer(serializer Serializer) GraphCompileOption {
 	return func(o *graphCompileOptions) {
 		o.serializer = serializer
@@ -71,6 +85,7 @@ func WithSerializer(serializer Serializer) GraphCompileOption {
 }
 
 // WithCheckPointID sets the checkpoint ID to load from and write to by default.
+// WithCheckPointID 设置默认加载和写入的检查点 ID。
 func WithCheckPointID(checkPointID string) Option {
 	return Option{
 		checkPointID: &checkPointID,
@@ -81,6 +96,11 @@ func WithCheckPointID(checkPointID string) Option {
 // If not provided, the checkpoint ID from WithCheckPointID will be used for writing.
 // This is useful for scenarios where you want to load from an existed checkpoint
 // but save the progress to a new, separate checkpoint.
+//
+// WithWriteToCheckPointID 指定另一个用于写入的检查点 ID。
+// 如果未提供，将使用 WithCheckPointID 中的检查点 ID 进行写入。
+// 这适用于想从已有检查点加载，
+// 但将进度保存到新的独立检查点的场景。
 func WithWriteToCheckPointID(checkPointID string) Option {
 	return Option{
 		writeToCheckPointID: &checkPointID,
@@ -88,6 +108,7 @@ func WithWriteToCheckPointID(checkPointID string) Option {
 }
 
 // WithForceNewRun forces the graph to run from the beginning, ignoring any checkpoints.
+// WithForceNewRun 强制图从头运行，忽略任何检查点。
 func WithForceNewRun() Option {
 	return Option{
 		forceNewRun: true,
@@ -95,9 +116,11 @@ func WithForceNewRun() Option {
 }
 
 // StateModifier modifies state during checkpoint operations for a given node path.
+// StateModifier 在给定节点路径的检查点操作期间修改状态。
 type StateModifier func(ctx context.Context, path NodePath, state any) error
 
 // WithStateModifier installs a state modifier invoked during checkpoint read/write.
+// WithStateModifier 安装在检查点读写期间调用的状态修改器。
 func WithStateModifier(sm StateModifier) Option {
 	return Option{
 		stateModifier: sm,
@@ -163,6 +186,7 @@ func forwardCheckPoint(ctx context.Context, nodeKey string) context.Context {
 
 	if subCP, ok := cp.SubGraphs[nodeKey]; ok {
 		delete(cp.SubGraphs, nodeKey) // only forward once
+		// 只转发一次
 		return context.WithValue(ctx, checkPointKey{}, subCP)
 	}
 	return context.WithValue(ctx, checkPointKey{}, (*checkpoint)(nil))
@@ -258,6 +282,17 @@ func isTypedNil(v any) bool {
 //   - If error is non-nil, migration stops and the error is returned to the caller.
 //
 // The original bytes are returned only if no state was changed anywhere in the checkpoint tree.
+//
+// MigrateCheckpointState 是用于检查点升级的高级兼容性工具。
+// 它使用给定的序列化器解码检查点字节，将 migrate 应用于 checkpoint.State 以及所有嵌套 SubGraphs 的状态，然后重新编码检查点。
+// 典型用例：
+// - 当你更改了图状态类型/schema，需要在 Resume 时迁移以加载旧检查点而不丢弃它们。
+// - 框架级向后兼容（例如 ADK 跨版本升级检查点）。
+// Migrate 回调约定：
+// - 返回 (newState, changed, error)。
+// - 如果 changed 为 false，状态保持不变。
+// - 如果 error 非 nil，迁移停止并将错误返回给调用方。
+// 仅当检查点树中任何位置的状态都未改变时，才返回原始字节。
 func MigrateCheckpointState(data []byte, serializer Serializer, migrate func(state any) (any, bool, error)) ([]byte, error) {
 	cp := &checkpoint{}
 	if err := serializer.Unmarshal(data, cp); err != nil {
@@ -274,6 +309,7 @@ func MigrateCheckpointState(data []byte, serializer Serializer, migrate func(sta
 }
 
 // migrateCheckpoint recursively applies migrate to cp.State and all SubGraphs.
+// migrateCheckpoint 递归地将 migrate 应用于 cp.State 和所有 SubGraphs。
 func migrateCheckpoint(cp *checkpoint, migrate func(state any) (any, bool, error)) (bool, error) {
 	anyChanged := false
 	if cp.State != nil {
@@ -299,6 +335,7 @@ func migrateCheckpoint(cp *checkpoint, migrate func(state any) (any, bool, error
 }
 
 // convertCheckPoint if value in checkpoint is streamReader, convert it to non-stream
+// convertCheckPoint 如果检查点中的值是 streamReader，则将其转换为非流
 func (c *checkPointer) convertCheckPoint(cp *checkpoint, isStream bool) (err error) {
 	for _, ch := range cp.Channels {
 		err = ch.convertValues(func(m map[string]any) error {
@@ -318,6 +355,7 @@ func (c *checkPointer) convertCheckPoint(cp *checkpoint, isStream bool) (err err
 }
 
 // convertCheckPoint convert values in checkpoint to streamReader if needed
+// convertCheckPoint 在需要时将检查点中的值转换为 streamReader
 func (c *checkPointer) restoreCheckPoint(cp *checkpoint, isStream bool) (err error) {
 	for _, ch := range cp.Channels {
 		err = ch.convertValues(func(m map[string]any) error {

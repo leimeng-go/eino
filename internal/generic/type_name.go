@@ -37,6 +37,15 @@ var (
 // named function: xxx/utils.ParseTypeName
 // method: xxx/utils.(*MyStruct).Method
 // anonymous function: xxx/utils.TestParseTypeName.func6.1
+//
+// ParseTypeName 返回给定值的类型名称。
+// 它接收 reflect.Value 作为输入并处理它以确定底层类型。如果类型是指针，则解引用以获取实际类型。（这是此函数的优化）
+// 例如：ParseTypeName(reflect.ValueOf(&&myStruct{})) returns "myStruct"（不是 "**myStruct"）
+// 如果类型是函数，则获取函数名，并同时处理命名函数和匿名函数。
+// 函数路径示例：[package_path].[receiver_type].[func_name]
+// 命名函数：xxx/utils.ParseTypeName
+// 方法：xxx/utils.(*MyStruct).Method
+// 匿名函数：xxx/utils.TestParseTypeName.func6.1
 func ParseTypeName(val reflect.Value) string {
 	typ := val.Type()
 

@@ -29,6 +29,13 @@ import (
 //		Tools: []tool.BaseTool{invokableTool1, streamableTool2},
 //	}
 //	toolsNode, err := NewAgenticToolsNode(ctx, conf)
+//
+// NewAgenticToolsNode 创建新的 AgenticToolsNode。
+// 例如
+// conf := &ToolsNodeConfig{
+// Tools: []tool.BaseTool{invokableTool1, streamableTool2},
+// }
+// toolsNode, err := NewAgenticToolsNode(ctx, conf)
 func NewAgenticToolsNode(ctx context.Context, conf *ToolsNodeConfig) (*AgenticToolsNode, error) {
 	tn, err := NewToolNode(ctx, conf)
 	if err != nil {
@@ -233,6 +240,7 @@ type userInputVariant interface {
 }
 
 // newFuncToolResultContentBlock creates a FunctionToolResultContentBlock from a typed content pointer.
+// newFuncToolResultContentBlock 从类型化内容指针创建 FunctionToolResultContentBlock。
 func newFuncToolResultContentBlock[T userInputVariant](content *T) *schema.FunctionToolResultContentBlock {
 	switch c := any(content).(type) {
 	case *schema.UserInputText:

@@ -40,6 +40,7 @@ func TestCommonError(t *testing.T) {
 	assert.NoError(t, err)
 
 	// node error
+	// 节点错误
 	_, err = r.Invoke(ctx, "input")
 	var ie *internalError
 
@@ -47,6 +48,7 @@ func TestCommonError(t *testing.T) {
 	assert.Equal(t, "my error", ie.origError.Error())
 
 	// wrapper error
+	// 包装错误
 	sr, sw := schema.Pipe[string](0)
 	sw.Close()
 	_, err = r.Transform(ctx, sr)
@@ -81,13 +83,16 @@ func TestSubGraphNodeError(t *testing.T) {
 
 func TestContextCancelDuringRun(t *testing.T) {
 	// Create a graph with a long-running node to test context cancellation
+	// 创建一个带长时间运行节点的图，用于测试 context 取消
 	g := NewGraph[string, string]()
 
 	// Add a node that waits for some time (long enough to be cancelled)
+	// 添加一个会等待一段时间的节点（足够长以便被取消）
 	assert.NoError(t, g.AddLambdaNode("slow_node", InvokableLambda(func(ctx context.Context, input string) (output string, err error) {
 		select {
 		case <-ctx.Done():
 			// Return context's error when cancelled
+			// 取消时返回 context 的错误
 			return "", ctx.Err()
 		case <-time.After(200 * time.Millisecond):
 			return input + "_processed", nil
@@ -98,13 +103,16 @@ func TestContextCancelDuringRun(t *testing.T) {
 	assert.NoError(t, g.AddEdge("slow_node", END))
 
 	// Create a context that we can cancel
+	// 创建一个可取消的 context
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Compile the graph
+	// 编译图
 	r, err := g.Compile(ctx)
 	assert.NoError(t, err)
 
 	// Run the invoke in a goroutine
+	// 在 goroutine 中运行 invoke
 	resultCh := make(chan error)
 	go func() {
 		_, err := r.Invoke(ctx, "input")
@@ -112,26 +120,33 @@ func TestContextCancelDuringRun(t *testing.T) {
 	}()
 
 	// Cancel the context after a short delay
+	// 短暂延迟后取消 context
 	time.Sleep(50 * time.Millisecond)
 	cancel()
 
 	// Get the result
+	// 获取结果
 	err = <-resultCh
 
 	// Verify the error is related to context cancellation
+	// 验证错误与 context 取消相关
 	assert.Error(t, err)
 
 	// Check error type and content
+	// 检查错误类型和内容
 	var ie *internalError
 	assert.True(t, errors.As(err, &ie))
 
 	// Error path should contain the node
+	// 错误路径应包含该节点
 	assert.Equal(t, []string{"slow_node"}, ie.nodePath.path)
 
 	// Original error should be context.Canceled
+	// 原始错误应为 context.Canceled
 	assert.ErrorIs(t, ie.origError, context.Canceled)
 
 	// Test unwrap capability
+	// 测试 unwrap 能力
 	unwrappedErr := ie.Unwrap()
 	assert.ErrorIs(t, unwrappedErr, context.Canceled)
 }

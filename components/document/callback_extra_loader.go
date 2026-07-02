@@ -22,27 +22,35 @@ import (
 )
 
 // LoaderCallbackInput is the input for the loader callback.
+// LoaderCallbackInput 是 loader 回调的输入。
 type LoaderCallbackInput struct {
 	// Source is the source of the documents.
+	// Source 是 documents 的来源。
 	Source Source
 
 	// Extra is the extra information for the callback.
+	// Extra 是回调的额外信息。
 	Extra map[string]any
 }
 
 // LoaderCallbackOutput is the output for the loader callback.
+// LoaderCallbackOutput 是 loader 回调的输出。
 type LoaderCallbackOutput struct {
 	// Source is the source of the documents.
+	// Source 是文档来源。
 	Source Source
 
 	// Docs is the documents to be loaded.
+	// Docs 是待加载的文档。
 	Docs []*schema.Document
 
 	// Extra is the extra information for the callback.
+	// Extra 是回调用的额外信息。
 	Extra map[string]any
 }
 
 // ConvLoaderCallbackInput converts the callback input to the loader callback input.
+// ConvLoaderCallbackInput 将回调输入转换为 loader 回调输入。
 func ConvLoaderCallbackInput(src callbacks.CallbackInput) *LoaderCallbackInput {
 	switch t := src.(type) {
 	case *LoaderCallbackInput:
@@ -57,6 +65,7 @@ func ConvLoaderCallbackInput(src callbacks.CallbackInput) *LoaderCallbackInput {
 }
 
 // ConvLoaderCallbackOutput converts the callback output to the loader callback output.
+// ConvLoaderCallbackOutput 将回调输出转换为 loader 回调输出。
 func ConvLoaderCallbackOutput(src callbacks.CallbackOutput) *LoaderCallbackOutput {
 	switch t := src.(type) {
 	case *LoaderCallbackOutput:

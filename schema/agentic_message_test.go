@@ -871,6 +871,7 @@ func TestConcatAgenticMessages(t *testing.T) {
 							Text: "World",
 						},
 						// No StreamingMeta - non-streaming
+						// 无 StreamingMeta - 非流式
 					},
 				},
 			},
@@ -1403,6 +1404,7 @@ func TestAgenticMessageString(t *testing.T) {
 	}
 
 	// Print the formatted output
+	// 打印格式化后的输出
 	output := msg.String()
 
 	assert.Equal(t, `role: assistant
@@ -1507,12 +1509,18 @@ response_meta:
 				{Type: ContentBlockTypeAssistantGenImage, AssistantGenImage: &AssistantGenImage{}},
 				{Type: ContentBlockTypeAssistantGenAudio, AssistantGenAudio: &AssistantGenAudio{}},
 				{Type: ContentBlockTypeAssistantGenVideo, AssistantGenVideo: &AssistantGenVideo{}},
-				{Type: ContentBlockTypeServerToolCall, ServerToolCall: &ServerToolCall{Name: "t"}},                                 // No CallID
-				{Type: ContentBlockTypeServerToolResult, ServerToolResult: &ServerToolResult{Name: "t"}},                           // No CallID
-				{Type: ContentBlockTypeMCPToolResult, MCPToolResult: &MCPToolResult{Name: "t"}},                                    // No Error
-				{Type: ContentBlockTypeMCPListToolsResult, MCPListToolsResult: &MCPListToolsResult{}},                              // No Error
+				{Type: ContentBlockTypeServerToolCall, ServerToolCall: &ServerToolCall{Name: "t"}}, // No CallID
+				// 无 CallID
+				{Type: ContentBlockTypeServerToolResult, ServerToolResult: &ServerToolResult{Name: "t"}}, // No CallID
+				// 无 CallID
+				{Type: ContentBlockTypeMCPToolResult, MCPToolResult: &MCPToolResult{Name: "t"}}, // No Error
+				// 无 Error
+				{Type: ContentBlockTypeMCPListToolsResult, MCPListToolsResult: &MCPListToolsResult{}}, // No Error
+				// 无 Error
 				{Type: ContentBlockTypeMCPToolApprovalResponse, MCPToolApprovalResponse: &MCPToolApprovalResponse{Approve: false}}, // No Reason
+				// 无 Reason
 				nil, // Nil block in slice
+				// 切片中的 nil block
 			},
 		}
 
@@ -1525,6 +1533,9 @@ response_meta:
 	t.Run("nil content struct in block", func(t *testing.T) {
 		// Test cases where the specific content struct is nil but type is set
 		// This shouldn't crash and should just print type
+		//
+		// 测试具体 content 结构体为 nil 但 type 已设置的情况
+		// 这不应崩溃，只应打印 type
 		msg := &AgenticMessage{
 			ContentBlocks: []*ContentBlock{
 				{Type: ContentBlockTypeReasoning, Reasoning: nil},
@@ -1551,6 +1562,7 @@ response_meta:
 		s := msg.String()
 		assert.Contains(t, s, "type: reasoning")
 		// ensure no panic and basic output present
+		// 确保无 panic 且包含基本输出
 	})
 }
 
@@ -1578,21 +1590,27 @@ func TestNewContentBlock(t *testing.T) {
 		field := cbType.Field(i)
 
 		// Skip non-content fields
+		// 跳过非 content 字段
 		if field.Name == "Type" || field.Name == "Extra" || field.Name == "StreamingMeta" {
 			continue
 		}
 
 		t.Run(field.Name, func(t *testing.T) {
 			// Ensure field is a pointer
+			// 确保字段是指针
 			assert.Equal(t, reflect.Ptr, field.Type.Kind(), "Field %s should be a pointer", field.Name)
 
 			// Create a new instance of the field's type
 			// field.Type is *T, so Elem() is T. reflect.New(T) returns *T.
+			//
+			// 创建该字段类型的新实例
+			// field.Type 是 *T，因此 Elem() 是 T。reflect.New(T) 返回 *T。
 			elemType := field.Type.Elem()
 			inputVal := reflect.New(elemType)
 			input := inputVal.Interface()
 
 			// Call NewContentBlock (generic) via type switch
+			// 通过 type switch 调用 NewContentBlock（泛型）
 			var block *ContentBlock
 			switch v := input.(type) {
 			case *Reasoning:
@@ -1643,12 +1661,14 @@ func TestNewContentBlock(t *testing.T) {
 			assert.NotNil(t, block, "NewContentBlock should return non-nil for type %T", input)
 
 			// Check if the corresponding field in block is set equals to input
+			// 检查 block 中对应字段是否设置为与输入相等
 			blockVal := reflect.ValueOf(block).Elem()
 			fieldVal := blockVal.FieldByName(field.Name)
 			assert.True(t, fieldVal.IsValid(), "Field %s not found in result", field.Name)
 			assert.Equal(t, input, fieldVal.Interface(), "Field %s should match input", field.Name)
 
 			// Check Type is set
+			// 检查 Type 是否已设置
 			typeVal := blockVal.FieldByName("Type")
 			assert.NotEmpty(t, typeVal.String(), "Type should be set for %s", field.Name)
 		})

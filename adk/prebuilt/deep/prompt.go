@@ -23,6 +23,11 @@ package deep
 //
 // These prompts are used under the terms of the original project's open source license.
 // When using this code in your own open source project, ensure compliance with the original license requirements.
+//
+// 此文件包含改编自 DeepAgents 项目和 ClaudeCode 的提示模板与工具描述。
+// 原始来源：https://github.com/langchain-ai/deepagents  https://claude.com/product/claude-code
+// 这些提示按原项目的开源许可证条款使用。
+// 在你自己的开源项目中使用此代码时，请确保遵守原许可证要求。
 
 const (
 	taskPrompt = `

@@ -31,6 +31,10 @@ import (
 //
 // Parsers are typically not called directly — they are configured on a
 // [document.Loader] and invoked via [document.WithParserOptions].
+//
+// Parser 将来自 [io.Reader] 的原始内容转换为 [schema.Document] 值。
+// Parse 可从单个 reader 返回多个文档（例如按页拆分的 PDF）。reader 会在 Parse 期间被消费，不得复用。
+// Parsers 通常不会被直接调用，而是配置在 [document.Loader] 上，并通过 [document.WithParserOptions] 调用。
 type Parser interface {
 	Parse(ctx context.Context, reader io.Reader, opts ...Option) ([]*schema.Document, error)
 }

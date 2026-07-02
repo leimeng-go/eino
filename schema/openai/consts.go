@@ -15,6 +15,7 @@
  */
 
 // Package openai defines constants for openai.
+// Package openai 定义 openai 的常量。
 package openai
 
 type TextAnnotationType string

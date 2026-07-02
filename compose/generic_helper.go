@@ -56,12 +56,16 @@ func newGenericHelper[I, O any]() *genericHelper {
 
 type genericHelper struct {
 	// when set input key, use this method to convert input from map[string]any to T
+	// 设置 input key 时，使用此方法将输入从 map[string]any 转换为 T
 	inputStreamFilter, outputStreamFilter streamMapFilter
 	// when predecessor's output is assignableTypeMay to current node's input, validate and convert(if needed) types using the following two methods
+	// 当前驱的输出可通过 assignableTypeMay 赋给当前节点输入时，使用以下两个方法校验并转换（如需要）类型
 	inputConverter, outputConverter handlerPair
 	// when current node enable field mapping, convert map input to expected struct using the following two methods
+	// 当前节点启用 field mapping 时，使用以下两个方法将 map 输入转换为期望的 struct
 	inputFieldMappingConverter, outputFieldMappingConverter handlerPair
 	// can convert input/output from stream to non-stream or non-stream to stream, used for checkpoint
+	// 可将输入/输出从流转换为非流，或从非流转换为流，用于 checkpoint
 	inputStreamConvertPair, outputStreamConvertPair streamConvertPair
 
 	inputZeroValue, outputZeroValue     func() any

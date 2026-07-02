@@ -867,11 +867,14 @@ start1134
 state24
 3`, result)
 
-	assert.Equal(t, 10, tGCB.onStartTimes)       // 3+sSubG*1*3+subG*2*2+g*0
+	assert.Equal(t, 10, tGCB.onStartTimes) // 3+sSubG*1*3+subG*2*2+g*0
+	// 3+sSubG*1*3+subG*2*2+g*0
 	assert.Equal(t, 3, tGCB.onEndTimes)          // success*3
 	assert.Equal(t, 10, tGCB.onStreamStartTimes) // 3+sSubG*1*3+subG*2*2+g*0
-	assert.Equal(t, 3, tGCB.onStreamEndTimes)    // success*3
-	assert.Equal(t, 14, tGCB.onErrorTimes)       // 2*(sSubG*1*3+subG*2*2+g*0)
+	// 3+sSubG*1*3+subG*2*2+g*0
+	assert.Equal(t, 3, tGCB.onStreamEndTimes) // success*3
+	assert.Equal(t, 14, tGCB.onErrorTimes)    // 2*(sSubG*1*3+subG*2*2+g*0)
+	// 2*(sSubG*1*3+subG*2*2+g*0)
 
 	// dag
 	r, err = g.Compile(ctx, WithCheckPointStore(newInMemoryStore()), WithNodeTriggerMode(AllPredecessor),
@@ -1428,6 +1431,7 @@ func TestCancelInterrupt(t *testing.T) {
 	r, err := g.Compile(ctx, WithCheckPointStore(newInMemoryStore()))
 	assert.NoError(t, err)
 	// interrupt after nodes
+	// 在节点之后中断
 	canceledCtx, cancel := WithGraphInterrupt(ctx)
 	go func() {
 		time.Sleep(500 * time.Millisecond)
@@ -1442,6 +1446,7 @@ func TestCancelInterrupt(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "input12", result)
 	// infinite timeout
+	// 无限超时
 	canceledCtx, cancel = WithGraphInterrupt(ctx)
 	go func() {
 		time.Sleep(500 * time.Millisecond)
@@ -1457,6 +1462,7 @@ func TestCancelInterrupt(t *testing.T) {
 	assert.Equal(t, "input12", result)
 
 	// interrupt rerun nodes - with auto-enabled PersistRerunInput, input is preserved
+	// 中断重跑节点——自动启用 PersistRerunInput 后，输入会被保留
 	canceledCtx, cancel = WithGraphInterrupt(ctx)
 	go func() {
 		time.Sleep(500 * time.Millisecond)
@@ -1486,6 +1492,7 @@ func TestCancelInterrupt(t *testing.T) {
 	r, err = g.Compile(ctx, WithNodeTriggerMode(AllPredecessor), WithCheckPointStore(newInMemoryStore()))
 	assert.NoError(t, err)
 	// interrupt after nodes
+	// 在节点之后中断
 	canceledCtx, cancel = WithGraphInterrupt(ctx)
 	go func() {
 		time.Sleep(500 * time.Millisecond)
@@ -1500,6 +1507,7 @@ func TestCancelInterrupt(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "input12", result)
 	// infinite timeout
+	// 无限超时
 	canceledCtx, cancel = WithGraphInterrupt(ctx)
 	go func() {
 		time.Sleep(500 * time.Millisecond)
@@ -1515,6 +1523,7 @@ func TestCancelInterrupt(t *testing.T) {
 	assert.Equal(t, "input12", result)
 
 	// interrupt rerun nodes - with auto-enabled PersistRerunInput, input is preserved
+	// 中断重跑节点——自动启用 PersistRerunInput 后，输入会被保留
 	canceledCtx, cancel = WithGraphInterrupt(ctx)
 	go func() {
 		time.Sleep(300 * time.Millisecond)
@@ -1530,6 +1539,7 @@ func TestCancelInterrupt(t *testing.T) {
 	assert.Equal(t, "input12", result)
 
 	// dag multi canceled nodes
+	// dag 中多个已取消节点
 	gg := NewGraph[string, map[string]any]()
 	_ = gg.AddLambdaNode("1", InvokableLambda(func(ctx context.Context, input string) (output string, err error) {
 		return input + "1", nil
@@ -1555,6 +1565,7 @@ func TestCancelInterrupt(t *testing.T) {
 	rr, err := gg.Compile(ctx, WithNodeTriggerMode(AllPredecessor), WithCheckPointStore(newInMemoryStore()))
 	assert.NoError(t, err)
 	// interrupt after nodes
+	// 在节点之后中断
 	canceledCtx, cancel = WithGraphInterrupt(ctx)
 	go func() {
 		time.Sleep(500 * time.Millisecond)
@@ -1573,6 +1584,7 @@ func TestCancelInterrupt(t *testing.T) {
 	}, result2)
 
 	// interrupt rerun nodes - with auto-enabled PersistRerunInput, input is preserved
+	// 中断重跑节点——自动启用 PersistRerunInput 后，输入会被保留
 	canceledCtx, cancel = WithGraphInterrupt(ctx)
 	go func() {
 		time.Sleep(500 * time.Millisecond)

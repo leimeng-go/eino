@@ -113,6 +113,7 @@ func TestConcatAssistantGenTextExtensions(t *testing.T) {
 
 	t.Run("streaming scenario - citations arrive in chunks", func(t *testing.T) {
 		// Simulates streaming where citations arrive progressively
+		// 模拟 citations 逐步到达的流式场景
 		exts := []*AssistantGenTextExtension{
 			{
 				Citations: []*TextCitation{
@@ -159,8 +160,10 @@ func TestConcatResponseMetaExtensions(t *testing.T) {
 
 		result, err := ConcatResponseMetaExtensions(exts)
 		assert.NoError(t, err)
-		assert.Equal(t, "msg_2", result.ID)          // Last non-empty ID
+		assert.Equal(t, "msg_2", result.ID) // Last non-empty ID
+		// 最后一个非空 ID
 		assert.Equal(t, "stop_3", result.StopReason) // Last non-empty StopReason
+		// 最后一个非空 StopReason
 	})
 
 	t.Run("all empty fields", func(t *testing.T) {

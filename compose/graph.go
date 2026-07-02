@@ -34,22 +34,28 @@ import (
 )
 
 // START is the start node of the graph. You can add your first edge with START.
+// START 是图的起始节点。你可以用 START 添加第一条边。
 const START = "start"
 
 // END is the end node of the graph. You can add your last edge with END.
+// END 是图的结束节点。你可以用 END 添加最后一条边。
 const END = "end"
 
 // graphRunType is a custom type used to control the running mode of the graph.
+// graphRunType 是用于控制图运行模式的自定义类型。
 type graphRunType string
 
 const (
 	// runTypePregel is a running mode of the graph that is suitable for large-scale graph processing tasks. Can have cycles in graph. Compatible with NodeTriggerType.AnyPredecessor.
+	// runTypePregel 是图的一种运行模式，适合大规模图处理任务。图中可以有环。兼容 NodeTriggerType.AnyPredecessor。
 	runTypePregel graphRunType = "Pregel"
 	// runTypeDAG is a running mode of the graph that represents the graph as a directed acyclic graph, suitable for tasks that can be represented as a directed acyclic graph. Compatible with NodeTriggerType.AllPredecessor.
+	// runTypeDAG 是图的一种运行模式，将图表示为有向无环图，适合可表示为有向无环图的任务。兼容 NodeTriggerType.AllPredecessor。
 	runTypeDAG graphRunType = "DAG"
 )
 
 // String returns the string representation of the graph run type.
+// String 返回图运行类型的字符串表示。
 func (g graphRunType) String() string {
 	return string(g)
 }
@@ -157,6 +163,7 @@ func isWorkflow(cmp component) bool {
 }
 
 // ErrGraphCompiled is returned when attempting to modify a graph after it has been compiled
+// ErrGraphCompiled 在尝试修改已编译的图时返回
 var ErrGraphCompiled = errors.New("graph has been compiled, cannot be modified")
 
 func (g *graph) addNode(key string, node *graphNode, options *graphAddNodeOpts) (err error) {
@@ -183,6 +190,7 @@ func (g *graph) addNode(key string, node *graphNode, options *graphAddNodeOpts) 
 	}
 
 	// check options
+	// 检查 options
 	if options.needState {
 		if g.stateGenerator == nil {
 			return fmt.Errorf("node '%s' needs state but graph state is not enabled", key)
@@ -195,15 +203,19 @@ func (g *graph) addNode(key string, node *graphNode, options *graphAddNodeOpts) 
 		}
 	}
 	// end: check options
+	// 结束：检查 options
 
 	// check pre- / post-handler type
+	// 检查 pre- / post-handler 类型
 	if options.processor != nil {
 		if options.processor.statePreHandler != nil {
 			// check state type
+			// 检查 state 类型
 			if g.stateType != options.processor.preStateType {
 				return fmt.Errorf("node[%s]'s pre handler state type[%v] is different from graph[%v]", key, options.processor.preStateType, g.stateType)
 			}
 			// check input type
+			// 检查 input 类型
 			if node.inputType() == nil && options.processor.statePreHandler.outputType != reflect.TypeOf((*any)(nil)).Elem() {
 				return fmt.Errorf("passthrough node[%s]'s pre handler type isn't any", key)
 			} else if node.inputType() != nil && node.inputType() != options.processor.statePreHandler.outputType {
@@ -212,10 +224,12 @@ func (g *graph) addNode(key string, node *graphNode, options *graphAddNodeOpts) 
 		}
 		if options.processor.statePostHandler != nil {
 			// check state type
+			// 检查 state 类型
 			if g.stateType != options.processor.postStateType {
 				return fmt.Errorf("node[%s]'s post handler state type[%v] is different from graph[%v]", key, options.processor.postStateType, g.stateType)
 			}
 			// check input type
+			// 检查 input 类型
 			if node.outputType() == nil && options.processor.statePostHandler.inputType != reflect.TypeOf((*any)(nil)).Elem() {
 				return fmt.Errorf("passthrough node[%s]'s post handler type isn't any", key)
 			} else if node.outputType() != nil && node.outputType() != options.processor.statePostHandler.inputType {
@@ -301,6 +315,13 @@ func (g *graph) addEdgeWithMappings(startNode, endNode string, noControl bool, n
 //	})
 //
 //	graph.AddEmbeddingNode("embedding_node_key", embeddingNode)
+//
+// AddEmbeddingNode 添加一个实现 embedding.Embedder 的节点。
+// 例如
+// embeddingNode, err := openai.NewEmbedder(ctx, &openai.EmbeddingConfig{
+// Model: "text-embedding-3-small",
+// })
+// graph.AddEmbeddingNode("embedding_node_key", embeddingNode)
 func (g *graph) AddEmbeddingNode(key string, node embedding.Embedder, opts ...GraphAddNodeOpt) error {
 	gNode, options := toEmbeddingNode(node, opts...)
 	return g.addNode(key, gNode, options)
@@ -312,6 +333,11 @@ func (g *graph) AddEmbeddingNode(key string, node embedding.Embedder, opts ...Gr
 //	retriever, err := vikingdb.NewRetriever(ctx, &vikingdb.RetrieverConfig{})
 //
 //	graph.AddRetrieverNode("retriever_node_key", retrieverNode)
+//
+// AddRetrieverNode 添加一个实现 retriever.Retriever 的节点。
+// 例如
+// retriever, err := vikingdb.NewRetriever(ctx, &vikingdb.RetrieverConfig{})
+// graph.AddRetrieverNode("retriever_node_key", retrieverNode)
 func (g *graph) AddRetrieverNode(key string, node retriever.Retriever, opts ...GraphAddNodeOpt) error {
 	gNode, options := toRetrieverNode(node, opts...)
 	return g.addNode(key, gNode, options)
@@ -323,6 +349,11 @@ func (g *graph) AddRetrieverNode(key string, node retriever.Retriever, opts ...G
 //	loader, err := file.NewLoader(ctx, &file.LoaderConfig{})
 //
 //	graph.AddLoaderNode("loader_node_key", loader)
+//
+// AddLoaderNode 添加一个实现 document.Loader 的节点。
+// 例如
+// loader, err := file.NewLoader(ctx, &file.LoaderConfig{})
+// graph.AddLoaderNode("loader_node_key", loader)
 func (g *graph) AddLoaderNode(key string, node document.Loader, opts ...GraphAddNodeOpt) error {
 	gNode, options := toLoaderNode(node, opts...)
 	return g.addNode(key, gNode, options)
@@ -334,6 +365,11 @@ func (g *graph) AddLoaderNode(key string, node document.Loader, opts ...GraphAdd
 //	indexer, err := vikingdb.NewIndexer(ctx, &vikingdb.IndexerConfig{})
 //
 //	graph.AddIndexerNode("indexer_node_key", indexer)
+//
+// AddIndexerNode 添加一个实现 indexer.Indexer 的节点。
+// 例如
+// indexer, err := vikingdb.NewIndexer(ctx, &vikingdb.IndexerConfig{})
+// graph.AddIndexerNode("indexer_node_key", indexer)
 func (g *graph) AddIndexerNode(key string, node indexer.Indexer, opts ...GraphAddNodeOpt) error {
 	gNode, options := toIndexerNode(node, opts...)
 	return g.addNode(key, gNode, options)
@@ -347,6 +383,13 @@ func (g *graph) AddIndexerNode(key string, node indexer.Indexer, opts ...GraphAd
 //	})
 //
 //	graph.AddChatModelNode("chat_model_node_key", chatModel)
+//
+// AddChatModelNode 添加一个实现 model.BaseChatModel 的节点。
+// 例如
+// chatModel, err := openai.NewChatModel(ctx, &openai.ChatModelConfig{
+// Model: "gpt-4o",
+// })
+// graph.AddChatModelNode("chat_model_node_key", chatModel)
 func (g *graph) AddChatModelNode(key string, node model.BaseChatModel, opts ...GraphAddNodeOpt) error {
 	gNode, options := toChatModelNode(node, opts...)
 	return g.addNode(key, gNode, options)
@@ -360,6 +403,13 @@ func (g *graph) AddChatModelNode(key string, node model.BaseChatModel, opts ...G
 //	})
 //
 //	graph.AddAgenticModelNode("agentic_model_node_key", model)
+//
+// AddAgenticModelNode 添加一个实现 agentic.Model 的节点。
+// 例如
+// model, err := openai.NewAgenticModel(ctx, &openai.AgenticModelConfig{
+// Model: "gpt-4o",
+// })
+// graph.AddAgenticModelNode("agentic_model_node_key", model)
 func (g *graph) AddAgenticModelNode(key string, node model.AgenticModel, opts ...GraphAddNodeOpt) error {
 	gNode, options := toAgenticModelNode(node, opts...)
 	return g.addNode(key, gNode, options)
@@ -374,6 +424,14 @@ func (g *graph) AddAgenticModelNode(key string, node model.AgenticModel, opts ..
 //	})
 //
 //	graph.AddChatTemplateNode("chat_template_node_key", chatTemplate)
+//
+// AddChatTemplateNode 添加实现 prompt.ChatTemplate 的节点。
+// 例如：
+// chatTemplate, err := prompt.FromMessages(schema.FString, &schema.Message{
+// Role:    schema.System,
+// Content: "You are acting as a {role}.",
+// })
+// graph.AddChatTemplateNode("chat_template_node_key", chatTemplate)
 func (g *graph) AddChatTemplateNode(key string, node prompt.ChatTemplate, opts ...GraphAddNodeOpt) error {
 	gNode, options := toChatTemplateNode(node, opts...)
 	return g.addNode(key, gNode, options)
@@ -385,6 +443,11 @@ func (g *graph) AddChatTemplateNode(key string, node prompt.ChatTemplate, opts .
 //	chatTemplate, err := prompt.FromAgenticMessages(schema.FString, &schema.AgenticMessage{})
 //
 //	graph.AddAgenticChatTemplateNode("chat_template_node_key", chatTemplate)
+//
+// AddAgenticChatTemplateNode 添加实现 prompt.AgenticChatTemplate 的节点。
+// 例如：
+// chatTemplate, err := prompt.FromAgenticMessages(schema.FString, &schema.AgenticMessage{})
+// graph.AddAgenticChatTemplateNode("chat_template_node_key", chatTemplate)
 func (g *graph) AddAgenticChatTemplateNode(key string, node prompt.AgenticChatTemplate, opts ...GraphAddNodeOpt) error {
 	gNode, options := toAgenticChatTemplateNode(node, opts...)
 	return g.addNode(key, gNode, options)
@@ -396,6 +459,11 @@ func (g *graph) AddAgenticChatTemplateNode(key string, node prompt.AgenticChatTe
 //	toolsNode, err := compose.NewToolNode(ctx, &compose.ToolsNodeConfig{})
 //
 //	graph.AddToolsNode("tools_node_key", toolsNode)
+//
+// AddToolsNode 添加实现 ToolsNode 的节点。
+// 例如：
+// toolsNode, err := compose.NewToolNode(ctx, &compose.ToolsNodeConfig{})
+// graph.AddToolsNode("tools_node_key", toolsNode)
 func (g *graph) AddToolsNode(key string, node *ToolsNode, opts ...GraphAddNodeOpt) error {
 	gNode, options := toToolsNode(node, opts...)
 	return g.addNode(key, gNode, options)
@@ -407,6 +475,11 @@ func (g *graph) AddToolsNode(key string, node *ToolsNode, opts ...GraphAddNodeOp
 //	toolsNode, err := compose.NewAgenticToolsNode(ctx, &compose.ToolsNodeConfig{})
 //
 //	graph.AddAgenticToolsNode("tools_node_key", toolsNode)
+//
+// AddAgenticToolsNode 添加实现 AgenticToolsNode 的节点。
+// 例如：
+// toolsNode, err := compose.NewAgenticToolsNode(ctx, &compose.ToolsNodeConfig{})
+// graph.AddAgenticToolsNode("tools_node_key", toolsNode)
 func (g *graph) AddAgenticToolsNode(key string, node *AgenticToolsNode, opts ...GraphAddNodeOpt) error {
 	gNode, options := toAgenticToolsNode(node, opts...)
 	return g.addNode(key, gNode, options)
@@ -418,6 +491,11 @@ func (g *graph) AddAgenticToolsNode(key string, node *AgenticToolsNode, opts ...
 //	markdownSplitter, err := markdown.NewHeaderSplitter(ctx, &markdown.HeaderSplitterConfig{})
 //
 //	graph.AddDocumentTransformerNode("document_transformer_node_key", markdownSplitter)
+//
+// AddDocumentTransformerNode 添加实现 document.Transformer 的节点。
+// 例如：
+// markdownSplitter, err := markdown.NewHeaderSplitter(ctx, &markdown.HeaderSplitterConfig{})
+// graph.AddDocumentTransformerNode("document_transformer_node_key", markdownSplitter)
 func (g *graph) AddDocumentTransformerNode(key string, node document.Transformer, opts ...GraphAddNodeOpt) error {
 	gNode, options := toDocumentTransformerNode(node, opts...)
 	return g.addNode(key, gNode, options)
@@ -430,6 +508,14 @@ func (g *graph) AddDocumentTransformerNode(key string, node document.Transformer
 // for Collect[I, O], use compose.CollectableLambda()
 // for Transform[I, O], use compose.TransformableLambda()
 // for arbitrary combinations of 4 kinds of lambda, use compose.AnyLambda()
+//
+// AddLambdaNode 添加至少实现 Invoke[I, O]、Stream[I, O]、Collect[I, O]、Transform[I, O] 之一的节点。
+// 由于不支持方法泛型，需要使用函数泛型生成作为 Runnable[I, O] 运行的 Lambda。
+// 对于 Invoke[I, O]，使用 compose.InvokableLambda()
+// 对于 Stream[I, O]，使用 compose.StreamableLambda()
+// 对于 Collect[I, O]，使用 compose.CollectableLambda()
+// 对于 Transform[I, O]，使用 compose.TransformableLambda()
+// 对于 4 种 lambda 的任意组合，使用 compose.AnyLambda()
 func (g *graph) AddLambdaNode(key string, node *Lambda, opts ...GraphAddNodeOpt) error {
 	gNode, options := toLambdaNode(node, opts...)
 	return g.addNode(key, gNode, options)
@@ -438,6 +524,10 @@ func (g *graph) AddLambdaNode(key string, node *Lambda, opts ...GraphAddNodeOpt)
 // AddGraphNode add one kind of Graph[I, O]、Chain[I, O]、StateChain[I, O, S] as a node.
 // for Graph[I, O], comes from NewGraph[I, O]()
 // for Chain[I, O], comes from NewChain[I, O]()
+//
+// AddGraphNode 将 Graph[I, O]、Chain[I, O]、StateChain[I, O, S] 中的一种添加为节点。
+// 对于 Graph[I, O]，来自 NewGraph[I, O]()
+// 对于 Chain[I, O]，来自 NewChain[I, O]()
 func (g *graph) AddGraphNode(key string, node AnyGraph, opts ...GraphAddNodeOpt) error {
 	gNode, options := toAnyGraphNode(node, opts...)
 	return g.addNode(key, gNode, options)
@@ -448,6 +538,11 @@ func (g *graph) AddGraphNode(key string, node AnyGraph, opts ...GraphAddNodeOpt)
 // e.g.
 //
 //	graph.AddPassthroughNode("passthrough_node_key")
+//
+// AddPassthroughNode 向图中添加一个透传节点。
+// 主要用于图的 pregel 模式。
+// 例如：
+// graph.AddPassthroughNode("passthrough_node_key")
 func (g *graph) AddPassthroughNode(key string, opts ...GraphAddNodeOpt) error {
 	gNode, options := toPassthroughNode(opts...)
 	return g.addNode(key, gNode, options)
@@ -463,6 +558,15 @@ func (g *graph) AddPassthroughNode(key string, opts ...GraphAddNodeOpt) error {
 //	branch := compose.NewGraphBranch(condition, endNodes)
 //
 //	graph.AddBranch("start_node_key", branch)
+//
+// AddBranch 向图中添加一个分支。
+// 例如：
+// condition := func(ctx context.Context, in string) (string, error) {
+// return "next_node_key", nil
+// }
+// endNodes := map[string]bool{"path01": true, "path02": true}
+// branch := compose.NewGraphBranch(condition, endNodes)
+// graph.AddBranch("start_node_key", branch)
 func (g *graph) AddBranch(startNode string, branch *GraphBranch) (err error) {
 	return g.addBranch(startNode, branch, false)
 }
@@ -502,6 +606,7 @@ func (g *graph) addBranch(startNode string, branch *GraphBranch, skipData bool) 
 	}
 
 	// check branch condition type
+	// 检查分支条件类型
 	result := checkAssignable(g.getNodeOutputType(startNode), branch.inputType)
 	if result == assignableTypeMustNot {
 		return fmt.Errorf("condition's input type[%s] and start node[%s]'s output type[%s] are mismatched", branch.inputType.String(), startNode, g.getNodeOutputType(startNode).String())
@@ -558,6 +663,9 @@ func (g *graph) addToValidateMap(startNode, endNode string, mapping []*FieldMapp
 
 // updateToValidateMap after update node, check validate map
 // check again if nodes in toValidateMap have been updated. because when there are multiple linked passthrough nodes, in the worst scenario, only one node can be updated at a time.
+//
+// updateToValidateMap 在更新节点后检查 validate map
+// 再次检查 toValidateMap 中的节点是否已更新。因为存在多个相连的透传节点时，最坏情况下每次只能更新一个节点。
 func (g *graph) updateToValidateMap() error {
 	var startNodeOutputType, endNodeInputType reflect.Type
 	for {
@@ -574,11 +682,13 @@ func (g *graph) updateToValidateMap() error {
 				}
 
 				// update toValidateMap
+				// 更新 toValidateMap
 				g.toValidateMap[startNode] = append(g.toValidateMap[startNode][:i], g.toValidateMap[startNode][i+1:]...)
 				i--
 
 				hasChanged = true
 				// assume that START and END type isn't empty
+				// 假设 START 和 END 类型不为空
 				if startNodeOutputType != nil && endNodeInputType == nil {
 					g.nodes[endNode.endNode].cr.inputType = startNodeOutputType
 					g.nodes[endNode.endNode].cr.outputType = g.nodes[endNode.endNode].cr.inputType
@@ -589,12 +699,14 @@ func (g *graph) updateToValidateMap() error {
 					g.nodes[startNode].cr.genericHelper = g.getNodeGenericHelper(endNode.endNode).forPredecessorPassthrough()
 				} else if len(endNode.mappings) == 0 {
 					// common node check
+					// 普通节点检查
 					result := checkAssignable(startNodeOutputType, endNodeInputType)
 					if result == assignableTypeMustNot {
 						return fmt.Errorf("graph edge[%s]-[%s]: start node's output type[%s] and end node's input type[%s] mismatch",
 							startNode, endNode.endNode, startNodeOutputType.String(), endNodeInputType.String())
 					} else if result == assignableTypeMay {
 						// add runtime check edges
+						// 添加运行时检查边
 						if _, ok := g.handlerOnEdges[startNode]; !ok {
 							g.handlerOnEdges[startNode] = make(map[string][]handlerPair)
 						}
@@ -610,6 +722,7 @@ func (g *graph) updateToValidateMap() error {
 					g.fieldMappingRecords[endNode.endNode] = append(g.fieldMappingRecords[endNode.endNode], endNode.mappings...)
 
 					// field mapping check
+					// 字段映射检查
 					checker, uncheckedSourcePaths, err := validateFieldMapping(g.getNodeOutputType(startNode), g.getNodeInputType(endNode.endNode), endNode.mappings)
 					if err != nil {
 						return err
@@ -677,6 +790,7 @@ func (g *graph) compile(ctx context.Context, opt *graphCompileOptions) (*composa
 	}
 
 	// get run type
+	// 获取 run 类型
 	runType := runTypePregel
 	cb := pregelChannelBuilder
 	if isChain(g.cmp) || isWorkflow(g.cmp) {
@@ -690,6 +804,7 @@ func (g *graph) compile(ctx context.Context, opt *graphCompileOptions) (*composa
 	}
 
 	// get eager type
+	// 获取 eager 类型
 	eager := false
 	if isWorkflow(g.cmp) || runType == runTypeDAG {
 		eager = true
@@ -706,6 +821,7 @@ func (g *graph) compile(ctx context.Context, opt *graphCompileOptions) (*composa
 	}
 
 	// toValidateMap isn't empty means there are nodes that cannot infer type
+	// toValidateMap 非空表示存在无法推断类型的节点
 	for _, v := range g.toValidateMap {
 		if len(v) > 0 {
 			return nil, fmt.Errorf("some node's input or output types cannot be inferred: %v", g.toValidateMap)
@@ -714,6 +830,7 @@ func (g *graph) compile(ctx context.Context, opt *graphCompileOptions) (*composa
 
 	for key := range g.fieldMappingRecords {
 		// not allowed to map multiple fields to the same field
+		// 不允许将多个字段映射到同一字段
 		toMap := make(map[string]bool)
 		for _, mapping := range g.fieldMappingRecords[key] {
 			if _, ok := toMap[mapping.to]; ok {
@@ -723,6 +840,7 @@ func (g *graph) compile(ctx context.Context, opt *graphCompileOptions) (*composa
 		}
 
 		// add map to input converter
+		// 添加 map 到输入的转换器
 		g.handlerPreNode[key] = append(g.handlerPreNode[key], g.getNodeGenericHelper(key).inputFieldMappingConverter)
 	}
 
@@ -878,6 +996,7 @@ func (g *graph) compile(ctx context.Context, opt *graphCompileOptions) (*composa
 	}
 
 	// default options
+	// 默认选项
 	if r.dag && r.options.maxRunSteps > 0 {
 		return nil, fmt.Errorf("cannot set max run steps in dag mode")
 	} else if !r.dag && r.options.maxRunSteps == 0 {
@@ -921,6 +1040,7 @@ type subGraphCompileCallback struct {
 }
 
 // OnFinish is called when the graph is compiled.
+// OnFinish 在图编译完成时调用。
 func (s *subGraphCompileCallback) OnFinish(ctx context.Context, info *GraphInfo) {
 	s.closure(ctx, info)
 }
@@ -1126,6 +1246,7 @@ func validateDAG(chanSubscribeTo map[string]*chanCall, controlPredecessors map[s
 }
 
 // DAGInvalidLoopErr indicates the graph contains a cycle and is invalid.
+// DAGInvalidLoopErr 表示图包含环，因此无效。
 var DAGInvalidLoopErr = errors.New("DAG is invalid, has loop")
 
 func findLoops(startNodes []string, chanCalls map[string]*chanCall) [][]string {
@@ -1204,16 +1325,24 @@ func formatLoops(loops [][]string) string {
 //
 // e.g.
 // NewNodePath("sub_graph_node_key", "node_key_within_sub_graph")
+//
+// NewNodePath 指定图中节点的路径，该路径由节点 key 组成。
+// 从顶层图开始，
+// 沿着这组节点 key 可以定位到顶层图或子图中的特定节点。
+// 例如
+// NewNodePath("sub_graph_node_key", "node_key_within_sub_graph")
 func NewNodePath(nodeKeyPath ...string) *NodePath {
 	return &NodePath{path: nodeKeyPath}
 }
 
 // NodePath represents a path composed of node keys to locate a node.
+// NodePath 表示由节点 key 组成、用于定位节点的路径。
 type NodePath struct {
 	path []string
 }
 
 // GetPath returns the sequence of node keys in the path.
+// GetPath 返回路径中的节点 key 序列。
 func (p *NodePath) GetPath() []string {
 	return p.path
 }

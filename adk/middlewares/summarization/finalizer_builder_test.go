@@ -406,6 +406,10 @@ func TestBuildPreservedSkillsText(t *testing.T) {
 		// estimateTokenCount = (len+3)/4
 		// "short" = 5 chars → 2 tokens
 		// strings.Repeat("x", 100) = 100 chars → 25 tokens
+		//
+		// estimateTokenCount = (len+3)/4
+		// "short" = 5 chars → 2 tokens
+		// strings.Repeat("x", 100) = 100 chars → 25 tokens
 		largeContent := strings.Repeat("x", 100)
 		messages := []adk.Message{
 			{
@@ -420,6 +424,7 @@ func TestBuildPreservedSkillsText(t *testing.T) {
 		}
 
 		// MaxTokensPerSkill=10: "short"→2 tokens (ok), largeContent→25 tokens (truncated)
+		// MaxTokensPerSkill=10: "short"→2 tokens（正常），largeContent→25 tokens（被截断）
 		text, err := buildPreservedSkillsText(ctx, messages, &PreserveSkillsConfig{
 			MaxSkills:         ptr(10),
 			MaxTokensPerSkill: ptr(10),
@@ -427,9 +432,11 @@ func TestBuildPreservedSkillsText(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		// small skill preserved as-is
+		// small skill 按原样保留
 		assert.Contains(t, text, "small")
 		assert.Contains(t, text, "short")
 		// large skill is truncated, not dropped — name still present, full content gone
+		// large skill 会被截断而不是丢弃——name 仍保留，完整 content 不再保留
 		assert.Contains(t, text, "large")
 		assert.NotContains(t, text, largeContent)
 		assert.Contains(t, text, "skill content truncated for compaction")
@@ -437,6 +444,7 @@ func TestBuildPreservedSkillsText(t *testing.T) {
 
 	t.Run("total token budget drops excess skills", func(t *testing.T) {
 		// Each content is 40 chars → (40+3)/4 = 10 tokens
+		// 每个 content 为 40 chars → (40+3)/4 = 10 tokens
 		content := strings.Repeat("a", 40)
 		messages := []adk.Message{
 			{
@@ -453,6 +461,7 @@ func TestBuildPreservedSkillsText(t *testing.T) {
 		}
 
 		// Budget=15: skill3=10 tokens fits, skill2=10 tokens → 10+10=20 > 15, stop.
+		// Budget=15: skill3=10 tokens 可放入，skill2=10 tokens → 10+10=20 > 15，停止。
 		text, err := buildPreservedSkillsText(ctx, messages, &PreserveSkillsConfig{
 			MaxSkills:         ptr(10),
 			SkillsTokenBudget: ptr(15),
@@ -467,6 +476,11 @@ func TestBuildPreservedSkillsText(t *testing.T) {
 	t.Run("token budget and per-skill limit combined", func(t *testing.T) {
 		// s1: 16 chars → 4 tokens
 		// s2: 200 chars → 50 tokens (exceeds per-skill limit of 20, gets truncated)
+		// s3: 24 chars → 6 tokens
+		// s4: 24 chars → 6 tokens
+		//
+		// s1: 16 chars → 4 tokens
+		// s2: 200 chars → 50 tokens（超过 per-skill limit 20，会被截断）
 		// s3: 24 chars → 6 tokens
 		// s4: 24 chars → 6 tokens
 		messages := []adk.Message{
@@ -488,6 +502,10 @@ func TestBuildPreservedSkillsText(t *testing.T) {
 		// Per-skill limit: 20 (s2 with 50 tokens is truncated to 20)
 		// Budget: 30 (from most recent: s4=6, s3=6, s2=20, total=32 > 30, so s2 cannot fit)
 		// Result: s4 and s3 preserved
+		//
+		// Per-skill limit: 20（s2 有 50 tokens，会被截断到 20）
+		// Budget: 30（从最近开始：s4=6，s3=6，s2=20，总计=32 > 30，因此 s2 放不下）
+		// 结果：保留 s4 和 s3
 		text, err := buildPreservedSkillsText(ctx, messages, &PreserveSkillsConfig{
 			MaxSkills:         ptr(10),
 			MaxTokensPerSkill: ptr(20),
@@ -503,23 +521,33 @@ func TestBuildPreservedSkillsText(t *testing.T) {
 
 	t.Run("truncated skill content preserves only prefix", func(t *testing.T) {
 		// Use a long content and generous maxTokens so the prefix is clearly visible.
+		// 使用较长的 content 和宽松的 maxTokens，以便清楚看到 prefix。
 		content := strings.Repeat("abcdefghij", 100) // 1000 bytes → 250 tokens
+		// 1000 字节 → 250 token
 		// maxTokens=125 → targetBytes = 500, minus ~101 marker bytes → ~399 prefix bytes
+		// maxTokens=125 → targetBytes = 500，减去约 101 个 marker 字节 → 约 399 个前缀字节
 		truncated := truncateSkillContent(content, 125)
 		assert.True(t, strings.HasPrefix(truncated, "abcdefghij")) // prefix preserved
+		// 保留前缀
 		assert.Contains(t, truncated, "skill content truncated for compaction")
 		assert.NotEqual(t, content, truncated)
 		// Ends with marker, not with original content suffix
+		// 以 marker 结尾，而不是以原内容后缀结尾
 		assert.True(t, strings.HasSuffix(truncated, "]"))
 		// No suffix from original content
+		// 不包含原内容的后缀
 		assert.False(t, strings.HasSuffix(truncated, "abcdefghij]"))
 	})
 
 	t.Run("truncated multibyte content does not produce invalid utf8", func(t *testing.T) {
 		// Each Chinese char is 3 bytes. 334 chars = 1002 bytes → 251 tokens
+		// 每个中文字符为 3 字节。334 个字符 = 1002 字节 → 251 token
 		content := strings.Repeat("中", 334)
 		// maxTokens=125 → targetBytes=500, minus marker ~101 bytes → ~399 bytes
 		// 399 / 3 = 133 full Chinese chars, no partial rune
+		//
+		// maxTokens=125 → targetBytes=500，减去 marker 约 101 字节 → 约 399 字节
+		// 399 / 3 = 133 个完整中文字符，无残缺 rune
 		truncated := truncateSkillContent(content, 125)
 		assert.True(t, utf8.ValidString(truncated))
 		assert.True(t, strings.HasPrefix(truncated, "中中中"))

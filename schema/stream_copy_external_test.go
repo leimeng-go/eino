@@ -106,6 +106,7 @@ func TestCopyDelay(t *testing.T) {
 	runtime.GOMAXPROCS(10)
 	n := 3
 	//m := 100
+	// m := 100
 	s := newStream[string](0)
 	scp := s.asReader().Copy(n)
 	go func() {

@@ -92,6 +92,9 @@ func TestRetryThenFailover(t *testing.T) {
 
 		// m1: 1 (lastSuccess) + 2 retries = 3 calls on lastSuccess attempt,
 		// then failover to m2 which also goes through retry wrapper: 1 call succeeds.
+		//
+		// m1：1 次（lastSuccess）+ 2 次重试 = lastSuccess 尝试中共 3 次调用，
+		// 然后 failover 到 m2，它也会经过 retry wrapper：1 次调用成功。
 		require.Equal(t, int32(3), atomic.LoadInt32(&m1Calls))
 		require.Equal(t, int32(1), atomic.LoadInt32(&m2Calls))
 	})
@@ -138,12 +141,15 @@ func TestRetryThenFailover(t *testing.T) {
 		require.Error(t, err)
 
 		// Should be RetryExhaustedError from m2's retry wrapper
+		// 应为来自 m2 重试包装器的 RetryExhaustedError
 		var retryErr *RetryExhaustedError
 		require.True(t, errors.As(err, &retryErr))
 
 		// m1: 1 initial + 1 retry = 2 calls
+		// m1：1 次初始调用 + 1 次重试 = 2 次调用
 		require.Equal(t, int32(2), atomic.LoadInt32(&m1Calls))
 		// m2: 1 initial + 1 retry = 2 calls
+		// m2：1 次初始调用 + 1 次重试 = 2 次调用
 		require.Equal(t, int32(2), atomic.LoadInt32(&m2Calls))
 	})
 
@@ -190,8 +196,10 @@ func TestRetryThenFailover(t *testing.T) {
 		require.Equal(t, "ok on retry", msg.Content)
 
 		// 2 calls: first fails, second succeeds via retry
+		// 2 次调用：第一次失败，第二次通过重试成功
 		require.Equal(t, int32(2), atomic.LoadInt32(&m1Calls))
 		// ShouldFailover should never be called
+		// ShouldFailover 不应被调用
 		require.Equal(t, int32(0), atomic.LoadInt32(&failoverCalled))
 	})
 
@@ -213,6 +221,7 @@ func TestRetryThenFailover(t *testing.T) {
 			MaxRetries: 3,
 			IsRetryAble: func(_ context.Context, err error) bool {
 				// Only non-retryable errors
+				// 仅不可重试错误
 				return !errors.Is(err, nonRetryableErr)
 			},
 			BackoffFunc: func(_ context.Context, _ int) time.Duration { return 0 },
@@ -241,6 +250,7 @@ func TestRetryThenFailover(t *testing.T) {
 		require.Equal(t, "ok from m2", msg.Content)
 
 		// m1 called only once — non-retryable error skips retry
+		// m1 只调用一次——不可重试错误会跳过重试
 		require.Equal(t, int32(1), atomic.LoadInt32(&m1Calls))
 		require.Equal(t, int32(1), atomic.LoadInt32(&m2Calls))
 	})
@@ -294,6 +304,7 @@ func TestRetryThenFailover(t *testing.T) {
 		require.Equal(t, "ok from m2", msgs[0].Content)
 
 		// m1: 1 initial + 1 retry = 2 calls on lastSuccess attempt
+		// m1：在 lastSuccess 尝试中，1 次初始调用 + 1 次重试 = 2 次调用
 		require.Equal(t, int32(2), atomic.LoadInt32(&m1Calls))
 		require.Equal(t, int32(1), atomic.LoadInt32(&m2Calls))
 	})
@@ -347,8 +358,10 @@ func TestRetryThenFailover(t *testing.T) {
 		require.True(t, errors.As(err, &retryErr))
 
 		// m1: 1 initial + 1 retry = 2 calls
+		// m1：1 次初始调用 + 1 次重试 = 2 次调用
 		require.Equal(t, int32(2), atomic.LoadInt32(&m1Calls))
 		// m2: 1 initial + 1 retry = 2 calls
+		// m2：1 次初始调用 + 1 次重试 = 2 次调用
 		require.Equal(t, int32(2), atomic.LoadInt32(&m2Calls))
 	})
 

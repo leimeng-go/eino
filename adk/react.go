@@ -30,6 +30,7 @@ import (
 )
 
 // ErrExceedMaxIterations indicates the agent reached the maximum iterations limit.
+// ErrExceedMaxIterations 表示智能体已达到最大迭代次数限制。
 var ErrExceedMaxIterations = errors.New("exceeds max iterations")
 
 type typedState[M MessageType] struct {
@@ -38,14 +39,23 @@ type typedState[M MessageType] struct {
 
 	// ToolInfos contains the tool definitions passed to the model via model.WithTools.
 	// Managed by the framework and modifiable by BeforeModelRewriteState handlers.
+	//
+	// ToolInfos 包含通过 model.WithTools 传给模型的工具定义。
+	// 由框架管理，并可由 BeforeModelRewriteState 处理器修改。
 	ToolInfos []*schema.ToolInfo
 
 	// DeferredToolInfos contains tool definitions for server-side deferred retrieval,
 	// passed to the model via model.WithDeferredTools. Nil when not in use.
+	//
+	// DeferredToolInfos 包含用于服务端延迟检索的工具定义，
+	// 通过 model.WithDeferredTools 传给模型。未使用时为 nil。
 	DeferredToolInfos []*schema.ToolInfo
 
 	// Internal fields below - do not access directly.
 	// Kept exported for backward compatibility with existing checkpoints.
+	//
+	// 以下为内部字段——不要直接访问。
+	// 为兼容现有检查点而保持导出。
 	HasReturnDirectly        bool
 	ReturnDirectlyToolCallID string
 	ToolGenActions           map[string]*AgentAction
@@ -54,12 +64,17 @@ type typedState[M MessageType] struct {
 	ReturnDirectlyEvent      *TypedAgentEvent[M]
 	RetryAttempt             int
 	ToolMsgIDs               map[string]map[string]string // toolName → callID → eino message ID
+	// toolName → callID → eino message ID
 }
 
 // State is the internal state of the ChatModelAgent.
 //
 // Deprecated: State is exported only for checkpoint backward compatibility.
 // Do not use it directly.
+//
+// State 是 ChatModelAgent 的内部状态。
+// Deprecated: State 仅为检查点向后兼容而导出。
+// 不要直接使用它。
 type State = typedState[*schema.Message]
 
 type agenticState = typedState[*schema.AgenticMessage]
@@ -71,6 +86,9 @@ const (
 	// raw checkpoint bytes in preprocessADKCheckpoint.
 	// It must stay the same byte length as stateGobNameV07 so the length-prefixed
 	// gob string in the stream remains valid.
+	//
+	// stateGobNameV080 是仅用于 v0.8.0-v0.8.3 的别名，在 preprocessADKCheckpoint 中对原始检查点字节进行补丁后使用。
+	// 它必须与 stateGobNameV07 保持相同字节长度，以确保流中带长度前缀的 gob 字符串仍然有效。
 	stateGobNameV080 = "_eino_adk_state_v080_"
 )
 
@@ -86,6 +104,15 @@ func init() {
 	//   State's exported fields are a superset of v0.7, so gob handles missing fields gracefully.
 	// - v0.8.0-v0.8.3: "_eino_adk_react_state" + GobEncoder wire → byte-patched to stateGobNameV080,
 	//   decode into stateV080 and migrate.
+	//
+	// 检查点兼容性说明：
+	// - ADK/compose 检查点使用 gob 编码，可能将状态存放在 `any` 后面，因此 gob 依赖线上的类型名来选择本地 Go 类型。
+	// - Gob 每个名称只允许对应一个本地 Go 类型，并且即使名称匹配，也会把 "struct wire" 和 "GobEncoder wire" 视为不兼容。
+	// 本文件维护 2 个 *State 解码时期：
+	// - v0.7.* 和当前版本："_eino_adk_react_state" + struct wire → 直接解码为 *State。
+	// State 的导出字段是 v0.7 的超集，因此 gob 会优雅处理缺失字段。
+	// - v0.8.0-v0.8.3："_eino_adk_react_state" + GobEncoder wire → 字节补丁为 stateGobNameV080，
+	// 解码为 stateV080 并迁移。
 	schema.RegisterName[*State](stateGobNameV07)
 	schema.RegisterName[*stateV080](stateGobNameV080)
 
@@ -93,6 +120,7 @@ func init() {
 	schema.RegisterName[*TypedAgentEvent[*schema.AgenticMessage]]("_eino_adk_agentic_event")
 
 	// backward compatibility when decoding checkpoints created by v0.8.0 - v0.8.3
+	// 解码 v0.8.0 - v0.8.3 创建的检查点时保持向后兼容
 	gob.Register(&AgentEvent{})
 	gob.Register(0)
 
@@ -195,6 +223,10 @@ func (s *typedState[M]) decrementRemainingIterations() {
 // into opaque bytes. This type's GobDecode reads that format.
 // It is registered under "_eino_adk_state_v080_" — a same-length alias used
 // only after byte-patching the checkpoint data in preprocessADKCheckpoint.
+//
+// stateV080 处理 v0.8.0-v0.8.3 的检查点格式。
+// 在这些版本中，*State 实现了 GobEncoder，并以 "_eino_adk_react_state" 注册。GobEncode 将 stateSerialization struct 序列化为不透明字节。此类型的 GobDecode 会读取该格式。
+// 它以 "_eino_adk_state_v080_" 注册——这是一个等长别名，仅在 preprocessADKCheckpoint 中对检查点数据进行字节补丁后使用。
 type stateV080 struct {
 	Messages                 []Message
 	HasReturnDirectly        bool
@@ -210,6 +242,9 @@ type stateV080 struct {
 
 // stateV080Serialization is the on-wire format that v0.8.0-v0.8.3 GobEncode produced.
 // It is only used by stateV080.GobDecode to parse those legacy opaque bytes.
+//
+// stateV080Serialization 是 v0.8.0-v0.8.3 的 GobEncode 生成的线上格式。
+// 它仅由 stateV080.GobDecode 用于解析这些遗留不透明字节。
 type stateV080Serialization stateV080
 
 func (sc *stateV080) GobDecode(b []byte) error {
@@ -229,6 +264,7 @@ func (sc *stateV080) GobDecode(b []byte) error {
 }
 
 // stateV080ToState converts a legacy *stateV080 (v0.8.0-v0.8.3) to a current *State.
+// stateV080ToState 将遗留的 *stateV080（v0.8.0-v0.8.3）转换为当前的 *State。
 func stateV080ToState(sc *stateV080) *State {
 	s := &State{
 		Messages:                 sc.Messages,
@@ -271,6 +307,14 @@ func stateV080ToState(sc *stateV080) *State {
 //   - This function is intended for use within ChatModelAgent runs only. It relies
 //     on ChatModelAgent's internal State to store and pop actions, which is not
 //     available in other agent types.
+//
+// SendToolGenAction 将 AgentAction 附加到当前工具执行接下来发出的工具事件。
+// 使用场景/时机：
+// - 在工具的 Run（Invokable/Streamable）实现中调用，以便在该工具的输出事件中包含 action。
+// - action 由当前工具调用上下文限定作用域：如果有 ToolCallID，则使用它作为 key，以支持同一工具使用不同参数的并发调用；否则使用提供的 toolName。
+// - 存储的 action 是临时的，会在工具完成时（包括流式完成）弹出并附加到工具事件。
+// 限制：
+// - 此函数仅用于 ChatModelAgent 运行中。它依赖 ChatModelAgent 的内部 State 来存储和弹出 action，其他智能体类型中不可用。
 func SendToolGenAction(ctx context.Context, toolName string, action *AgentAction) error {
 	key := toolName
 	toolCallID := compose.GetToolCallID(ctx)
@@ -304,6 +348,9 @@ type typedReactConfig[M MessageType] struct {
 
 	// afterAgentFunc is called when the agent reaches a successful terminal state.
 	// It runs as a graph node, so compose.ProcessState is available.
+	//
+	// afterAgentFunc 在 agent 到达成功的终止状态时调用。
+	// 它作为图节点运行，因此可使用 compose.ProcessState。
 	afterAgentFunc func(ctx context.Context, msg M) (M, error)
 }
 
@@ -396,6 +443,9 @@ func newReact(ctx context.Context, config *reactConfig) (reactGraph, error) {
 	// CancelAfterChatModel safe-point: on the tool-calls path, after the branch
 	// has confirmed that the model response contains tool calls (i.e. not a final
 	// answer). Skipped entirely when the model produces a final answer.
+	//
+	// CancelAfterChatModel 安全点：在工具调用路径上，当分支已确认模型响应包含工具调用（即不是最终答案）之后。
+	// 当模型生成最终答案时会完全跳过。
 	_ = g.AddLambdaNode(cancelCheckNode_, compose.InvokableLambda(func(ctx context.Context, msg Message) (Message, error) {
 		if cancelCtx != nil && cancelCtx.shouldCancel() {
 			if cancelCtx.getMode()&CancelAfterChatModel != 0 {
@@ -439,12 +489,21 @@ func newReact(ctx context.Context, config *reactConfig) (reactGraph, error) {
 
 	// AfterToolCalls node: persists tool results to state and fires the after-tool-calls hook.
 	// The graph auto-materializes the ToolsNode stream into []Message before this node.
+	//
+	// AfterToolCalls 节点：将工具结果持久化到状态，并触发 after-tool-calls hook。
+	// 图会在该节点之前自动将 ToolsNode 流具象化为 []Message。
 	afterToolCalls := func(ctx context.Context, toolResults []Message) ([]Message, error) {
 		// Propagate tool message IDs from event sender to state messages.
 		// The event sender pre-generated IDs and stored them in state.ToolMsgIDs[toolName+callID].
 		// Here we pop them and set them on the compose-created tool result messages
 		// so that state messages share the same IDs as their corresponding event messages.
 		// If no stored ID is found (old checkpoint, custom event sender), generate a fresh one.
+		//
+		// 将工具消息 ID 从事件发送方传播到状态消息。
+		// 事件发送方预先生成了 ID，并存入 state.ToolMsgIDs[toolName+callID]。
+		// 这里将其弹出并设置到 compose 创建的工具结果消息上，
+		// 使状态消息与对应的事件消息共享相同 ID。
+		// 如果找不到已存储的 ID（旧检查点、自定义事件发送方），则生成新的 ID。
 		_ = compose.ProcessState(ctx, func(_ context.Context, st *State) error {
 			for _, msg := range toolResults {
 				if id := st.popToolMsgID(msg.ToolName, msg.ToolCallID); id != "" {
@@ -470,6 +529,7 @@ func newReact(ctx context.Context, config *reactConfig) (reactGraph, error) {
 		compose.WithNodeName(afterToolCallsNode_))
 
 	// AfterToolCallsCancelCheck: CancelAfterToolCalls safe-point, separated from toolPostHandle.
+	// AfterToolCallsCancelCheck：CancelAfterToolCalls 安全点，与 toolPostHandle 分离。
 	afterToolCallsCancelCheck := func(ctx context.Context, toolResults []Message) ([]Message, error) {
 		if cancelCtx != nil && cancelCtx.shouldCancel() {
 			if cancelCtx.getMode()&CancelAfterToolCalls != 0 {
@@ -485,6 +545,7 @@ func newReact(ctx context.Context, config *reactConfig) (reactGraph, error) {
 	_ = g.AddEdge(initNode_, chatModel_)
 
 	// Determine the terminal node: afterAgentNode_ if afterAgentFunc is set, otherwise compose.END.
+	// 确定终止节点：如果设置了 afterAgentFunc，则为 afterAgentNode_，否则为 compose.END。
 	terminalNode := compose.END
 	if config.afterAgentFunc != nil {
 		_ = g.AddLambdaNode(afterAgentNode_, compose.InvokableLambda(config.afterAgentFunc),
@@ -729,6 +790,7 @@ func newAgenticReact(ctx context.Context, config *agenticReactConfig) (agenticRe
 	_ = g.AddEdge(initNode_, chatModel_)
 
 	// Determine the terminal node: afterAgentNode_ if afterAgentFunc is set, otherwise compose.END.
+	// 确定终止节点：如果设置了 afterAgentFunc，则为 afterAgentNode_，否则为 compose.END。
 	terminalNode := compose.END
 	if config.afterAgentFunc != nil {
 		_ = g.AddLambdaNode(afterAgentNode_, compose.InvokableLambda(config.afterAgentFunc),
@@ -804,6 +866,10 @@ func newAgenticReact(ctx context.Context, config *agenticReactConfig) (agenticRe
 // that contains a tool result content block.
 // Assumes one tool result per message, which is guaranteed by AgenticToolsNode
 // (see compose.toolMessageToAgenticMessage).
+//
+// extractToolIdentifiers 从包含工具结果内容块的 AgenticMessage 中提取工具名称和调用 ID。
+// 假定每条消息只有一个工具结果，这由 AgenticToolsNode 保证
+// （见 compose.toolMessageToAgenticMessage）。
 func extractToolIdentifiers(msg *schema.AgenticMessage) (toolName, callID string) {
 	if msg == nil {
 		return "", ""

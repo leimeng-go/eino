@@ -40,6 +40,9 @@ type deterministicTransferState struct {
 // NOT RECOMMENDED: Agent transfer with full context sharing between agents has not proven
 // to be more effective empirically. Consider using ChatModelAgent with AgentTool
 // or DeepAgent instead for most multi-agent scenarios.
+//
+// AgentWithDeterministicTransferTo 包装一个智能体，使其确定性地转移到给定智能体。
+// 不推荐：智能体之间共享完整上下文的转移在经验上并未证明更有效。大多数多智能体场景建议改用带 AgentTool 的 ChatModelAgent 或 DeepAgent。
 func AgentWithDeterministicTransferTo(_ context.Context, config *DeterministicTransferConfig) Agent {
 	if ra, ok := config.Agent.(ResumableAgent); ok {
 		return &resumableAgentWithDeterministicTransferTo{

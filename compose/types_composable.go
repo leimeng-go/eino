@@ -22,6 +22,7 @@ import (
 )
 
 // AnyGraph the identifiers for composable and compilable Graph[I, O]、Chain[I, O] in Eino.
+// AnyGraph 是 Eino 中可组合且可编译的 Graph[I, O]、Chain[I, O] 的标识。
 type AnyGraph interface {
 	getGenericHelper() *genericHelper
 	compile(ctx context.Context, options *graphCompileOptions) (*composableRunnable, error)

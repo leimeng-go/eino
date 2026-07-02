@@ -23,6 +23,11 @@ package filesystem
 //
 // These prompts are used under the terms of the original project's open source license.
 // When using this code in your own open source project, ensure compliance with the original license requirements.
+//
+// 此文件包含改编自 DeepAgents 项目的提示模板和工具描述。
+// 原始来源：https://github.com/langchain-ai/deepagents
+// 这些提示按原项目开源许可证的条款使用。
+// 在你自己的开源项目中使用此代码时，请确保遵守原许可证要求。
 
 const (
 	tooLargeToolMessage = `Tool result too large, the result of this tool call {tool_call_id} was saved in the filesystem at this path: {file_path}
@@ -90,6 +95,7 @@ Usage:
 - 在编辑文件之前，你应该始终确保已读取该文件`
 
 	// EnhancedReadFileDescSuffix is appended to ReadFileToolDesc when using MultiModalReadFileTool.
+	// 使用 MultiModalReadFileTool 时，EnhancedReadFileDescSuffix 会追加到 ReadFileToolDesc。
 	EnhancedReadFileDescSuffix = `
 - This tool supports reading image files (e.g., PNG, JPG, etc.). When reading an image file, the contents are presented visually, as the underlying model is a multimodal LLM.
 - This tool can read PDF files (.pdf). For large PDFs (more than 10 pages), you MUST provide the pages parameter to read specific page ranges (e.g., pages: "1-5"). Reading a large PDF without the pages parameter will fail. Maximum 20 pages per request.`

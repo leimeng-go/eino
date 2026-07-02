@@ -26,6 +26,9 @@ import (
 // ChatModelWithTools returns a chat model configured with tool schemas.
 // If a ToolCallingChatModel is provided, it is used directly (and optionally
 // configured with tools). Otherwise, a plain ChatModel is bound with tools.
+//
+// ChatModelWithTools 返回配置了工具 schema 的聊天模型。
+// 如果提供了 ToolCallingChatModel，则直接使用它（并可选择配置工具）。否则，将普通 ChatModel 与工具绑定。
 func ChatModelWithTools(cm model.ChatModel, toolCallingModel model.ToolCallingChatModel, toolInfos []*schema.ToolInfo) (
 	model.BaseChatModel, error) {
 

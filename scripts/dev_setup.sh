@@ -55,6 +55,7 @@ EINO_EXT_REPO="https://github.com/cloudwego/eino-ext"
 EINO_EXAMPLES_REPO="https://github.com/cloudwego/eino-examples"
 
 # Parse flags
+# 解析参数
 RESET=false
 for arg in "$@"; do
   case $arg in
@@ -65,12 +66,14 @@ done
 echo "==> Setting up eino dev workspace in: $REPO_ROOT"
 
 # --reset: remove existing dirs
+# --reset：删除已有目录
 if [ "$RESET" = true ]; then
   echo "==> --reset: removing $EXT_DIR/ and $EXAMPLES_DIR/"
   rm -rf "$EXT_DIR" "$EXAMPLES_DIR" go.work go.work.sum
 fi
 
 # Clone repos if not already present
+# 如果仓库尚不存在，则进行克隆
 if [ ! -d "$EXT_DIR/.git" ]; then
   echo "==> Cloning eino-ext into $EXT_DIR/"
   git clone "$EINO_EXT_REPO" "$EXT_DIR"
@@ -86,6 +89,7 @@ else
 fi
 
 # Exclude dirs from eino's git tracking (local only, not committed)
+# 从 eino 的 git 跟踪中排除目录（仅本地，不提交）
 EXCLUDE_FILE=".git/info/exclude"
 add_exclude() {
   local entry="$1"
@@ -98,11 +102,13 @@ add_exclude "$EXT_DIR/"
 add_exclude "$EXAMPLES_DIR/"
 
 # Build go.work covering eino root + every go.mod found in ext/ and examples/
+# 构建 go.work，覆盖 eino 根目录以及 ext/ 和 examples/ 中找到的每个 go.mod
 if [ ! -f "go.work" ]; then
   echo "==> Creating go.work"
   go work init .
 
   # Collect all module directories (directories containing a go.mod)
+  # 收集所有模块目录（包含 go.mod 的目录）
   while IFS= read -r modfile; do
     dir="$(dirname "$modfile")"
     go work use "$dir"

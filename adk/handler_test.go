@@ -1558,6 +1558,7 @@ func TestRunLocalValueFunctions(t *testing.T) {
 		}
 
 		// unregistered custom struct should fail
+		// 未注册的自定义 struct 应失败
 		err := checkGobEncodability("key", unregisteredType{Data: "hello"})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "not gob-serializable")
@@ -1566,6 +1567,7 @@ func TestRunLocalValueFunctions(t *testing.T) {
 		assert.Contains(t, err.Error(), "unregisteredType")
 
 		// primitives should succeed
+		// 基本类型应成功
 		assert.NoError(t, checkGobEncodability("key", "hello"))
 		assert.NoError(t, checkGobEncodability("key", 42))
 		assert.NoError(t, checkGobEncodability("key", true))
@@ -1820,6 +1822,7 @@ func TestAfterToolCallsHook(t *testing.T) {
 		cm.EXPECT().WithTools(gomock.Any()).Return(cm, nil).AnyTimes()
 
 		// First call: model returns two tool calls
+		// 第一次调用：model 返回两个工具调用
 		cm.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(schema.AssistantMessage("calling tools", []schema.ToolCall{
 				{ID: "call_1", Function: schema.FunctionCall{Name: "tool_alpha", Arguments: "{}"}},
@@ -1827,6 +1830,7 @@ func TestAfterToolCallsHook(t *testing.T) {
 			}), nil).Times(1)
 
 		// Second call: model returns final response
+		// 第二次调用：model 返回最终响应
 		cm.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(schema.AssistantMessage("done", nil), nil).Times(1)
 
@@ -1863,6 +1867,7 @@ func TestAfterToolCallsHook(t *testing.T) {
 		defer mu.Unlock()
 
 		// Should be called exactly once (one iteration with tool calls)
+		// 应只调用一次（一次包含工具调用的迭代）
 		assert.Equal(t, 1, callCount)
 	})
 
@@ -1872,6 +1877,7 @@ func TestAfterToolCallsHook(t *testing.T) {
 		cm := mockModel.NewMockToolCallingChatModel(ctrl)
 
 		// Model returns a direct response with no tool calls
+		// model 返回无工具调用的直接响应
 		cm.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(schema.AssistantMessage("direct response", nil), nil).Times(1)
 
@@ -1908,12 +1914,14 @@ func TestAfterToolCallsHook(t *testing.T) {
 		cm.EXPECT().WithTools(gomock.Any()).Return(cm, nil).AnyTimes()
 
 		// First call: model returns a tool call
+		// 第一次调用：model 返回一个工具调用
 		cm.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(schema.AssistantMessage("calling", []schema.ToolCall{
 				{ID: "c1", Function: schema.FunctionCall{Name: "mytool", Arguments: "{}"}},
 			}), nil).Times(1)
 
 		// Second call: final response
+		// 第二次调用：最终响应
 		cm.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(schema.AssistantMessage("final", nil), nil).Times(1)
 
@@ -1934,6 +1942,7 @@ func TestAfterToolCallsHook(t *testing.T) {
 		iter := agent.Run(ctx, &AgentInput{Messages: []Message{schema.UserMessage("original")}},
 			WithAfterToolCallsHook(func(ctx context.Context) error {
 				// Verify tool results are already in state when the hook fires
+				// 验证 hook 触发时工具结果已在 state 中
 				_ = compose.ProcessState(ctx, func(_ context.Context, st *State) error {
 					for _, msg := range st.Messages {
 						if msg.Role == schema.Tool {
@@ -2007,18 +2016,21 @@ func TestAfterToolCallsHook(t *testing.T) {
 		cm.EXPECT().WithTools(gomock.Any()).Return(cm, nil).AnyTimes()
 
 		// Iteration 1: tool call
+		// 迭代 1：工具调用
 		cm.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(schema.AssistantMessage("calling1", []schema.ToolCall{
 				{ID: "c1", Function: schema.FunctionCall{Name: "mytool", Arguments: "{}"}},
 			}), nil).Times(1)
 
 		// Iteration 2: tool call again
+		// 迭代 2：再次工具调用
 		cm.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(schema.AssistantMessage("calling2", []schema.ToolCall{
 				{ID: "c2", Function: schema.FunctionCall{Name: "mytool", Arguments: "{}"}},
 			}), nil).Times(1)
 
 		// Iteration 3: final answer
+		// 迭代 3：最终答案
 		cm.EXPECT().Generate(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(schema.AssistantMessage("done", nil), nil).Times(1)
 

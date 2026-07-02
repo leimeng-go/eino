@@ -126,4 +126,75 @@
 //   - RunInfo may be nil: always nil-check before dereferencing in handlers,
 //     especially when a component is used standalone outside a graph without
 //     InitCallbacks being called.
+//
+// Package callbacks 为 Eino 中的组件执行提供可观测性钩子。
+// 回调会在每次组件调用前后的五个生命周期时机触发：
+// - [TimingOnStart] / [TimingOnEnd]：非流式输入和输出。
+// - [TimingOnStartWithStreamInput] / [TimingOnEndWithStreamOutput]：流式变体 —— 处理器会收到流的副本，并且 MUST 关闭它。
+// - [TimingOnError]：组件返回非 nil 错误（流内部错误不会在这里上报）。
+// # 挂载处理器
+// 全局处理器（观察每个 graph 中的每个 node）：
+// callbacks.AppendGlobalHandlers(myHandler) // 仅在启动时调用一次 —— NOT thread-safe
+// 单次调用处理器（观察一次 graph 运行）：
+// runnable.Invoke(ctx, input, compose.WithCallbacks(myHandler))
+// 指定特定 node：
+// compose.WithCallbacks(myHandler).DesignateNode("nodeName")
+// 处理器继承：如果传给 graph 运行的 context 已携带处理器（例如来自父 graph），这些处理器会自动被整个子运行继承。
+// # 构建处理器
+// 选项 1 —— [NewHandlerBuilder]：为所需时机注册原始函数。输入/输出无类型；使用组件包的 ConvCallbackInput helper 转换为具体类型：
+// handler := callbacks.NewHandlerBuilder().
+// OnStartFn(func(ctx context.Context, info *RunInfo, input CallbackInput) context.Context {
+// 处理组件开始
+// return ctx
+// }).
+// OnEndFn(func(ctx context.Context, info *RunInfo, output CallbackOutput) context.Context {
+// 处理组件结束
+// return ctx
+// }).
+// OnErrorFn(func(ctx context.Context, info *RunInfo, err error) context.Context {
+// 处理组件错误
+// return ctx
+// }).
+// OnStartWithStreamInputFn(func(ctx context.Context, info *RunInfo, input *schema.StreamReader[CallbackInput]) context.Context {
+// defer input.Close() // MUST 关闭 —— 否则会导致 pipeline goroutine 泄漏
+// return ctx
+// }).
+// OnEndWithStreamOutputFn(func(ctx context.Context, info *RunInfo, output *schema.StreamReader[CallbackOutput]) context.Context {
+// defer output.Close() // MUST 关闭
+// return ctx
+// }).
+// Build()
+// 选项 2 —— utils/callbacks.NewHandlerHelper：按组件类型分发，因此每个处理器函数会直接收到具体类型的输入/输出：
+// handler := callbacks.NewHandlerHelper().
+// ChatModel(&model.CallbackHandler{
+// OnStart: func(ctx context.Context, info *RunInfo, input *model.CallbackInput) context.Context {
+// log.Printf("Model started: %s, messages: %d", info.Name, len(input.Messages))
+// return ctx
+// },
+// }).
+// Prompt(&prompt.CallbackHandler{
+// OnEnd: func(ctx context.Context, info *RunInfo, output *prompt.CallbackOutput) context.Context {
+// log.Printf("Prompt completed")
+// return ctx
+// },
+// }).
+// Handler()
+// # 在处理器内传递状态
+// 某个时机返回的 ctx 会传给同一个处理器的下一个时机，从而可通过 context.WithValue 实现 OnStart→OnEnd 状态传递：
+// NewHandlerBuilder().
+// OnStartFn(func(ctx context.Context, info *RunInfo, _ CallbackInput) context.Context {
+// return context.WithValue(ctx, startTimeKey{}, time.Now())
+// }).
+// OnEndFn(func(ctx context.Context, info *RunInfo, _ CallbackOutput) context.Context {
+// start := ctx.Value(startTimeKey{}).(time.Time)
+// log.Printf("duration: %v", time.Since(start))
+// return ctx
+// }).Build()
+// 不同处理器之间没有保证的执行顺序，也没有 context 链。若要在处理器之间共享状态，请将其存放在最外层 context 中的并发安全变量里。
+// # 常见陷阱
+// - 流副本必须关闭：当 N 个处理器注册某个流式时机时，流会被复制 N+1 份（每个处理器一份 + 下游一份）。如果任何处理器的副本未关闭，原始流就无法释放，整个 pipeline 会泄漏。
+// - 不要修改 Input/Output：所有下游节点和处理器共享同一个指针。修改会在并发 graph 执行中造成数据竞争。
+// - AppendGlobalHandlers 不是线程安全的：只在初始化期间调用，绝不要与 graph 执行并发调用。
+// - OnError 看不到流错误：消费者读取 StreamReader 时发生的错误不会经过 OnError。
+// - RunInfo 可能为 nil：处理器中解引用前务必先检查 nil，尤其是组件在 graph 外独立使用且未调用 InitCallbacks 时。
 package callbacks

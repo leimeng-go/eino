@@ -26,30 +26,39 @@ import (
 )
 
 // GraphBranchCondition is the condition type for the branch.
+// GraphBranchCondition 是分支的条件类型。
 type GraphBranchCondition[T any] func(ctx context.Context, in T) (endNode string, err error)
 
 // StreamGraphBranchCondition is the condition type for the stream branch.
+// StreamGraphBranchCondition 是流式分支的条件类型。
 type StreamGraphBranchCondition[T any] func(ctx context.Context, in *schema.StreamReader[T]) (endNode string, err error)
 
 // GraphMultiBranchCondition is the condition type for the multi choice branch.
+// GraphMultiBranchCondition 是多选分支的条件类型。
 type GraphMultiBranchCondition[T any] func(ctx context.Context, in T) (endNode map[string]bool, err error)
 
 // StreamGraphMultiBranchCondition is the condition type for the stream multi choice branch.
+// StreamGraphMultiBranchCondition 是流式多选分支的条件类型。
 type StreamGraphMultiBranchCondition[T any] func(ctx context.Context, in *schema.StreamReader[T]) (endNodes map[string]bool, err error)
 
 // GraphBranch is the branch type for the graph.
 // It is used to determine the next node based on the condition.
+//
+// GraphBranch 是图的分支类型。
+// 它用于根据条件确定下一个节点。
 type GraphBranch struct {
 	invoke    func(ctx context.Context, input any) (output []string, err error)
 	collect   func(ctx context.Context, input streamReader) (output []string, err error)
 	inputType reflect.Type
 	*genericHelper
-	endNodes   map[string]bool
-	idx        int // used to distinguish branches in parallel
+	endNodes map[string]bool
+	idx      int // used to distinguish branches in parallel
+	// 用于区分并行中的分支
 	noDataFlow bool
 }
 
 // GetEndNode returns the all end nodes of the branch.
+// GetEndNode 返回该分支的所有结束节点。
 func (gb *GraphBranch) GetEndNode() map[string]bool {
 	return gb.endNodes
 }
@@ -62,6 +71,10 @@ func newGraphBranch[T any](r *runnablePacker[T, []string, any], endNodes map[str
 				// When a nil is passed as an 'any' type, its original type information is lost,
 				// becoming an untyped nil. This would cause type assertions to fail.
 				// So if the input is nil and the target type T is an interface, we need to explicitly create a nil of type T.
+				//
+				// 当 nil 作为 'any' 类型传入时，其原始类型信息会丢失，
+				// 变成无类型 nil。这会导致类型断言失败。
+				// 因此，如果输入为 nil 且目标类型 T 是接口，需要显式创建一个 T 类型的 nil。
 				if input == nil && generic.TypeOf[T]().Kind() == reflect.Interface {
 					var i T
 					in = i
@@ -86,6 +99,9 @@ func newGraphBranch[T any](r *runnablePacker[T, []string, any], endNodes map[str
 
 // NewGraphMultiBranch creates a branch for graphs where a condition selects
 // multiple end nodes; only keys present in endNodes are allowed.
+//
+// NewGraphMultiBranch 创建一个图分支，其条件会选择
+// 多个结束节点；只允许 endNodes 中存在的键。
 func NewGraphMultiBranch[T any](condition GraphMultiBranchCondition[T], endNodes map[string]bool) *GraphBranch {
 	condRun := func(ctx context.Context, in T, opts ...any) ([]string, error) {
 		ends, err := condition(ctx, in)
@@ -108,6 +124,9 @@ func NewGraphMultiBranch[T any](condition GraphMultiBranchCondition[T], endNodes
 
 // NewStreamGraphMultiBranch creates a streaming branch where a condition on
 // the input stream selects multiple end nodes.
+//
+// NewStreamGraphMultiBranch 创建一个流式分支，其基于
+// 输入流的条件会选择多个结束节点。
 func NewStreamGraphMultiBranch[T any](condition StreamGraphMultiBranchCondition[T],
 	endNodes map[string]bool) *GraphBranch {
 
@@ -142,6 +161,17 @@ func NewStreamGraphMultiBranch[T any](condition StreamGraphMultiBranchCondition[
 //	branch := compose.NewGraphBranch(condition, endNodes)
 //
 //	graph.AddBranch("key_of_node_before_branch", branch)
+//
+// NewGraphBranch 创建一个新的图分支。
+// 它用于根据条件确定下一个节点。
+// 例如：
+// condition := func(ctx context.Context, in string) (string, error) {
+// 确定下一个节点的逻辑
+// return "next_node_key", nil
+// }
+// endNodes := map[string]bool{"path01": true, "path02": true}
+// branch := compose.NewGraphBranch(condition, endNodes)
+// graph.AddBranch("key_of_node_before_branch", branch)
 func NewGraphBranch[T any](condition GraphBranchCondition[T], endNodes map[string]bool) *GraphBranch {
 	return NewGraphMultiBranch(func(ctx context.Context, in T) (endNode map[string]bool, err error) {
 		ret, err := condition(ctx, in)
@@ -165,6 +195,18 @@ func NewGraphBranch[T any](condition GraphBranchCondition[T], endNodes map[strin
 //	branch := compose.NewStreamGraphBranch(condition, endNodes)
 //
 //	graph.AddBranch("key_of_node_before_branch", branch)
+//
+// NewStreamGraphBranch 创建一个新的流式图分支。
+// 它用于根据流输入的条件确定下一个节点。
+// 例如：
+// condition := func(ctx context.Context, in *schema.StreamReader[T]) (string, error) {
+// 确定下一个节点的逻辑。
+// 要使用流特性，可以使用第一个 chunk 来确定下一个节点。
+// return "next_node_key", nil
+// }
+// endNodes := map[string]bool{"path01": true, "path02": true}
+// branch := compose.NewStreamGraphBranch(condition, endNodes)
+// graph.AddBranch("key_of_node_before_branch", branch)
 func NewStreamGraphBranch[T any](condition StreamGraphBranchCondition[T], endNodes map[string]bool) *GraphBranch {
 	return NewStreamGraphMultiBranch(func(ctx context.Context, in *schema.StreamReader[T]) (endNode map[string]bool, err error) {
 		ret, err := condition(ctx, in)

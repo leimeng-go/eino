@@ -23,6 +23,7 @@ type options struct {
 }
 
 // WithAgentCallbacks registers callbacks to be invoked by the host multi-agent.
+// WithAgentCallbacks 注册由 host 多智能体调用的回调。
 func WithAgentCallbacks(agentCallbacks ...MultiAgentCallback) agent.AgentOption {
 	return agent.WrapImplSpecificOptFn(func(opts *options) {
 		opts.agentCallbacks = append(opts.agentCallbacks, agentCallbacks...)

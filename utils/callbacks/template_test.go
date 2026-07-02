@@ -366,12 +366,14 @@ func TestNewComponentTemplate(t *testing.T) {
 		sw1.Close()
 		callbacks.OnEndWithStreamOutput[[]*schema.Message](ctx, sr1)
 		// Check AgenticModel stream
+		// 检查 AgenticModel 流
 		sir2, siw2 := schema.Pipe[callbacks.CallbackOutput](1)
 		siw2.Close()
 		handler.OnEndWithStreamOutput(ctx, &callbacks.RunInfo{Component: components.ComponentOfAgenticModel}, sir2)
 		assert.Equal(t, 42, cnt)
 
 		// Check AgenticToolsNode stream
+		// 检查 AgenticToolsNode 流
 		sir3, siw3 := schema.Pipe[callbacks.CallbackOutput](1)
 		siw3.Close()
 		handler.OnEndWithStreamOutput(ctx, &callbacks.RunInfo{Component: compose.ComponentOfAgenticToolsNode}, sir3)
@@ -387,6 +389,7 @@ func TestNewComponentTemplate(t *testing.T) {
 		cnt := 0
 
 		// 1. Test Graph and Chain Setters and Execution
+		// 1. 测试 Graph 和 Chain 的 Setter 与执行
 		tpl := NewHandlerHelper().
 			Graph(callbacks.NewHandlerBuilder().
 				OnStartFn(func(ctx context.Context, info *callbacks.RunInfo, input callbacks.CallbackInput) context.Context {
@@ -402,30 +405,44 @@ func TestNewComponentTemplate(t *testing.T) {
 		h := tpl.Handler()
 
 		// Trigger Graph OnStart
+		// 触发 Graph OnStart
 		h.OnStart(ctx, &callbacks.RunInfo{Component: compose.ComponentOfGraph}, nil)
 		assert.Equal(t, 1, cnt)
 
 		// Trigger Chain OnEnd
+		// 触发 Chain OnEnd
 		h.OnEnd(ctx, &callbacks.RunInfo{Component: compose.ComponentOfChain}, nil)
 		assert.Equal(t, 2, cnt)
 
 		// 2. Test Needed logic for Graph/Chain when handler is present/absent
 		// Graph is present (OnStart)
+		//
+		// 2. 测试有/无处理器时 Graph/Chain 的 Needed 逻辑
+		// Graph 存在（OnStart）
 		needed := h.(callbacks.TimingChecker).Needed(ctx, &callbacks.RunInfo{Component: compose.ComponentOfGraph}, callbacks.TimingOnStart)
 		assert.True(t, needed)
 
 		// Chain is present (OnEnd) - but we check OnStart which is not defined in the builder above?
 		// NewHandlerBuilder returns a handler that usually returns true for Needed if the specific func is not nil.
 		// Let's verify Chain OnStart is NOT needed because we only set OnEndFn.
+		//
+		// Chain 存在（OnEnd）——但这里检查 OnStart，它没有在上面的 builder 中定义？
+		// 如果特定函数非 nil，NewHandlerBuilder 返回的处理器通常会让 Needed 返回 true。
+		// 验证 Chain OnStart 不需要，因为我们只设置了 OnEndFn。
 		needed = h.(callbacks.TimingChecker).Needed(ctx, &callbacks.RunInfo{Component: compose.ComponentOfChain}, callbacks.TimingOnStart)
 		assert.False(t, needed) // Should be false because OnStartFn wasn't set for Chain
+		// 应为 false，因为 Chain 未设置 OnStartFn
 
 		// Lambda is NOT present
+		// Lambda 不存在
 		needed = h.(callbacks.TimingChecker).Needed(ctx, &callbacks.RunInfo{Component: compose.ComponentOfLambda}, callbacks.TimingOnStart)
 		assert.False(t, needed)
 
 		// 3. Test Conversion Fallbacks (Default cases)
 		// We need a handler with ToolsNode and AgenticToolsNode to test their conversion fallbacks
+		//
+		// 3. 测试转换回退（默认分支）
+		// 需要一个带 ToolsNode 和 AgenticToolsNode 的处理器来测试其转换回退
 		tpl2 := NewHandlerHelper().
 			ToolsNode(&ToolsNodeCallbackHandlers{
 				OnStart: func(ctx context.Context, info *callbacks.RunInfo, input *schema.Message) context.Context {
@@ -459,31 +476,40 @@ func TestNewComponentTemplate(t *testing.T) {
 		h2 := tpl2.Handler()
 
 		// Pass wrong type (string) to trigger default case in convToolsNodeCallbackInput -> returns nil
+		// 传入错误类型（string）以触发 convToolsNodeCallbackInput 中的默认分支 -> 返回 nil
 		h2.OnStart(ctx, &callbacks.RunInfo{Component: compose.ComponentOfToolsNode}, "wrong-input-type")
 		assert.Equal(t, 3, cnt) // +1
 
 		// Pass wrong type to trigger default case in convToolsNodeCallbackOutput -> returns nil
+		// 传入错误类型以触发 convToolsNodeCallbackOutput 中的默认分支 -> 返回 nil
 		h2.OnEnd(ctx, &callbacks.RunInfo{Component: compose.ComponentOfToolsNode}, "wrong-output-type")
 		assert.Equal(t, 4, cnt) // +1
 
 		// Pass wrong type to trigger default case in convAgenticToolsNodeCallbackInput -> returns nil
+		// 传入错误类型以触发 convAgenticToolsNodeCallbackInput 中的默认分支 -> 返回 nil
 		h2.OnStart(ctx, &callbacks.RunInfo{Component: compose.ComponentOfAgenticToolsNode}, "wrong-input-type")
 		assert.Equal(t, 5, cnt) // +1
 
 		// Pass wrong type to trigger default case in convAgenticToolsNodeCallbackOutput -> returns nil
+		// 传入错误类型以触发 convAgenticToolsNodeCallbackOutput 中的默认分支 -> 返回 nil
 		h2.OnEnd(ctx, &callbacks.RunInfo{Component: compose.ComponentOfAgenticToolsNode}, "wrong-output-type")
 		assert.Equal(t, 6, cnt) // +1
 
 		// 4. Test Needed for Agentic components when handlers are Set vs Unset
 		// tpl2 has AgenticToolsNode set
+		//
+		// 4. 测试 Agentic 组件在处理器已设置和未设置时的情况
+		// tpl2 已设置 AgenticToolsNode
 		needed = h2.(callbacks.TimingChecker).Needed(ctx, &callbacks.RunInfo{Component: compose.ComponentOfAgenticToolsNode}, callbacks.TimingOnStart)
 		assert.True(t, needed)
 
 		// tpl2 does NOT have AgenticModel set
+		// tpl2 未设置 AgenticModel
 		needed = h2.(callbacks.TimingChecker).Needed(ctx, &callbacks.RunInfo{Component: components.ComponentOfAgenticModel}, callbacks.TimingOnStart)
 		assert.False(t, needed)
 
 		// Set it now
+		// 现在设置它
 		tpl2.AgenticModel(&AgenticModelCallbackHandler{
 			OnStart: func(ctx context.Context, runInfo *callbacks.RunInfo, input *model.AgenticCallbackInput) context.Context {
 				return ctx
@@ -494,14 +520,17 @@ func TestNewComponentTemplate(t *testing.T) {
 		assert.True(t, needed)
 
 		// Check invalid component
+		// 检查无效组件
 		needed = h2.(callbacks.TimingChecker).Needed(ctx, &callbacks.RunInfo{Component: "UnknownComponent"}, callbacks.TimingOnStart)
 		assert.False(t, needed)
 
 		// Check RunInfo nil
+		// 检查 RunInfo 为 nil
 		needed = h2.(callbacks.TimingChecker).Needed(ctx, nil, callbacks.TimingOnStart)
 		assert.False(t, needed)
 
 		// 5. Test Needed for Transformer, Loader, Indexer, etc to ensure switch coverage
+		// 5. 测试 Transformer、Loader、Indexer 等，确保 switch 覆盖完整
 		tpl3 := NewHandlerHelper().
 			Transformer(&TransformerCallbackHandler{OnStart: func(ctx context.Context, info *callbacks.RunInfo, input *document.TransformerCallbackInput) context.Context {
 				return ctx
@@ -533,6 +562,7 @@ func TestNewComponentTemplate(t *testing.T) {
 		assert.True(t, checker.Needed(ctx, &callbacks.RunInfo{Component: components.ComponentOfTool}, callbacks.TimingOnStart))
 
 		// Verify False paths (by using a helper without them)
+		// 验证 false 路径（通过使用不包含它们的辅助对象）
 		emptyH := NewHandlerHelper().Handler().(callbacks.TimingChecker)
 		assert.False(t, emptyH.Needed(ctx, &callbacks.RunInfo{Component: components.ComponentOfTransformer}, callbacks.TimingOnStart))
 		assert.False(t, emptyH.Needed(ctx, &callbacks.RunInfo{Component: components.ComponentOfLoader}, callbacks.TimingOnStart))
@@ -542,6 +572,7 @@ func TestNewComponentTemplate(t *testing.T) {
 		assert.False(t, emptyH.Needed(ctx, &callbacks.RunInfo{Component: components.ComponentOfTool}, callbacks.TimingOnStart))
 
 		// 6. Test Needed for remaining components (ChatModel, Prompt, AgenticPrompt)
+		// 6. 测试其余组件（ChatModel、Prompt、AgenticPrompt）
 		tpl4 := NewHandlerHelper().
 			ChatModel(&ModelCallbackHandler{OnStart: func(ctx context.Context, runInfo *callbacks.RunInfo, input *model.CallbackInput) context.Context {
 				return ctx

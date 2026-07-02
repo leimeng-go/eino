@@ -896,6 +896,8 @@ func TestCascadingTyped_EventFromAgenticMessage(t *testing.T) {
 // assertAgenticEventRoleFields asserts that all AgenticMessage events in the
 // list have zero-valued Role and ToolName fields (which are *schema.Message-only),
 // and that AgenticRole is populated with a non-zero value.
+//
+// assertAgenticEventRoleFields 断言列表中的所有 AgenticMessage 事件都有零值的 Role 和 ToolName 字段（仅用于 *schema.Message），并且 AgenticRole 已填充为非零值。
 func assertAgenticEventRoleFields(t *testing.T, events []*TypedAgentEvent[*schema.AgenticMessage]) {
 	t.Helper()
 	for i, event := range events {
@@ -1359,6 +1361,7 @@ func TestConcatMessageStream_AgenticClosesStream(t *testing.T) {
 }
 
 // --- Agentic retry/failover stream test helpers ---
+// --- Agentic 重试/故障转移流测试辅助函数 ---
 
 func agenticStreamWithMidError(chunks []*schema.AgenticMessage, err error) *schema.StreamReader[*schema.AgenticMessage] {
 	sr, sw := schema.Pipe[*schema.AgenticMessage](len(chunks) + 1)
@@ -1687,6 +1690,9 @@ func TestAgenticFailoverStream_MidStreamError(t *testing.T) {
 // guards against the regression where buildAgenticReActRunFunc dropped the
 // failover config, leaving ModelFailoverConfig as a no-op for typed agents
 // that have any tools configured.
+//
+// TestAgenticFailoverGenerate_WithTools 验证在 *schema.AgenticMessage 的 ReAct（带工具）路径上会遵循 ModelFailoverConfig。
+// 这用于防止回归：buildAgenticReActRunFunc 曾丢弃 failover config，导致配置了任何工具的 typed agents 中 ModelFailoverConfig 变成 no-op。
 func TestAgenticFailoverGenerate_WithTools(t *testing.T) {
 	ctx := context.Background()
 

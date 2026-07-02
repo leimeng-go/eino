@@ -116,6 +116,10 @@ func handlersToToolMiddlewares[M MessageType](handlers []TypedChatModelAgentMidd
 	// Forward iteration: compose.wrapToolCall applies middlewares in reverse order
 	// (len-1 down to 0), so keeping the original handler order here means
 	// handlers[0] ends up outermost — matching the model wrapping convention.
+	//
+	// 正向迭代：compose.wrapToolCall 会按相反顺序应用 middleware
+	// （从 len-1 到 0），因此这里保持原始 handler 顺序意味着
+	// handlers[0] 最终位于最外层——与模型包装约定一致。
 	for _, handler := range handlers {
 
 		m := compose.ToolMiddleware{}
@@ -263,6 +267,7 @@ type typedEventSenderModelWrapper[M MessageType] struct {
 }
 
 // NewEventSenderModelWrapper creates a ChatModelAgentMiddleware that sends model output as agent events.
+// NewEventSenderModelWrapper 创建一个 ChatModelAgentMiddleware，用于将模型输出作为智能体事件发送。
 func NewEventSenderModelWrapper() ChatModelAgentMiddleware {
 	return &typedEventSenderModelWrapper[*schema.Message]{
 		TypedBaseChatModelAgentMiddleware: &TypedBaseChatModelAgentMiddleware[*schema.Message]{},
@@ -363,6 +368,23 @@ func (m *typedEventSenderModel[M]) Stream(ctx context.Context, input []M, opts .
 // This prevents a goroutine leak when a mid-stream error is followed by EOF: errWrapper fires
 // first (caching the verdict), and onEOF reuses the cached value instead of blocking on a
 // drained channel.
+//
+// buildStreamConvertOptions 构造 ConvertOption hook，用于通过
+// 重试判定信号协议控制流终止。
+// 判定信号生命周期：
+// - streamWithShouldRetry 为每次重试尝试创建新的 retryVerdictSignal，将其存入
+// execCtx.retryVerdictSignal，并在 ShouldRetry 决定后只发送一个 retryVerdict。
+// - 下面的闭包捕获的是创建闭包时为 nil 的 *retryVerdictSignal；它们会
+// 从 execCtx.retryVerdictSignal 读取实时值，该值会在每次模型调用前设置。
+// 两个 hook 协同覆盖所有流终止路径：
+// - WithErrWrapper 拦截流中错误。它会阻塞等待判定，以决定
+// 将错误包装为 WillRetryError（被拒绝的尝试）还是原样传递（被接受）。
+// - WithOnEOF 拦截正常 EOF（成功的流）。它会阻塞等待判定，以
+// 注入 WillRetryError（被拒绝）或传递 io.EOF（被接受）。
+// 两个 hook 共享一个由 sync.Once 保护的读取器，因此判定 channel 最多只读取一次。
+// 这可避免流中错误后跟 EOF 时发生 goroutine 泄漏：errWrapper 会
+// 先触发（缓存判定），onEOF 复用缓存值，而不是在
+// 已耗尽的 channel 上阻塞。
 func (m *typedEventSenderModel[M]) buildStreamConvertOptions(ctx context.Context) []schema.ConvertOption {
 	var retryAttempt int
 	_ = compose.ProcessState(ctx, func(_ context.Context, st *typedState[M]) error {
@@ -439,6 +461,11 @@ func (m *typedEventSenderModel[M]) buildStreamConvertOptions(ctx context.Context
 	// It is true when additional failover attempts remain after the current one,
 	// meaning stream errors should be wrapped as WillRetryError so the flow layer
 	// skips them. On the final attempt it is false, so the error propagates normally.
+	//
+	// failoverHasMoreAttempts 由 failoverModelWrapper 在每次内部调用前设置。
+	// 若当前尝试之后仍有额外 failover 尝试，则为 true，
+	// 表示流错误应包装为 WillRetryError，以便 flow 层
+	// 跳过它们。最后一次尝试时为 false，错误会正常传播。
 	failoverHasMore := getFailoverHasMoreAttempts(ctx)
 
 	if retryWrapper == nil && !(hasFailover && failoverHasMore) {
@@ -447,6 +474,7 @@ func (m *typedEventSenderModel[M]) buildStreamConvertOptions(ctx context.Context
 
 	combinedErrWrapper := func(err error) error {
 		// If retry is configured and will retry this error, use the retry wrapper's WillRetryError.
+		// 如果已配置 retry 且会重试此错误，则使用 retry wrapper 的 WillRetryError。
 		if retryWrapper != nil {
 			wrapped := retryWrapper(err)
 			if errors.As(wrapped, new(*WillRetryError)) {
@@ -456,6 +484,10 @@ func (m *typedEventSenderModel[M]) buildStreamConvertOptions(ctx context.Context
 		// Retry won't handle this error (either exhausted or not configured), but
 		// failover still has more attempts remaining. Wrap it as WillRetryError so
 		// the flow layer skips this event from the failed attempt.
+		//
+		// retry 不会处理此错误（已耗尽或未配置），但
+		// failover 仍有更多尝试。将其包装为 WillRetryError，以便
+		// flow 层跳过失败尝试产生的此事件。
 		if hasFailover && failoverHasMore {
 			if errors.Is(err, ErrStreamCanceled) {
 				return err
@@ -483,6 +515,7 @@ func copyMessage[M MessageType](msg M) M {
 }
 
 // typedSetMessageID sets a specific message ID in Extra.
+// typedSetMessageID 在 Extra 中设置指定的消息 ID。
 func typedSetMessageID[M MessageType](msg M, id string) {
 	switch v := any(msg).(type) {
 	case *schema.Message:
@@ -493,6 +526,7 @@ func typedSetMessageID[M MessageType](msg M, id string) {
 }
 
 // GetMessageID returns the eino-internal message ID from the given message, or "".
+// GetMessageID 返回给定消息中的 eino 内部消息 ID，若无则返回 ""。
 func GetMessageID[M MessageType](msg M) string {
 	switch v := any(msg).(type) {
 	case *schema.Message:
@@ -507,6 +541,10 @@ func GetMessageID[M MessageType](msg M) string {
 // EnsureMessageID assigns a UUID v4 message ID if the message doesn't have one.
 // Idempotent: if ID already set, no-op.
 // Middleware authors should call this before SendEvent if they create messages.
+//
+// EnsureMessageID 在消息没有 ID 时分配 UUID v4 消息 ID。
+// 幂等：如果已设置 ID，则不执行任何操作。
+// Middleware 作者如果创建消息，应在 SendEvent 前调用它。
 func EnsureMessageID[M MessageType](msg M) {
 	switch v := any(msg).(type) {
 	case *schema.Message:
@@ -549,6 +587,12 @@ func (*typedEventSenderToolWrapper[M]) isEventSenderToolWrapper() {}
 // []TypedChatModelAgentMiddleware[M], so when M is *schema.AgenticMessage, a direct
 // type assertion to *eventSenderToolWrapper (which implements the *schema.Message alias)
 // would fail. The marker interface bridges this gap.
+//
+// eventSenderToolWrapperMarker 支持在泛型上下文中跨类型检测 eventSenderToolWrapper。
+// hasUserEventSenderToolWrapper[M] 接收
+// []TypedChatModelAgentMiddleware[M]，因此当 M 为 *schema.AgenticMessage 时，直接
+// 类型断言为 *eventSenderToolWrapper（它实现的是 *schema.Message 别名）
+// 会失败。该 marker interface 用于弥合此差异。
 type eventSenderToolWrapperMarker interface{ isEventSenderToolWrapper() }
 
 // NewEventSenderToolWrapper returns a ChatModelAgentMiddleware that sends tool result events.
@@ -556,6 +600,12 @@ type eventSenderToolWrapperMarker interface{ isEventSenderToolWrapper() }
 // reflect the fully processed tool output. To control exactly where events are emitted,
 // include this in ChatModelAgentConfig.Handlers at the desired position.
 // When detected in Handlers, the framework skips the default event sender to avoid duplicates.
+//
+// NewEventSenderToolWrapper 返回一个 ChatModelAgentMiddleware，用于发送工具结果事件。
+// 默认情况下，框架会将其放在所有用户 middleware 之前（最外层），因此事件
+// 反映完全处理后的工具输出。若要精确控制事件发出位置，
+// 请将其放入 ChatModelAgentConfig.Handlers 的目标位置。
+// 在 Handlers 中检测到它时，框架会跳过默认事件发送器以避免重复。
 func NewEventSenderToolWrapper() ChatModelAgentMiddleware {
 	return newTypedEventSenderToolWrapper[*schema.Message]()
 }
@@ -564,6 +614,11 @@ func NewEventSenderToolWrapper() ChatModelAgentMiddleware {
 // This is used internally to ensure the default event sender matches the agent's message type
 // (e.g. *schema.AgenticMessage agents need an AgenticMessage-typed wrapper so that
 // compose.ProcessState can access the correct state type).
+//
+// newTypedEventSenderToolWrapper 为给定消息类型创建一个带类型的事件发送 wrapper。
+// 内部使用它来确保默认事件发送器匹配智能体的消息类型
+// （例如 *schema.AgenticMessage 智能体需要 AgenticMessage 类型的 wrapper，以便
+// compose.ProcessState 能访问正确的状态类型）。
 func newTypedEventSenderToolWrapper[M MessageType]() *typedEventSenderToolWrapper[M] {
 	return &typedEventSenderToolWrapper[M]{
 		TypedBaseChatModelAgentMiddleware: &TypedBaseChatModelAgentMiddleware[M]{},
@@ -571,6 +626,7 @@ func newTypedEventSenderToolWrapper[M MessageType]() *typedEventSenderToolWrappe
 }
 
 // textToFunctionToolResultBlocks wraps a plain text string into FunctionToolResultBlocks.
+// textToFunctionToolResultBlocks 将纯文本字符串包装为 FunctionToolResultBlocks。
 func textToFunctionToolResultBlocks(text string) []*schema.FunctionToolResultContentBlock {
 	if text == "" {
 		return nil
@@ -581,6 +637,7 @@ func textToFunctionToolResultBlocks(text string) []*schema.FunctionToolResultCon
 }
 
 // functionToolResultAgenticMessage constructs a function tool result message with AgenticRoleType "user".
+// functionToolResultAgenticMessage 构造 AgenticRoleType 为 "user" 的函数工具结果消息。
 func functionToolResultAgenticMessage(callID, name string, content []*schema.FunctionToolResultContentBlock) *schema.AgenticMessage {
 	return &schema.AgenticMessage{
 		Role: schema.AgenticRoleTypeUser,
@@ -638,6 +695,9 @@ func toolResultAgenticMessage(callID, name string, tr *schema.ToolResult) *schem
 // toolResultToBlocks converts a ToolResult's multimodal parts into FunctionToolResultBlocks.
 // This preserves all media types (text, image, audio, video, file), unlike toolResultText
 // which only extracts text.
+//
+// toolResultToBlocks 将 ToolResult 的多模态部分转换为 FunctionToolResultBlocks。
+// 这会保留所有媒体类型（text、image、audio、video、file），不同于只提取文本的 toolResultText。
 func toolResultToBlocks(tr *schema.ToolResult) []*schema.FunctionToolResultContentBlock {
 	if tr == nil || len(tr.Parts) == 0 {
 		return nil
@@ -717,6 +777,9 @@ func derefString(s *string) string {
 
 // typedToolInvokeEvent constructs the tool result event for the invoke path,
 // dispatching on M to create the correct message and event types.
+//
+// typedToolInvokeEvent 为 invoke 路径构造工具结果事件，
+// 根据 M 分派以创建正确的消息和事件类型。
 func typedToolInvokeEvent[M MessageType](callID, toolName, result, toolMsgID string) *TypedAgentEvent[M] {
 	var zero M
 	switch any(zero).(type) {
@@ -737,6 +800,9 @@ func typedToolInvokeEvent[M MessageType](callID, toolName, result, toolMsgID str
 
 // typedToolStreamEvent constructs the tool result event for the stream path,
 // dispatching on M to create the correct message stream and event types.
+//
+// typedToolStreamEvent 为 stream 路径构造工具结果事件，
+// 根据 M 分派以创建正确的消息流和事件类型。
 func typedToolStreamEvent[M MessageType](callID, toolName, toolMsgID string, stream *schema.StreamReader[string]) *TypedAgentEvent[M] {
 	var zero M
 	switch any(zero).(type) {
@@ -775,6 +841,10 @@ func typedToolStreamEvent[M MessageType](callID, toolName, toolMsgID string, str
 // typedToolEnhancedInvokeEvent constructs the tool result event for the enhanced invoke path.
 // For *schema.Message it builds a multimodal tool message; for *schema.AgenticMessage it
 // uses the string content of the result (AgenticToolsNode only uses the string path).
+//
+// typedToolEnhancedInvokeEvent 为 enhanced invoke 路径构造工具结果事件。
+// 对于 *schema.Message，它构建多模态工具消息；对于 *schema.AgenticMessage，
+// 它使用结果的字符串内容（AgenticToolsNode 只使用字符串路径）。
 func typedToolEnhancedInvokeEvent[M MessageType](callID, toolName, toolMsgID string, result *schema.ToolResult) (*TypedAgentEvent[M], error) {
 	var zero M
 	switch any(zero).(type) {
@@ -801,6 +871,10 @@ func typedToolEnhancedInvokeEvent[M MessageType](callID, toolName, toolMsgID str
 // typedToolEnhancedStreamEvent constructs the tool result event for the enhanced stream path.
 // For *schema.Message it builds multimodal tool messages; for *schema.AgenticMessage it
 // converts each chunk's multimodal parts into FunctionToolResultBlocks.
+//
+// typedToolEnhancedStreamEvent 为 enhanced stream 路径构造工具结果事件。
+// 对于 *schema.Message，它构建多模态工具消息；对于 *schema.AgenticMessage，
+// 它将每个 chunk 的多模态部分转换为 FunctionToolResultBlocks。
 func typedToolEnhancedStreamEvent[M MessageType](callID, toolName, toolMsgID string, stream *schema.StreamReader[*schema.ToolResult]) *TypedAgentEvent[M] {
 	var zero M
 	switch any(zero).(type) {
@@ -1018,6 +1092,10 @@ func (w *typedStateModelWrapper[M]) wrapGenerateEndpoint(endpoint typedGenerateE
 	// === ID Assignment layer (innermost, framework-controlled) ===
 	// Ensures model output has a message ID before any WrapModel handler or event sender sees it.
 	// Copies the result to avoid mutating a potentially shared pointer returned by the model.
+	//
+	// === ID 分配层（最内层，由框架控制）===
+	// 确保在任何 WrapModel 处理器或事件发送器看到模型输出前，它已有消息 ID。
+	// 复制结果，避免修改模型返回的、可能被共享的指针。
 	{
 		realInner := endpoint
 		endpoint = func(ctx context.Context, input []M, opts ...model.Option) (M, error) {
@@ -1100,6 +1178,11 @@ func (w *typedStateModelWrapper[M]) wrapStreamEndpoint(endpoint typedStreamEndpo
 	// Pre-allocates a UUID and injects it into the first chunk only.
 	// Only the first chunk carries the ID in Extra to avoid concatStrings corruption
 	// during ConcatMessages (which string-concatenates duplicate Extra keys).
+	//
+	// === ID 分配层（最内层，由框架控制）===
+	// 预先分配 UUID，并仅注入到第一个 chunk。
+	// 只有第一个 chunk 在 Extra 中携带 ID，以避免 ConcatMessages 期间出现 concatStrings 损坏
+	// （它会对重复的 Extra key 做字符串拼接）。
 	{
 		realInner := endpoint
 		endpoint = func(ctx context.Context, input []M, opts ...model.Option) (*schema.StreamReader[M], error) {
@@ -1197,6 +1280,10 @@ func (w *typedStateModelWrapper[M]) Generate(ctx context.Context, _ []M, opts ..
 	// Backfill: old checkpoints or fresh starts have nil ToolInfos.
 	// Use compose-level tools from opts (which always reflects the latest bc.toolInfos)
 	// rather than w.toolInfos (which may be stale if the graph was reused).
+	//
+	// 回填：旧检查点或全新启动时 ToolInfos 为 nil。
+	// 使用 opts 中的 compose 级工具（始终反映最新的 bc.toolInfos），
+	// 而不是 w.toolInfos（图被复用时可能已过期）。
 	if stateToolInfos == nil {
 		composeLevelOpts := model.GetCommonOptions(&model.Options{}, opts...)
 		if composeLevelOpts.Tools != nil {
@@ -1236,6 +1323,7 @@ func (w *typedStateModelWrapper[M]) Generate(ctx context.Context, _ []M, opts ..
 	}
 
 	// Persist state (including tool infos) after BeforeModelRewriteState.
+	// 在 BeforeModelRewriteState 之后持久化状态（包括工具信息）。
 	_ = compose.ProcessState(ctx, func(_ context.Context, st *typedState[M]) error {
 		st.Messages = state.Messages
 		st.ToolInfos = state.ToolInfos
@@ -1246,6 +1334,10 @@ func (w *typedStateModelWrapper[M]) Generate(ctx context.Context, _ []M, opts ..
 	// Derive model options from state. Append after caller opts so state takes precedence
 	// (model.GetCommonOptions applies left-to-right, last wins).
 	// Use explicit copy to avoid mutating the caller's opts slice.
+	//
+	// 从状态派生模型选项。追加到调用方 opts 之后，使状态具有优先级
+	// （model.GetCommonOptions 从左到右应用，后者胜出）。
+	// 使用显式复制，避免修改调用方的 opts 切片。
 	derivedOpts := make([]model.Option, len(opts), len(opts)+2)
 	copy(derivedOpts, opts)
 	derivedOpts = append(derivedOpts, model.WithTools(state.ToolInfos))
@@ -1263,6 +1355,10 @@ func (w *typedStateModelWrapper[M]) Generate(ctx context.Context, _ []M, opts ..
 	// Re-read State.Messages after Generate completes: when ShouldRetry uses
 	// PersistModifiedInputMessages, applyDecisionForRetry writes modified messages to State.
 	// We must pick up those changes before appending the model result.
+	//
+	// Generate 完成后重新读取 State.Messages：当 ShouldRetry 使用
+	// PersistModifiedInputMessages 时，applyDecisionForRetry 会将修改后的消息写入 State。
+	// 在追加模型结果前，必须获取这些变更。
 	if w.modelRetryConfig != nil && w.modelRetryConfig.ShouldRetry != nil {
 		_ = compose.ProcessState(ctx, func(_ context.Context, st *typedState[M]) error {
 			state.Messages = st.Messages
@@ -1292,6 +1388,7 @@ func (w *typedStateModelWrapper[M]) Generate(ctx context.Context, _ []M, opts ..
 	}
 
 	// Persist state (including tool infos) after AfterModelRewriteState.
+	// 在 AfterModelRewriteState 之后持久化状态（包括工具信息）。
 	_ = compose.ProcessState(ctx, func(_ context.Context, st *typedState[M]) error {
 		st.Messages = state.Messages
 		st.ToolInfos = state.ToolInfos
@@ -1322,6 +1419,10 @@ func (w *typedStateModelWrapper[M]) Stream(ctx context.Context, _ []M, opts ...m
 	// Backfill: old checkpoints or fresh starts have nil ToolInfos.
 	// Use compose-level tools from opts (which always reflects the latest bc.toolInfos)
 	// rather than w.toolInfos (which may be stale if the graph was reused).
+	//
+	// 回填：旧检查点或全新启动时 ToolInfos 为 nil。
+	// 使用 opts 中的 compose 级工具（始终反映最新的 bc.toolInfos），
+	// 而不是 w.toolInfos（图被复用时可能已过期）。
 	if stateToolInfos == nil {
 		composeLevelOpts := model.GetCommonOptions(&model.Options{}, opts...)
 		if composeLevelOpts.Tools != nil {
@@ -1359,6 +1460,7 @@ func (w *typedStateModelWrapper[M]) Stream(ctx context.Context, _ []M, opts ...m
 	}
 
 	// Persist state (including tool infos) after BeforeModelRewriteState.
+	// 在 BeforeModelRewriteState 之后持久化状态（包括工具信息）。
 	_ = compose.ProcessState(ctx, func(_ context.Context, st *typedState[M]) error {
 		st.Messages = state.Messages
 		st.ToolInfos = state.ToolInfos
@@ -1369,6 +1471,10 @@ func (w *typedStateModelWrapper[M]) Stream(ctx context.Context, _ []M, opts ...m
 	// Derive model options from state. Append after caller opts so state takes precedence
 	// (model.GetCommonOptions applies left-to-right, last wins).
 	// Use explicit copy to avoid mutating the caller's opts slice.
+	//
+	// 从状态派生模型选项。追加到调用方 opts 之后，使状态具有优先级
+	// （model.GetCommonOptions 从左到右应用，后者胜出）。
+	// 使用显式复制，避免修改调用方的 opts 切片。
 	derivedOpts := make([]model.Option, len(opts), len(opts)+2)
 	copy(derivedOpts, opts)
 	derivedOpts = append(derivedOpts, model.WithTools(state.ToolInfos))
@@ -1387,6 +1493,7 @@ func (w *typedStateModelWrapper[M]) Stream(ctx context.Context, _ []M, opts ...m
 	}
 
 	// Re-read State.Messages after Stream completes: same rationale as in Generate above.
+	// Stream 完成后重新读取 State.Messages：理由同上面的 Generate。
 	if w.modelRetryConfig != nil && w.modelRetryConfig.ShouldRetry != nil {
 		_ = compose.ProcessState(ctx, func(_ context.Context, st *typedState[M]) error {
 			state.Messages = st.Messages
@@ -1414,6 +1521,7 @@ func (w *typedStateModelWrapper[M]) Stream(ctx context.Context, _ []M, opts ...m
 	}
 
 	// Persist state (including tool infos) after AfterModelRewriteState.
+	// 在 AfterModelRewriteState 之后持久化状态（包括工具信息）。
 	_ = compose.ProcessState(ctx, func(_ context.Context, st *typedState[M]) error {
 		st.Messages = state.Messages
 		st.ToolInfos = state.ToolInfos

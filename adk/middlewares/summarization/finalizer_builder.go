@@ -34,6 +34,11 @@ import (
 //     summary with recent original user messages from the conversation (up to ~30k tokens).
 //  2. Adds a preamble and a postamble around the summary content.
 //  3. Converts the summary into a user message, prepended with the original system messages.
+//
+// DefaultFinalize 是默认的 TypedFinalizeFunc 实现，提供与中间件内部相同的总结后处理：
+// 1. 将模型生成的总结中的 <all_user_messages>...</all_user_messages> 部分替换为对话中最近的原始用户消息（最多约 30k tokens）。
+// 2. 在总结内容前后添加 preamble 和 postamble。
+// 3. 将总结转换为用户消息，并在前面附加原始 system 消息。
 func DefaultFinalize[M adk.MessageType](ctx context.Context, originalMessages []M, summary M) ([]M, error) {
 	systemMsgs, contextMsgs := splitSystemAndContextMsgs(originalMessages)
 
@@ -53,6 +58,9 @@ func DefaultFinalize[M adk.MessageType](ctx context.Context, originalMessages []
 
 // TypedFinalizerBuilder builds a TypedFinalizeFunc by chaining handlers,
 // generic over message type M.
+//
+// TypedFinalizerBuilder 通过串联处理器来构建 TypedFinalizeFunc，
+// 对消息类型 M 泛型化。
 type TypedFinalizerBuilder[M adk.MessageType] struct {
 	handlers []TypedFinalizeFunc[M]
 	errs     []error
@@ -60,6 +68,9 @@ type TypedFinalizerBuilder[M adk.MessageType] struct {
 
 // FinalizerBuilder is a backward-compatible alias for TypedFinalizerBuilder
 // specialized with *schema.Message.
+//
+// FinalizerBuilder 是 TypedFinalizerBuilder 的向后兼容别名，
+// 专用于 *schema.Message。
 type FinalizerBuilder = TypedFinalizerBuilder[*schema.Message]
 
 // NewTypedFinalizer creates a new TypedFinalizerBuilder.
@@ -80,12 +91,26 @@ type FinalizerBuilder = TypedFinalizerBuilder[*schema.Message]
 //	    Finalize: finalizer,
 //	    // ...
 //	}
+//
+// NewTypedFinalizer 创建一个新的 TypedFinalizerBuilder。
+// 处理器按注册顺序运行，所有处理器运行完成后，summary message 会像 DefaultFinalize 那样进行后处理。例如，当 originalMessages 中包含 PreserveSkills 和一条 system message 时，最终输出为：
+// [system message, preserved skill message, processed summary]
+// 示例：
+// finalizer, err := NewTypedFinalizer[*schema.Message]().
+// PreserveSkills(&PreserveSkillsConfig{}).
+// Build()
+// cfg := &Config{
+// Finalize: finalizer,
+// ...
+// }
 func NewTypedFinalizer[M adk.MessageType]() *TypedFinalizerBuilder[M] {
 	return &TypedFinalizerBuilder[M]{}
 }
 
 // NewFinalizer creates a new FinalizerBuilder that builds a FinalizeFunc
 // by chaining handlers.
+//
+// NewFinalizer 创建一个新的 FinalizerBuilder，通过串联处理器来构建 FinalizeFunc。
 func NewFinalizer() *FinalizerBuilder {
 	return &FinalizerBuilder{}
 }
@@ -96,6 +121,10 @@ func NewFinalizer() *FinalizerBuilder {
 // originalMessages, the final output is:
 //
 //	[system message, preserved skill message, processed summary]
+//
+// Build 通过串联所有已注册处理器来构造最终的 TypedFinalizeFunc，并像 DefaultFinalize 那样对 summary message 进行后处理。
+// 例如，当 originalMessages 中包含 PreserveSkills 和一条 system message 时，最终输出为：
+// [system message, preserved skill message, processed summary]
 func (b *TypedFinalizerBuilder[M]) Build() (TypedFinalizeFunc[M], error) {
 	if len(b.errs) > 0 {
 		msgs := make([]string, len(b.errs))
@@ -148,12 +177,21 @@ type PreserveSkillsConfig struct {
 	// SkillToolName is the tool name used for loading skills.
 	// Must match the tool name configured in the ADK skill middleware.
 	// Optional. Defaults to "skill".
+	//
+	// SkillToolName 是用于加载 skills 的工具名称。
+	// 必须与 ADK skill middleware 中配置的工具名称一致。
+	// 可选。默认值为 "skill"。
 	SkillToolName string
 
 	// MaxSkills limits the maximum number of skills to preserve.
 	// = 0 means do not preserve any skills (disabled).
 	// > 0 means preserve up to this many most recent skills.
 	// Optional. Defaults to 5.
+	//
+	// MaxSkills 限制要保留的 skills 最大数量。
+	// = 0 表示不保留任何 skills（禁用）。
+	// > 0 表示最多保留这么多个最近的 skills。
+	// 可选。默认值为 5。
 	MaxSkills *int
 
 	// MaxTokensPerSkill limits the maximum token count for a single preserved skill.
@@ -162,12 +200,21 @@ type PreserveSkillsConfig struct {
 	// Note: if this value is set smaller than the token count of the marker text itself,
 	// the skill will contain only the marker text with no original content preserved.
 	// Optional. Defaults to 5000.
+	//
+	// MaxTokensPerSkill 限制单个保留 skill 的最大 token 数。
+	// 超过此限制的 skills 会被截断，截断部分会替换为简短标记文本（例如 "[... skill content truncated ...]"）。
+	// 注意：如果该值小于标记文本本身的 token 数，skill 将只包含标记文本，不保留任何原始内容。
+	// 可选。默认值为 5000。
 	MaxTokensPerSkill *int
 
 	// SkillsTokenBudget limits the total token count for all preserved skills combined.
 	// Skills are preserved from most recent to oldest; once the budget is exhausted,
 	// remaining skills are dropped.
 	// Optional. Defaults to 25000.
+	//
+	// SkillsTokenBudget 限制所有保留 skills 合计的总 token 数。
+	// skills 会从最近到最旧依次保留；一旦预算耗尽，剩余 skills 会被丢弃。
+	// 可选。默认值为 25000。
 	SkillsTokenBudget *int
 }
 
@@ -183,6 +230,14 @@ type PreserveSkillsConfig struct {
 // When skill content is found, PreserveSkills returns:
 //
 //	[]M{user("<preserved foo: bar>"), S}
+//
+// PreserveSkills 保留由 ADK skill middleware 加载的 skill 内容。
+// 它会扫描会话中匹配的 skill 工具调用，并在 summary 之前以 user message 返回保留的 skill 内容。
+// 示例：
+// messages: [assistant(tool_call: skill "foo"), tool(content: "bar")]
+// summary:  S
+// 找到 skill content 时，PreserveSkills 返回：
+// []M{user("<preserved foo: bar>"), S}
 func (b *TypedFinalizerBuilder[M]) PreserveSkills(config *PreserveSkillsConfig) *TypedFinalizerBuilder[M] {
 	if err := config.check(); err != nil {
 		b.errs = append(b.errs, fmt.Errorf("PreserveSkills: %w", err))
@@ -395,6 +450,7 @@ func buildPreservedSkillsText[M adk.MessageType](_ context.Context, messages []M
 	}
 
 	// Reverse to restore chronological order.
+	// 反转以恢复时间顺序。
 	for i, j := 0, len(budgetedSkills)-1; i < j; i, j = i+1, j-1 {
 		budgetedSkills[i], budgetedSkills[j] = budgetedSkills[j], budgetedSkills[i]
 	}
@@ -415,6 +471,10 @@ func buildPreservedSkillsText[M adk.MessageType](_ context.Context, messages []M
 // It keeps the first portion of the content and appends a truncation marker
 // (e.g. "[... skill content truncated ...]") to indicate the omission.
 // If maxTokens is smaller than the marker itself, only the marker is returned.
+//
+// truncateSkillContent 会截断 skill content，使其符合 maxTokens。
+// 它保留内容的开头部分，并追加截断标记（例如 "[... skill content truncated ...]"）以表示省略。
+// 如果 maxTokens 小于标记本身，则只返回该标记。
 func truncateSkillContent(content string, maxTokens int) string {
 	if len(content) == 0 {
 		return content
@@ -434,6 +494,7 @@ func truncateSkillContent(content string, maxTokens int) string {
 	}
 
 	// Back up to a valid UTF-8 rune boundary.
+	// 回退到有效的 UTF-8 rune 边界。
 	for targetBytes > 0 && targetBytes < len(content) && !utf8.RuneStart(content[targetBytes]) {
 		targetBytes--
 	}

@@ -31,6 +31,7 @@ func TestInMemoryBackend_WriteAndRead(t *testing.T) {
 	ctx := context.Background()
 
 	// Test Write
+	// 测试 Write
 	err := backend.Write(ctx, &WriteRequest{
 		FilePath: "/test.txt",
 		Content:  "line1\nline2\nline3\nline4\nline5",
@@ -40,6 +41,7 @@ func TestInMemoryBackend_WriteAndRead(t *testing.T) {
 	}
 
 	// Test Read - full content
+	// 测试 Read - 完整内容
 	content, err := backend.Read(ctx, &ReadRequest{
 		FilePath: "/test.txt",
 		Limit:    100,
@@ -53,6 +55,7 @@ func TestInMemoryBackend_WriteAndRead(t *testing.T) {
 	}
 
 	// Test Read - with offset and limit
+	// 测试 Read - 带 offset 和 limit
 	content, err = backend.Read(ctx, &ReadRequest{
 		FilePath: "/test.txt",
 		Offset:   1,
@@ -67,6 +70,7 @@ func TestInMemoryBackend_WriteAndRead(t *testing.T) {
 	}
 
 	// Test Read - non-existent file
+	// 测试 Read - 文件不存在
 	_, err = backend.Read(ctx, &ReadRequest{
 		FilePath: "/nonexistent.txt",
 		Limit:    10,
@@ -81,6 +85,7 @@ func TestInMemoryBackend_LsInfo(t *testing.T) {
 	ctx := context.Background()
 
 	// Create some files
+	// 创建一些文件
 	backend.Write(ctx, &WriteRequest{
 		FilePath: "/file1.txt",
 		Content:  "content1",
@@ -103,20 +108,24 @@ func TestInMemoryBackend_LsInfo(t *testing.T) {
 	})
 
 	// Test LsInfo - root
+	// 测试 LsInfo - 根目录
 	infos, err := backend.LsInfo(ctx, &LsInfoRequest{Path: "/"})
 	if err != nil {
 		t.Fatalf("LsInfo failed: %v", err)
 	}
 	if len(infos) != 4 { // file1.txt, file2.txt, dir1, dir2
+		// file1.txt、file2.txt、dir1、dir2
 		t.Errorf("Expected 4 items in root, got %d", len(infos))
 	}
 
 	// Test LsInfo - specific directory
+	// 测试 LsInfo - 指定目录
 	infos, err = backend.LsInfo(ctx, &LsInfoRequest{Path: "/dir1"})
 	if err != nil {
 		t.Fatalf("LsInfo for /dir1 failed: %v", err)
 	}
 	if len(infos) != 2 { // file3.txt, subdir
+		// file3.txt、subdir
 		t.Errorf("Expected 2 items in /dir1, got %d", len(infos))
 	}
 }
@@ -126,12 +135,14 @@ func TestInMemoryBackend_Edit(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a file
+	// 创建文件
 	backend.Write(ctx, &WriteRequest{
 		FilePath: "/edit.txt",
 		Content:  "hello world\nhello again\nhello world",
 	})
 
 	// Test Edit - report error if old string occurs
+	// 测试 Edit - 如果 old string 出现则报告错误
 	err := backend.Edit(ctx, &EditRequest{
 		FilePath:   "/edit.txt",
 		OldString:  "hello",
@@ -143,6 +154,7 @@ func TestInMemoryBackend_Edit(t *testing.T) {
 	}
 
 	// Test Edit - replace all occurrences
+	// 测试 Edit - 替换所有匹配项
 	backend.Write(ctx, &WriteRequest{
 		FilePath: "/edit2.txt",
 		Content:  "hello world\nhello again\nhello world",
@@ -167,6 +179,7 @@ func TestInMemoryBackend_Edit(t *testing.T) {
 	}
 
 	// Test Edit - non-existent file
+	// 测试 Edit - 文件不存在
 	err = backend.Edit(ctx, &EditRequest{
 		FilePath:   "/nonexistent.txt",
 		OldString:  "old",
@@ -178,6 +191,7 @@ func TestInMemoryBackend_Edit(t *testing.T) {
 	}
 
 	// Test Edit - empty oldString
+	// 测试 Edit - oldString 为空
 	err = backend.Edit(ctx, &EditRequest{
 		FilePath:   "/edit.txt",
 		OldString:  "",
@@ -279,6 +293,7 @@ func TestInMemoryBackend_GlobInfo(t *testing.T) {
 	ctx := context.Background()
 
 	// Create some files
+	// 创建一些文件
 	backend.Write(ctx, &WriteRequest{
 		FilePath: "/file1.txt",
 		Content:  "content1",
@@ -297,6 +312,7 @@ func TestInMemoryBackend_GlobInfo(t *testing.T) {
 	})
 
 	// Test GlobInfo - match .txt files in root only
+	// 测试 GlobInfo - 仅匹配根目录中的 .txt 文件
 	infos, err := backend.GlobInfo(ctx, &GlobInfoRequest{
 		Pattern: "*.txt",
 		Path:    "/",
@@ -305,6 +321,7 @@ func TestInMemoryBackend_GlobInfo(t *testing.T) {
 		t.Fatalf("GlobInfo failed: %v", err)
 	}
 	if len(infos) != 1 { // only file1.txt in root
+		// 仅根目录中的 file1.txt
 		t.Errorf("Expected 1 .txt file in root, got %d", len(infos))
 	}
 	if infos[0].Path != "file1.txt" {
@@ -312,6 +329,7 @@ func TestInMemoryBackend_GlobInfo(t *testing.T) {
 	}
 
 	// Test GlobInfo - match all .py files in dir1
+	// 测试 GlobInfo - 匹配 dir1 中的所有 .py 文件
 	infos, err = backend.GlobInfo(ctx, &GlobInfoRequest{
 		Pattern: "*.py",
 		Path:    "/dir1",
@@ -320,6 +338,7 @@ func TestInMemoryBackend_GlobInfo(t *testing.T) {
 		t.Fatalf("GlobInfo for /dir1 failed: %v", err)
 	}
 	if len(infos) != 1 { // file4.py
+		// file4.py
 		t.Errorf("Expected 1 .py file in /dir1, got %d", len(infos))
 	}
 	if infos[0].Path != "file4.py" {
@@ -643,6 +662,7 @@ func TestInMemoryBackend_Concurrent(t *testing.T) {
 	ctx := context.Background()
 
 	// Test concurrent writes and reads
+	// 测试并发写入和读取
 	done := make(chan bool)
 	for i := 0; i < 10; i++ {
 		go func(n int) {
@@ -2272,6 +2292,7 @@ func TestInMemoryBackend_Read_Scenarios(t *testing.T) {
 		}
 		lines := strings.Split(content.Content, "\n")
 		if len(lines) != 3 { // ["line1", "line2", ""]
+			// ["line1", "line2", ""]
 			t.Errorf("expected 3 elements from split, got %d", len(lines))
 		}
 	})
@@ -2281,6 +2302,7 @@ func TestInMemoryBackend_Read_Scenarios(t *testing.T) {
 		backend.Write(ctx, &WriteRequest{FilePath: "/f.txt", Content: "a\nb\nc"})
 
 		// Offset=3 (1-based) → last line "c"
+		// Offset=3（从 1 开始）→ 最后一行 "c"
 		content, err := backend.Read(ctx, &ReadRequest{FilePath: "/f.txt", Offset: 3, Limit: 10})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -2353,6 +2375,7 @@ func TestInMemoryBackend_Read_Scenarios(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		// Line 2 is an empty string between two newlines
+		// 第 2 行是两个换行符之间的空字符串
 		if content.Content != "" {
 			t.Errorf("expected empty line content, got %q", content.Content)
 		}

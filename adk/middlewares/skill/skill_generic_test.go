@@ -30,6 +30,7 @@ import (
 )
 
 // --- Generic mock types ---
+// --- 通用 mock 类型 ---
 
 type mockGenericModel[M adk.MessageType] struct {
 	generateFunc func(ctx context.Context, input []M, opts ...model.Option) (M, error)
@@ -89,6 +90,7 @@ func (h *mockGenericAgentHub[M]) Get(_ context.Context, _ string, opts *TypedAge
 }
 
 // --- Helper to build an assistant event for each message type ---
+// --- 为每种消息类型构建 assistant 事件的辅助函数 ---
 
 func assistantEvent[M adk.MessageType](text string) *adk.TypedAgentEvent[M] {
 	var zero M
@@ -121,6 +123,7 @@ func assistantEvent[M adk.MessageType](text string) *adk.TypedAgentEvent[M] {
 }
 
 // --- Part 1: WrapModel test ---
+// --- 第 1 部分：WrapModel 测试 ---
 
 func testWrapModel[M adk.MessageType](t *testing.T) {
 	ctx := context.Background()
@@ -152,6 +155,7 @@ func testWrapModel[M adk.MessageType](t *testing.T) {
 }
 
 // --- Part 2: Agent mode tests ---
+// --- 第 2 部分：Agent 模式测试 ---
 
 func testAgentMode[M adk.MessageType](t *testing.T) {
 	ctx := context.Background()
@@ -182,6 +186,7 @@ func testAgentMode[M adk.MessageType](t *testing.T) {
 		assert.Contains(t, result, "agent answer")
 
 		// Verify agent received a user message (fork mode, no history).
+		// 验证智能体收到了一条用户消息（fork 模式，无历史记录）。
 		require.NotNil(t, agent.lastIn)
 		require.Len(t, agent.lastIn.Messages, 1)
 	})
@@ -212,6 +217,7 @@ func testAgentMode[M adk.MessageType](t *testing.T) {
 		require.Len(t, agent.lastIn.Messages, 1)
 
 		// Verify the message is a user-role message.
+		// 验证该消息是 user 角色消息。
 		msg := agent.lastIn.Messages[0]
 		var zero M
 		switch any(zero).(type) {
@@ -246,6 +252,7 @@ func testAgentMode[M adk.MessageType](t *testing.T) {
 			buildForkMessages: func(_ context.Context, in TypedSubAgentInput[M]) ([]M, error) {
 				captured = in
 				// Build a simple user message.
+				// 构建一条简单的用户消息。
 				var zero M
 				switch any(zero).(type) {
 				case *schema.Message:
@@ -453,6 +460,7 @@ func testAgentMode[M adk.MessageType](t *testing.T) {
 }
 
 // --- Top-level test ---
+// --- 顶层测试 ---
 
 func TestSkillGeneric(t *testing.T) {
 	t.Run("Message", func(t *testing.T) {

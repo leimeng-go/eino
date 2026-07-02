@@ -240,6 +240,7 @@ func (c *channelManager) reportBranch(from string, skippedNodes []string) error 
 				nKeys = appendIfNotExist(nKeys, successor)
 			}
 			// todo: detect if end node has been skipped?
+			// todo: 检测结束节点是否已被跳过？
 		}
 	}
 	return nil
@@ -305,6 +306,10 @@ func (t *taskManager) submit(tasks []*task) error {
 	// synchronously execute one task, if there are no other tasks in the task pool and meet one of the following conditions：
 	// 1. the new task is the only one
 	// 2. the task manager mode is set to needAll
+	//
+	// 同步执行一个任务：当任务池中没有其他任务，并满足以下条件之一时：
+	// 1. 新任务是唯一任务
+	// 2. 任务管理器模式设置为 needAll
 	for i := 0; i < len(tasks); i++ {
 		currentTask := tasks[i]
 
@@ -320,6 +325,7 @@ func (t *taskManager) submit(tasks []*task) error {
 		err := runPreHandler(currentTask, t.runWrapper)
 		if err != nil {
 			// pre-handler error, regarded as a failure of the task itself
+			// pre-handler 错误，视为任务自身失败
 			currentTask.err = err
 			tasks = append(tasks[:i], tasks[i+1:]...)
 			i--
@@ -331,6 +337,7 @@ func (t *taskManager) submit(tasks []*task) error {
 	}
 	if len(tasks) == 0 {
 		// all tasks' pre-handler failed
+		// 所有任务的 pre-handler 都失败
 		return nil
 	}
 
@@ -359,6 +366,7 @@ func (t *taskManager) wait() (tasks []*task, canceled bool, canceledTasks []*tas
 	ta, success, canceled := t.waitOne()
 	if canceled {
 		// has canceled and timeout, return canceled tasks
+		// 已取消且超时，返回已取消的任务
 		for _, rta := range t.runningTasks {
 			canceledTasks = append(canceledTasks, rta)
 		}
@@ -368,6 +376,7 @@ func (t *taskManager) wait() (tasks []*task, canceled bool, canceledTasks []*tas
 	}
 	if t.canceled {
 		// has canceled, but not timeout, wait all
+		// 已取消但未超时，等待全部任务
 		tasks, canceledTasks = t.waitAll()
 		return append(tasks, ta), true, canceledTasks
 	}
@@ -406,6 +415,7 @@ func (t *taskManager) waitOne() (ta *task, success bool, canceled bool) {
 
 	if ta.err != nil {
 		// biz error, jump post processor
+		// 业务错误，跳转到后置处理器
 		return ta, true, false
 	}
 	runPostHandler(ta, t.runWrapper)
@@ -434,19 +444,23 @@ func (t *taskManager) waitAll() (successTasks []*task, canceledTasks []*task) {
 func (t *taskManager) receive(recv func() (*task, bool)) (ta *task, closed bool, canceled bool) {
 	if t.deadline != nil {
 		// have canceled, receive in a certain time
+		// 已取消，在一定时间内接收
 		return receiveWithDeadline(recv, *t.deadline)
 	}
 	if t.canceled {
 		// canceled without timeout
+		// 已取消但未超时
 		ta, closed = recv()
 		return ta, closed, false
 	}
 	if t.cancelCh != nil {
 		// have not canceled, receive while listening
+		// 未取消，边监听边接收
 		ta, closed, canceled, t.canceled, t.deadline = receiveWithListening(recv, t.cancelCh)
 		return ta, closed, canceled
 	}
 	// won't cancel
+	// 不会取消
 	ta, closed = recv()
 	return ta, closed, false
 }
@@ -501,6 +515,8 @@ func receiveWithListening(recv func() (*task, bool), cancel chan *time.Duration)
 			// at the same time as cancel, and select picked the task result). Since
 			// cancel was already issued, treat this as an immediate cancel rather than
 			// blocking forever on resultCh.
+			//
+			// cancel channel 已关闭——这表示之前一次 receiveWithListening 调用已经消费了 cancel 信号（任务完成与 cancel 同时发生，且 select 选中了任务结果）。由于 cancel 已经发出，应将其视为立即取消，而不是永远阻塞在 resultCh 上。
 			return nil, false, true, true, nil
 		}
 		canceled = true

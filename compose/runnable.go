@@ -29,6 +29,11 @@ import (
 // runnable is the core conception of eino, we do downgrade compatibility for four data flow patterns,
 // and can automatically connect components that only implement one or more methods.
 // eg, if a component only implements Stream() method, you can still call Invoke() to convert stream output to invoke output.
+//
+// Runnable 是可执行对象的接口。Graph、Chain 可编译为 Runnable。
+// Runnable 是 eino 的核心概念，我们为四种数据流模式做了降级兼容，
+// 并可自动连接只实现一个或多个方法的组件。
+// 例如，如果某个组件只实现了 Stream() 方法，仍可调用 Invoke() 将流输出转换为 invoke 输出。
 type Runnable[I, O any] interface {
 	Invoke(ctx context.Context, input I, opts ...Option) (output O, err error)
 	Stream(ctx context.Context, input I, opts ...Option) (output *schema.StreamReader[O], err error)
@@ -43,6 +48,11 @@ type transform func(ctx context.Context, input streamReader, opts ...any) (outpu
 // one instance corresponds to one instance of the executable object.
 // all information comes from executable object without any other dimensions of information.
 // for the graphNode, ChainBranch, StatePreHandler, StatePostHandler etc.
+//
+// composableRunnable 是对用户直接提供的所有可执行对象的包装。
+// 一个实例对应一个可执行对象实例。
+// 所有信息都来自可执行对象，不包含其他维度的信息。
+// 用于 graphNode、ChainBranch、StatePreHandler、StatePostHandler 等。
 type composableRunnable struct {
 	i invoke
 	t transform
@@ -59,6 +69,9 @@ type composableRunnable struct {
 
 	// only available when in Graph node
 	// if composableRunnable not in Graph node, this field would be nil
+	//
+	// 仅在 Graph 节点中可用
+	// 如果 composableRunnable 不在 Graph 节点中，此字段为 nil
 	nodeInfo *nodeInfo
 }
 
@@ -123,6 +136,10 @@ func (rp *runnablePacker[I, O, TOption]) toComposableRunnable() *composableRunna
 			// When a nil is passed as an 'any' type, its original type information is lost,
 			// becoming an untyped nil. This would cause type assertions to fail for nil-able
 			// input types, so recreate the zero value of I when nil is valid for I.
+			//
+			// 当 nil 作为 'any' 类型传入时，其原始类型信息会丢失，
+			// 变成无类型 nil。这会导致可为 nil 的输入类型进行类型断言失败，
+			// 因此当 nil 对 I 有效时，重新创建 I 的零值。
 			if input == nil && isNilAssignableType(reflect.TypeOf((*I)(nil)).Elem()) {
 				var i I
 				in = i
@@ -164,12 +181,14 @@ func (rp *runnablePacker[I, O, TOption]) toComposableRunnable() *composableRunna
 }
 
 // Invoke works like `ping => pong`.
+// Invoke 的工作方式类似 `ping => pong`。
 func (rp *runnablePacker[I, O, TOption]) Invoke(ctx context.Context,
 	input I, opts ...TOption) (output O, err error) {
 	return rp.i(ctx, input, opts...)
 }
 
 // Stream works like `ping => stream output`.
+// Stream 的工作方式类似 `ping => stream output`。
 func (rp *runnablePacker[I, O, TOption]) Stream(ctx context.Context,
 	input I, opts ...TOption) (output *schema.StreamReader[O], err error) {
 
@@ -177,12 +196,14 @@ func (rp *runnablePacker[I, O, TOption]) Stream(ctx context.Context,
 }
 
 // Collect works like `stream input => pong`.
+// Collect 的工作方式类似 `stream input => pong`。
 func (rp *runnablePacker[I, O, TOption]) Collect(ctx context.Context,
 	input *schema.StreamReader[I], opts ...TOption) (output O, err error) {
 	return rp.c(ctx, input, opts...)
 }
 
 // Transform works like `stream input => stream output`.
+// Transform 的工作方式类似 `stream input => stream output`。
 func (rp *runnablePacker[I, O, TOption]) Transform(ctx context.Context,
 	input *schema.StreamReader[I], opts ...TOption) (output *schema.StreamReader[O], err error) {
 	return rp.t(ctx, input, opts...)
@@ -421,6 +442,10 @@ func toGenericRunnable[I, O any](cr *composableRunnable, ctxWrapper func(ctx con
 			// When a nil is passed as an 'any' type, its original type information is lost,
 			// becoming an untyped nil. This would cause type assertions to fail.
 			// So if the output is nil and the target type O is an interface, we need to explicitly create a nil of type O.
+			//
+			// 当 nil 作为 'any' 类型传入时，其原始类型信息会丢失，
+			// 变成无类型 nil。这会导致类型断言失败。
+			// 因此如果输出为 nil 且目标类型 O 是接口，需要显式创建 O 类型的 nil。
 			if out == nil && generic.TypeOf[O]().Kind() == reflect.Interface {
 				var o O
 				to = o
@@ -518,6 +543,7 @@ func outputKeyedComposableRunnable(key string, r *composableRunnable) *composabl
 }
 
 // composablePassthrough special runnable that passthrough input to output
+// composablePassthrough 是将输入透传为输出的特殊可运行对象
 func composablePassthrough() *composableRunnable {
 	r := &composableRunnable{isPassthrough: true, nodeInfo: &nodeInfo{}}
 

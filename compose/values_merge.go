@@ -26,6 +26,10 @@ import (
 // RegisterValuesMergeFunc registers a function to merge outputs from multiple nodes when fan-in.
 // It's used to define how to merge for a specific type.
 // For maps that already have a default merge function, you don't need to register a new one unless you want to customize the merge logic.
+//
+// RegisterValuesMergeFunc 注册一个函数，用于在 fan-in 时合并多个节点的输出。
+// 它用于定义特定类型的合并方式。
+// 对于已有默认合并函数的 map，除非要自定义合并逻辑，否则无需注册新的函数。
 func RegisterValuesMergeFunc[T any](fn func([]T) (T, error)) {
 	internal.RegisterValuesMergeFunc(fn)
 }
@@ -36,6 +40,7 @@ type mergeOptions struct {
 }
 
 // the caller should ensure len(vs) > 1
+// 调用方应确保 len(vs) > 1
 func mergeValues(vs []any, opts *mergeOptions) (any, error) {
 	v0 := reflect.ValueOf(vs[0])
 	t0 := v0.Type()
@@ -45,6 +50,7 @@ func mergeValues(vs []any, opts *mergeOptions) (any, error) {
 	}
 
 	// merge StreamReaders
+	// 合并 StreamReaders
 	if s, ok := vs[0].(streamReader); ok {
 		t := s.getChunkType()
 		if internal.GetMergeFunc(t) == nil {

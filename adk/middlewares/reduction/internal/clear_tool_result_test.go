@@ -69,10 +69,13 @@ func Test_reduceByTokens(t *testing.T) {
 					Messages: []adk.Message{
 						schema.UserMessage("msg1"),
 						schema.ToolMessage(strings.Repeat("a", 40), "call-1", schema.WithToolName("tool1")), // ~10 tokens (old)
+						// 约 10 个 token（旧）
 						schema.UserMessage("msg2"),
 						schema.ToolMessage(strings.Repeat("b", 40), "call-2", schema.WithToolName("tool2")), // ~10 tokens (old)
+						// 约 10 个 token（旧）
 						schema.UserMessage("msg3"),
 						schema.ToolMessage(strings.Repeat("c", 40), "call-3", schema.WithToolName("tool3")), // ~10 tokens (recent, protected)
+						// 约 10 个 token（最近，受保护）
 					},
 				},
 				toolResultTokenThreshold: 20,
@@ -94,8 +97,10 @@ func Test_reduceByTokens(t *testing.T) {
 					Messages: []adk.Message{
 						schema.UserMessage("old msg"),
 						schema.ToolMessage(strings.Repeat("x", 100), "call-1", schema.WithToolName("tool1")), // ~25 tokens (old)
+						// 约 25 个 token（旧）
 						schema.UserMessage("recent msg"),
 						schema.ToolMessage(strings.Repeat("x", 100), "call-2", schema.WithToolName("tool2")), // ~25 tokens (recent, protected)
+						// 约 25 个 token（最近，受保护）
 					},
 				},
 				toolResultTokenThreshold: 10,
@@ -108,6 +113,10 @@ func Test_reduceByTokens(t *testing.T) {
 				// Total tool result tokens = 50, exceeds threshold of 10
 				// But last 200 tokens are protected (includes last 2 messages)
 				// So only the first tool result should be cleared
+				//
+				// 工具结果 token 总数 = 50，超过阈值 10
+				// 但最后 200 个 token 受保护（包括最后 2 条消息）
+				// 因此只应清除第一个工具结果
 				assert.Equal(t, "[Old tool result content cleared]", state.Messages[1].Content)
 				assert.Equal(t, strings.Repeat("x", 100), state.Messages[3].Content)
 			},
@@ -151,6 +160,7 @@ func Test_reduceByTokens(t *testing.T) {
 			wantErr: assert.NoError,
 			validateState: func(t *testing.T, state *adk.ChatModelAgentState) {
 				// All messages should remain unchanged
+				// 所有消息都应保持不变
 				assert.Equal(t, "msg 1", state.Messages[0].Content)
 				assert.Equal(t, "response 1", state.Messages[1].Content)
 				assert.Equal(t, "msg 2", state.Messages[2].Content)
@@ -180,13 +190,17 @@ func Test_reduceByTokens(t *testing.T) {
 					Messages: []adk.Message{
 						schema.UserMessage("hello world"),
 						schema.ToolMessage("this is a long tool result", "call-1", schema.WithToolName("tool1")), // 6 words (old)
+						// 6 个词（旧）
 						schema.UserMessage("another message"),
 						schema.ToolMessage("recent tool result here", "call-2", schema.WithToolName("tool2")), // 4 words (recent)
+						// 4 个词（最近）
 					},
 				},
 				toolResultTokenThreshold: 9, // 10 words total threshold
-				keepRecentTokens:         5, // 15 words protection budget
-				placeholder:              "[Old tool result content cleared]",
+				// 总阈值为 10 个词
+				keepRecentTokens: 5, // 15 words protection budget
+				// 保护预算为 15 个词
+				placeholder: "[Old tool result content cleared]",
 				estimator: func(msg *schema.Message) int {
 					if msg.Content == "" {
 						return 0
@@ -213,8 +227,10 @@ func Test_reduceByTokens(t *testing.T) {
 					Messages: []adk.Message{
 						schema.UserMessage("msg1"),
 						schema.ToolMessage("[Old tool result content cleared]", "call-1", schema.WithToolName("tool1")), // Already cleared
+						// 已清除
 						schema.UserMessage("msg2"),
 						schema.ToolMessage(strings.Repeat("a", 100), "call-2", schema.WithToolName("tool2")), // New long result
+						// 新的长结果
 					},
 				},
 				toolResultTokenThreshold: 10,
@@ -226,6 +242,9 @@ func Test_reduceByTokens(t *testing.T) {
 			validateState: func(t *testing.T, state *adk.ChatModelAgentState) {
 				// Only the new long result counts toward the threshold
 				// Both should have placeholder
+				//
+				// 只有新的长结果计入阈值
+				// 两者都应有占位符
 				assert.Equal(t, "[Old tool result content cleared]", state.Messages[1].Content)
 				assert.Equal(t, strings.Repeat("a", 100), state.Messages[3].Content)
 			},
@@ -241,14 +260,17 @@ func Test_reduceByTokens(t *testing.T) {
 						schema.ToolMessage(strings.Repeat("b", 40), "call-2", schema.WithToolName("tool2")), // ~10 tokens
 					},
 				},
-				toolResultTokenThreshold: 10,   // Low threshold (will exceed)
-				keepRecentTokens:         1000, // Very high protection (protects all)
-				placeholder:              "[Old tool result content cleared]",
-				estimator:                defaultTokenCounter,
+				toolResultTokenThreshold: 10, // Low threshold (will exceed)
+				// 低阈值（会超出）
+				keepRecentTokens: 1000, // Very high protection (protects all)
+				// 很高的保护值（保护全部）
+				placeholder: "[Old tool result content cleared]",
+				estimator:   defaultTokenCounter,
 			},
 			wantErr: assert.NoError,
 			validateState: func(t *testing.T, state *adk.ChatModelAgentState) {
 				// All messages are within protected range, nothing should be cleared
+				// 所有消息都在受保护范围内，不应清除任何内容
 				assert.Equal(t, strings.Repeat("a", 40), state.Messages[1].Content)
 				assert.Equal(t, strings.Repeat("b", 40), state.Messages[3].Content)
 			},
@@ -273,6 +295,7 @@ func Test_newClearToolResult(t *testing.T) {
 		assert.NotNil(t, fn)
 
 		// Test that function works with nil config (uses defaults)
+		// 测试函数在 nil config 下可工作（使用默认值）
 		state := &adk.ChatModelAgentState{
 			Messages: []adk.Message{
 				schema.UserMessage("hello"),
@@ -282,6 +305,7 @@ func Test_newClearToolResult(t *testing.T) {
 		err := fn(ctx, state)
 		assert.NoError(t, err)
 		// Default threshold is 20000, so short result should not be cleared
+		// 默认阈值为 20000，因此短结果不应被清除
 		assert.Equal(t, "short result", state.Messages[1].Content)
 	})
 

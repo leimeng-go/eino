@@ -35,6 +35,10 @@ type nodeOptionsPair generic.Pair[*graphNode, *graphAddNodeOpts]
 // ChainBranch represents a conditional branch in a chain of operations.
 // It allows for dynamic routing of execution based on a condition.
 // All branches within ChainBranch are expected to either end the Chain, or converge to another node in the Chain.
+//
+// ChainBranch 表示操作链中的条件分支。
+// 它允许根据条件动态路由执行流程。
+// ChainBranch 中的所有分支都应结束 Chain，或汇聚到 Chain 中的另一个节点。
 type ChainBranch struct {
 	internalBranch *GraphBranch
 	key2BranchNode map[string]nodeOptionsPair
@@ -43,6 +47,8 @@ type ChainBranch struct {
 
 // NewChainMultiBranch creates a chain branch where a condition selects
 // multiple end nodes to route execution.
+//
+// NewChainMultiBranch 创建一个链分支，其中由条件选择多个终止节点来路由执行。
 func NewChainMultiBranch[T any](cond GraphMultiBranchCondition[T]) *ChainBranch {
 	invokeCond := func(ctx context.Context, in T, opts ...any) (endNodes []string, err error) {
 		ends, err := cond(ctx, in)
@@ -64,6 +70,8 @@ func NewChainMultiBranch[T any](cond GraphMultiBranchCondition[T]) *ChainBranch 
 
 // NewStreamChainMultiBranch creates a chain branch that selects multiple end
 // nodes based on a condition evaluated on the input stream.
+//
+// NewStreamChainMultiBranch 创建一个链分支，它基于输入流上求值的条件选择多个终止节点。
 func NewStreamChainMultiBranch[T any](cond StreamGraphMultiBranchCondition[T]) *ChainBranch {
 	collectCon := func(ctx context.Context, in *schema.StreamReader[T], opts ...any) (endNodes []string, err error) {
 		ends, err := cond(ctx, in)
@@ -97,6 +105,18 @@ func NewStreamChainMultiBranch[T any](cond StreamGraphMultiBranchCondition[T]) *
 //	cb := NewChainBranch[string](condition)
 //	cb.AddPassthrough("next_node_key_01", xxx) // node in branch, represent one path of branch
 //	cb.AddPassthrough("next_node_key_02", xxx) // node in branch
+//
+// NewChainBranch 基于给定条件创建新的 ChainBranch 实例。
+// 它接收泛型类型 T 以及该类型的 GraphBranchCondition 函数。
+// 返回的 ChainBranch 会包含空的 key2BranchNode map，以及一个包装所提供 cond 的条件函数，用于处理类型断言和错误检查。
+// 例如：
+// condition := func(ctx context.Context, in string, opts ...any) (endNode string, err error) {
+// 用于确定下一个节点的逻辑
+// return "some_next_node_key", nil
+// }
+// cb := NewChainBranch[string](condition)
+// cb.AddPassthrough("next_node_key_01", xxx) // 分支中的节点，表示分支的一条路径
+// cb.AddPassthrough("next_node_key_02", xxx) // 分支中的节点
 func NewChainBranch[T any](cond GraphBranchCondition[T]) *ChainBranch {
 	return NewChainMultiBranch(func(ctx context.Context, in T) (endNode map[string]bool, err error) {
 		ret, err := cond(ctx, in)
@@ -120,6 +140,17 @@ func NewChainBranch[T any](cond GraphBranchCondition[T]) *ChainBranch {
 //	}
 //
 //	cb := NewStreamChainBranch[string](condition)
+//
+// NewStreamChainBranch 基于给定的流条件创建新的 ChainBranch 实例。
+// 它接收泛型类型 T 以及该类型的 StreamGraphBranchCondition 函数。
+// 返回的 ChainBranch 会包含空的 key2BranchNode map，以及一个包装所提供 cond 的条件函数，用于处理类型断言和错误检查。
+// 例如：
+// condition := func(ctx context.Context, in *schema.StreamReader[string], opts ...any) (endNode string, err error) {
+// 用于确定下一个节点的逻辑，你可以读取流并做出决策。
+// 为节省时间，通常读取流的第一个 chunk，然后决定走哪条路径。
+// return "some_next_node_key", nil
+// }
+// cb := NewStreamChainBranch[string](condition)
 func NewStreamChainBranch[T any](cond StreamGraphBranchCondition[T]) *ChainBranch {
 	return NewStreamChainMultiBranch(func(ctx context.Context, in *schema.StreamReader[T]) (endNodes map[string]bool, err error) {
 		ret, err := cond(ctx, in)
@@ -141,6 +172,17 @@ func NewStreamChainBranch[T any](cond StreamGraphBranchCondition[T]) *ChainBranc
 //	})
 //	cb.AddChatModel("chat_model_key_01", chatModel01)
 //	cb.AddChatModel("chat_model_key_02", chatModel02)
+//
+// AddChatModel 向分支添加一个 ChatModel 节点。
+// 例如：
+// chatModel01, err := openai.NewChatModel(ctx, &openai.ChatModelConfig{
+// Model: "gpt-4o",
+// })
+// chatModel02, err := openai.NewChatModel(ctx, &openai.ChatModelConfig{
+// Model: "gpt-4o-mini",
+// })
+// cb.AddChatModel("chat_model_key_01", chatModel01)
+// cb.AddChatModel("chat_model_key_02", chatModel02)
 func (cb *ChainBranch) AddChatModel(key string, node model.BaseChatModel, opts ...GraphAddNodeOpt) *ChainBranch {
 	gNode, options := toChatModelNode(node, opts...)
 	return cb.addNode(key, gNode, options)
@@ -157,6 +199,17 @@ func (cb *ChainBranch) AddChatModel(key string, node model.BaseChatModel, opts .
 //	})
 //	cb.AddAgenticModel("agentic_model_key_1", model1)
 //	cb.AddAgenticModel("agentic_model_key_2", model2)
+//
+// AddAgenticModel 向分支添加一个 agentic.Model 节点。
+// 例如：
+// model1, err := openai.NewAgenticModel(ctx, &openai.AgenticModelConfig{
+// Model: "gpt-4o",
+// })
+// model2, err := openai.NewAgenticModel(ctx, &openai.AgenticModelConfig{
+// Model: "gpt-4o-mini",
+// })
+// cb.AddAgenticModel("agentic_model_key_1", model1)
+// cb.AddAgenticModel("agentic_model_key_2", model2)
 func (cb *ChainBranch) AddAgenticModel(key string, node model.AgenticModel, opts ...GraphAddNodeOpt) *ChainBranch {
 	gNode, options := toAgenticModelNode(node, opts...)
 	return cb.addNode(key, gNode, options)
@@ -178,6 +231,19 @@ func (cb *ChainBranch) AddAgenticModel(key string, node model.AgenticModel, opts
 //	})
 //
 //	cb.AddChatTemplate("chat_template_key_02", chatTemplate2)
+//
+// AddChatTemplate 向分支添加一个 ChatTemplate 节点。
+// 例如：
+// chatTemplate, err := prompt.FromMessages(schema.FString, &schema.Message{
+// Role:    schema.System,
+// Content: "You are acting as a {role}.",
+// })
+// cb.AddChatTemplate("chat_template_key_01", chatTemplate)
+// chatTemplate2, err := prompt.FromMessages(schema.FString, &schema.Message{
+// Role:    schema.System,
+// Content: "You are acting as a {role}, you are not allowed to chat in other topics.",
+// })
+// cb.AddChatTemplate("chat_template_key_02", chatTemplate2)
 func (cb *ChainBranch) AddChatTemplate(key string, node prompt.ChatTemplate, opts ...GraphAddNodeOpt) *ChainBranch {
 	gNode, options := toChatTemplateNode(node, opts...)
 	return cb.addNode(key, gNode, options)
@@ -193,6 +259,13 @@ func (cb *ChainBranch) AddChatTemplate(key string, node prompt.ChatTemplate, opt
 //	chatTemplate2, err := prompt.FromAgenticMessages(schema.FString, &schema.AgenticMessage{})
 //
 //	cb.AddAgenticChatTemplate("chat_template_key_02", chatTemplate2)
+//
+// AddAgenticChatTemplate 向分支添加一个 prompt.AgenticChatTemplate 节点。
+// 例如：
+// chatTemplate, err := prompt.FromAgenticMessages(schema.FString, &schema.AgenticMessage{})
+// cb.AddAgenticChatTemplate("chat_template_key_01", chatTemplate)
+// chatTemplate2, err := prompt.FromAgenticMessages(schema.FString, &schema.AgenticMessage{})
+// cb.AddAgenticChatTemplate("chat_template_key_02", chatTemplate2)
 func (cb *ChainBranch) AddAgenticChatTemplate(key string, node prompt.AgenticChatTemplate, opts ...GraphAddNodeOpt) *ChainBranch {
 	gNode, options := toAgenticChatTemplateNode(node, opts...)
 	return cb.addNode(key, gNode, options)
@@ -206,6 +279,13 @@ func (cb *ChainBranch) AddAgenticChatTemplate(key string, node prompt.AgenticCha
 //	})
 //
 //	cb.AddToolsNode("tools_node_key", toolsNode)
+//
+// AddToolsNode 向分支添加一个 ToolsNode。
+// 例如：
+// toolsNode, err := compose.NewToolNode(ctx, &compose.ToolsNodeConfig{
+// Tools: []tools.BaseTool{...},
+// })
+// cb.AddToolsNode("tools_node_key", toolsNode)
 func (cb *ChainBranch) AddToolsNode(key string, node *ToolsNode, opts ...GraphAddNodeOpt) *ChainBranch {
 	gNode, options := toToolsNode(node, opts...)
 	return cb.addNode(key, gNode, options)
@@ -219,6 +299,13 @@ func (cb *ChainBranch) AddToolsNode(key string, node *ToolsNode, opts ...GraphAd
 //	})
 //
 //	cb.AddAgenticToolsNode("tools_node_key", toolsNode)
+//
+// AddAgenticToolsNode 向分支添加一个 AgenticToolsNode。
+// 例如：
+// toolsNode, err := compose.NewAgenticToolsNode(ctx, &compose.ToolsNodeConfig{
+// Tools: []tools.BaseTool{...},
+// })
+// cb.AddAgenticToolsNode("tools_node_key", toolsNode)
 func (cb *ChainBranch) AddAgenticToolsNode(key string, node *AgenticToolsNode, opts ...GraphAddNodeOpt) *ChainBranch {
 	gNode, options := toAgenticToolsNode(node, opts...)
 	return cb.addNode(key, gNode, options)
@@ -233,6 +320,14 @@ func (cb *ChainBranch) AddAgenticToolsNode(key string, node *AgenticToolsNode, o
 //	}
 //
 //	cb.AddLambda("lambda_node_key", compose.InvokeLambda(lambdaFunc))
+//
+// AddLambda 向分支添加一个 Lambda 节点。
+// 例如：
+// lambdaFunc := func(ctx context.Context, in string, opts ...any) (out string, err error) {
+// 处理输入的逻辑
+// return "processed_output", nil
+// }
+// cb.AddLambda("lambda_node_key", compose.InvokeLambda(lambdaFunc))
 func (cb *ChainBranch) AddLambda(key string, node *Lambda, opts ...GraphAddNodeOpt) *ChainBranch {
 	gNode, options := toLambdaNode(node, opts...)
 	return cb.addNode(key, gNode, options)
@@ -246,6 +341,13 @@ func (cb *ChainBranch) AddLambda(key string, node *Lambda, opts ...GraphAddNodeO
 //	})
 //
 //	cb.AddEmbedding("embedding_node_key", embeddingNode)
+//
+// AddEmbedding 向分支添加一个 Embedding 节点。
+// 例如：
+// embeddingNode, err := openai.NewEmbedder(ctx, &openai.EmbeddingConfig{
+// Model: "text-embedding-3-small",
+// })
+// cb.AddEmbedding("embedding_node_key", embeddingNode)
 func (cb *ChainBranch) AddEmbedding(key string, node embedding.Embedder, opts ...GraphAddNodeOpt) *ChainBranch {
 	gNode, options := toEmbeddingNode(node, opts...)
 	return cb.addNode(key, gNode, options)
@@ -259,6 +361,13 @@ func (cb *ChainBranch) AddEmbedding(key string, node embedding.Embedder, opts ..
 //	})
 //
 //	cb.AddRetriever("retriever_node_key", retriever)
+//
+// AddRetriever 向分支添加一个 Retriever 节点。
+// 例如：
+// retriever, err := volc_vikingdb.NewRetriever(ctx, &volc_vikingdb.RetrieverConfig{
+// Collection: "my_collection",
+// })
+// cb.AddRetriever("retriever_node_key", retriever)
 func (cb *ChainBranch) AddRetriever(key string, node retriever.Retriever, opts ...GraphAddNodeOpt) *ChainBranch {
 	gNode, options := toRetrieverNode(node, opts...)
 	return cb.addNode(key, gNode, options)
@@ -273,6 +382,14 @@ func (cb *ChainBranch) AddRetriever(key string, node retriever.Retriever, opts .
 //	})
 //
 //	cb.AddLoader("loader_node_key", loader)
+//
+// AddLoader 向分支添加一个 Loader 节点。
+// 例如：
+// pdfParser, err := pdf.NewPDFParser()
+// loader, err := file.NewFileLoader(ctx, &file.FileLoaderConfig{
+// Parser: pdfParser,
+// })
+// cb.AddLoader("loader_node_key", loader)
 func (cb *ChainBranch) AddLoader(key string, node document.Loader, opts ...GraphAddNodeOpt) *ChainBranch {
 	gNode, options := toLoaderNode(node, opts...)
 	return cb.addNode(key, gNode, options)
@@ -286,6 +403,13 @@ func (cb *ChainBranch) AddLoader(key string, node document.Loader, opts ...Graph
 //	})
 //
 //	cb.AddIndexer("indexer_node_key", indexer)
+//
+// AddIndexer 向分支添加一个 Indexer 节点。
+// 例如：
+// indexer, err := volc_vikingdb.NewIndexer(ctx, &volc_vikingdb.IndexerConfig{
+// Collection: "my_collection",
+// })
+// cb.AddIndexer("indexer_node_key", indexer)
 func (cb *ChainBranch) AddIndexer(key string, node indexer.Indexer, opts ...GraphAddNodeOpt) *ChainBranch {
 	gNode, options := toIndexerNode(node, opts...)
 	return cb.addNode(key, gNode, options)
@@ -297,6 +421,11 @@ func (cb *ChainBranch) AddIndexer(key string, node indexer.Indexer, opts ...Grap
 //	markdownSplitter, err := markdown.NewHeaderSplitter(ctx, &markdown.HeaderSplitterConfig{})
 //
 //	cb.AddDocumentTransformer("document_transformer_node_key", markdownSplitter)
+//
+// AddDocumentTransformer 向分支添加一个 Document Transformer 节点。
+// 例如：
+// markdownSplitter, err := markdown.NewHeaderSplitter(ctx, &markdown.HeaderSplitterConfig{})
+// cb.AddDocumentTransformer("document_transformer_node_key", markdownSplitter)
 func (cb *ChainBranch) AddDocumentTransformer(key string, node document.Transformer, opts ...GraphAddNodeOpt) *ChainBranch {
 	gNode, options := toDocumentTransformerNode(node, opts...)
 	return cb.addNode(key, gNode, options)
@@ -308,6 +437,11 @@ func (cb *ChainBranch) AddDocumentTransformer(key string, node document.Transfor
 //	graph, err := compose.NewGraph[string, string]()
 //
 //	cb.AddGraph("graph_node_key", graph)
+//
+// AddGraph 向分支添加一个通用 Graph 节点。
+// 例如：
+// graph, err := compose.NewGraph[string, string]()
+// cb.AddGraph("graph_node_key", graph)
 func (cb *ChainBranch) AddGraph(key string, node AnyGraph, opts ...GraphAddNodeOpt) *ChainBranch {
 	gNode, options := toAnyGraphNode(node, opts...)
 	return cb.addNode(key, gNode, options)
@@ -317,6 +451,10 @@ func (cb *ChainBranch) AddGraph(key string, node AnyGraph, opts ...GraphAddNodeO
 // eg.
 //
 //	cb.AddPassthrough("passthrough_node_key")
+//
+// AddPassthrough 向分支添加一个 Passthrough 节点。
+// 例如：
+// cb.AddPassthrough("passthrough_node_key")
 func (cb *ChainBranch) AddPassthrough(key string, opts ...GraphAddNodeOpt) *ChainBranch {
 	gNode, options := toPassthroughNode(opts...)
 	return cb.addNode(key, gNode, options)

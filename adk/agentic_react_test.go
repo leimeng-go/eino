@@ -368,6 +368,7 @@ func TestAgenticReact_ReturnDirectly(t *testing.T) {
 	mdl := &sequentialAgenticModel{
 		responses: []*schema.AgenticMessage{
 			// Model calls the return-directly tool.
+			// 模型调用 return-directly 工具。
 			agenticToolCallMsg("direct", "call-1", `"final answer"`),
 		},
 	}
@@ -394,9 +395,12 @@ func TestAgenticReact_ReturnDirectly(t *testing.T) {
 
 		// Model should be called only once (for the tool call), not a second
 		// time, because the tool is return-directly.
+		//
+		// 模型应只被调用一次（用于工具调用），而不是第二次，因为该工具是 return-directly。
 		assert.Equal(t, int32(1), atomic.LoadInt32(&mdl.callCount))
 
 		// Find the final output event — should be the return-directly tool result.
+		// 查找最终输出事件——应为 return-directly 工具结果。
 		last := lastAgenticEvent(events)
 		require.NotNil(t, last)
 		require.Nil(t, last.Err)

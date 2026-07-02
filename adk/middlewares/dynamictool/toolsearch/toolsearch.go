@@ -15,6 +15,7 @@
  */
 
 // Package toolsearch provides tool search middleware.
+// Package toolsearch 提供工具搜索中间件。
 package toolsearch
 
 import (
@@ -34,8 +35,10 @@ import (
 )
 
 // Config is the configuration for the tool search middleware.
+// Config 是工具搜索中间件的配置。
 type Config struct {
 	// DynamicTools is a list of tools that can be dynamically searched and loaded by the agent.
+	// DynamicTools 是可由智能体动态搜索和加载的工具列表。
 	DynamicTools []tool.BaseTool
 
 	// UseModelToolSearch indicates whether the ChatModel natively supports tool search.
@@ -46,12 +49,19 @@ type Config struct {
 	// based on tool_search results before each model call. Note that this approach may
 	// invalidate the model's KV-cache (as the tool list changes between calls), and effectiveness
 	// depends on the model's ability to work with a dynamically changing tool set.
+	//
+	// UseModelToolSearch 表示 ChatModel 是否原生支持工具搜索。
+	// 当为 true 时，中间件会将工具搜索委托给模型的原生能力。
+	// 当为 false（默认）时，中间件会在每次模型调用前根据 tool_search 结果过滤工具列表来管理工具可见性。注意，由于工具列表会在调用间变化，这种方式可能会使模型的 KV-cache 失效，其效果取决于模型处理动态变化工具集的能力。
 	UseModelToolSearch bool
 }
 
 // NewTyped constructs and returns the generic tool search middleware.
 //
 // This is the generic constructor that supports both *schema.Message and *schema.AgenticMessage.
+//
+// NewTyped 构造并返回泛型工具搜索中间件。
+// 这是支持 *schema.Message 和 *schema.AgenticMessage 的泛型构造函数。
 func NewTyped[M adk.MessageType](ctx context.Context, config *Config) (adk.TypedChatModelAgentMiddleware[M], error) {
 	if config == nil {
 		return nil, fmt.Errorf("config is required")
@@ -117,6 +127,21 @@ func NewTyped[M adk.MessageType](ctx context.Context, config *Config) (adk.Typed
 //	    // ...
 //	    Handlers: []adk.ChatModelAgentMiddleware{middleware},
 //	})
+//
+// New 构造并返回工具搜索中间件。
+// 工具搜索中间件为拥有大型工具库的智能体启用动态工具选择。
+// 此中间件不会一次性将所有工具传给模型（这可能压垮上下文限制），而是：
+// 1. 添加一个接受关键字查询以搜索工具的 "tool_search" 元工具
+// 2. 初始时从模型的工具列表中隐藏所有动态工具
+// 3. 当模型调用 tool_search 时，匹配的工具会在后续调用中可用
+// 示例用法：
+// middleware, _ := toolsearch.New(ctx, &toolsearch.Config{
+// DynamicTools: []tool.BaseTool{weatherTool, stockTool, currencyTool, ...},
+// })
+// agent, _ := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
+// ...
+// Handlers: []adk.ChatModelAgentMiddleware{middleware},
+// })
 func New(ctx context.Context, config *Config) (adk.ChatModelAgentMiddleware, error) {
 	return NewTyped[*schema.Message](ctx, config)
 }
@@ -283,18 +308,25 @@ func (m *typedMiddleware[M]) BeforeModelRewriteState(ctx context.Context, state 
 		if m.useModelToolSearch {
 			// Model-native search: move dynamic tools to DeferredToolInfos for server-side retrieval,
 			// keep only static tools in ToolInfos, and remove the tool_search tool (the model handles search itself).
+			//
+			// 模型原生搜索：将动态工具移到 DeferredToolInfos 以进行服务端检索，
+			// ToolInfos 中仅保留静态工具，并移除 tool_search 工具（由模型自行处理搜索）。
 			state.DeferredToolInfos = m.extractDynamicTools(state.ToolInfos)
 			state.ToolInfos = m.stripDynamicTools(state.ToolInfos)
 			state.ToolInfos = removeTool(state.ToolInfos, toolSearchToolName)
 		} else {
 			// Client-side search: hide dynamic tools initially; they become visible
 			// only after the model calls tool_search and forward selection adds them back.
+			//
+			// 客户端搜索：初始时隐藏动态工具；只有在模型调用 tool_search 且 forward selection 将其加回后，它们才会可见。
 			state.ToolInfos = m.stripDynamicTools(state.ToolInfos)
 		}
 	}
 
 	// Forward selection (client-side search only): scan tool_search results in the
 	// conversation history and add the selected dynamic tools back to ToolInfos.
+	//
+	// 正向选择（仅客户端搜索）：扫描对话历史中的 tool_search 结果，并将选中的动态工具加回 ToolInfos。
 	if !m.useModelToolSearch {
 		existing := toolNameSet(state.ToolInfos)
 		for _, msg := range state.Messages {
@@ -323,6 +355,8 @@ func (m *typedMiddleware[M]) BeforeModelRewriteState(ctx context.Context, state 
 
 // extractToolSearchResult checks if the given message is a tool result from the tool_search tool,
 // and if so returns the content string. Returns ("", false) if not a matching tool result.
+//
+// extractToolSearchResult 检查给定消息是否为 tool_search 工具的工具结果；如果是，则返回内容字符串。若不是匹配的工具结果，则返回 ("", false)。
 func extractToolSearchResult[M adk.MessageType](msg M, toolName string) (string, bool) {
 	switch v := any(msg).(type) {
 	case *schema.Message:
@@ -456,6 +490,9 @@ func search(argumentsInJSON string, tools map[string]*schema.ToolInfo) ([]*schem
 	// Direct selection mode: select:tool1,tool2
 	// max_results is intentionally not applied here because the model has
 	// already specified the exact tools it wants by name.
+	//
+	// 直接选择模式：select:tool1,tool2
+	// 这里有意不应用 max_results，因为模型已经按名称明确指定了它想要的工具。
 	if strings.HasPrefix(query, "select:") {
 		names := strings.Split(strings.TrimPrefix(query, "select:"), ",")
 		toolSet := make(map[string]bool, len(tools))
@@ -498,12 +535,14 @@ func intMin(a, b int) int {
 }
 
 // scoredTool pairs a tool name with its search score.
+// scoredTool 将工具名称与其搜索分数组合在一起。
 type scoredTool struct {
 	name  string
 	score int
 }
 
 // keywordSearch scores all tools against the query keywords and returns the top N.
+// keywordSearch 根据查询关键词为所有工具打分，并返回前 N 个结果。
 func keywordSearch(query string, maxResults int, tools map[string]*schema.ToolInfo) []string {
 	keywords := parseKeywords(query)
 	if len(keywords) == 0 {
@@ -525,6 +564,7 @@ func keywordSearch(query string, maxResults int, tools map[string]*schema.ToolIn
 			kwScore := 0
 
 			// Score against name parts
+			// 按名称片段打分
 			for _, part := range nameParts {
 				partLower := strings.ToLower(part)
 				if partLower == kwLower {
@@ -535,11 +575,13 @@ func keywordSearch(query string, maxResults int, tools map[string]*schema.ToolIn
 			}
 
 			// Score against full name
+			// 按完整名称打分
 			if strings.Contains(nameLower, kwLower) {
 				kwScore = intMax(kwScore, 3)
 			}
 
 			// Score against description (substring match)
+			// 按描述打分（子串匹配）
 			if descLower != "" && strings.Contains(descLower, kwLower) {
 				kwScore = intMax(kwScore, 2)
 			}
@@ -562,6 +604,7 @@ func keywordSearch(query string, maxResults int, tools map[string]*schema.ToolIn
 	}
 
 	// Sort by score descending, then by name for stability
+	// 按分数降序排序，再按名称排序以保持稳定性
 	sort.Slice(scored, func(i, j int) bool {
 		if scored[i].score != scored[j].score {
 			return scored[i].score > scored[j].score
@@ -577,12 +620,14 @@ func keywordSearch(query string, maxResults int, tools map[string]*schema.ToolIn
 }
 
 // keyword represents a parsed search keyword.
+// keyword 表示解析后的搜索关键词。
 type keyword struct {
 	word     string
 	required bool
 }
 
 // parseKeywords splits a query string into keywords, handling the '+' required prefix.
+// parseKeywords 将查询字符串拆分为关键词，并处理带 '+' 的必需前缀。
 func parseKeywords(query string) (keywords []keyword) {
 	parts := strings.Fields(query)
 	for _, p := range parts {
@@ -600,19 +645,24 @@ func parseKeywords(query string) (keywords []keyword) {
 
 // splitToolName splits a tool name into parts by underscores, double underscores (MCP separator),
 // and camelCase boundaries.
+//
+// splitToolName 按下划线、双下划线（MCP 分隔符）和 camelCase 边界拆分工具名称。
 func splitToolName(name string) []string {
 	// First split by double underscore (MCP server__tool separator)
+	// 先按双下划线（MCP server__tool 分隔符）拆分
 	segments := strings.Split(name, "__")
 
 	var parts []string
 	for _, seg := range segments {
 		// Split each segment by single underscore
+		// 将每个片段按单下划线拆分
 		underscoreParts := strings.Split(seg, "_")
 		for _, up := range underscoreParts {
 			if up == "" {
 				continue
 			}
 			// Further split by camelCase
+			// 再按 camelCase 拆分
 			camelParts := splitCamelCase(up)
 			parts = append(parts, camelParts...)
 		}
@@ -621,6 +671,7 @@ func splitToolName(name string) []string {
 }
 
 // splitCamelCase splits a camelCase or PascalCase string into its constituent words.
+// splitCamelCase 将 camelCase 或 PascalCase 字符串拆分为组成单词。
 func splitCamelCase(s string) []string {
 	if s == "" {
 		return nil

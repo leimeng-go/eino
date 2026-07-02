@@ -15,6 +15,7 @@
  */
 
 // Package patchtoolcalls provides a middleware that patches dangling tool calls in the message history.
+// Package patchtoolcalls 提供一个 middleware，用于修补消息历史中悬空的工具调用。
 package patchtoolcalls
 
 import (
@@ -27,6 +28,7 @@ import (
 )
 
 // Config defines the configuration options for the patch tool calls middleware.
+// Config 定义 patch tool calls middleware 的配置选项。
 type Config struct {
 	// PatchedContentGenerator is an optional custom function to generate the content
 	// of patched tool messages. If not provided, a default message will be used.
@@ -39,6 +41,16 @@ type Config struct {
 	// Returns:
 	//   - string: the content to use for the patched tool message
 	//   - error: any error that occurred during generation
+	//
+	// PatchedContentGenerator 是一个可选的自定义函数，用于生成修补后的工具消息内容。
+	// 如果未提供，将使用默认消息。
+	// 参数：
+	// - ctx：操作的 context
+	// - toolName：被调用工具的名称
+	// - toolCallID：工具调用的 id
+	// 返回：
+	// - string：用于修补后的工具消息的内容
+	// - error：生成过程中发生的任何错误
 	PatchedContentGenerator func(ctx context.Context, toolName, toolCallID string) (string, error)
 }
 
@@ -46,6 +58,9 @@ type Config struct {
 //
 // The middleware scans the message history before each model invocation and inserts
 // placeholder tool messages for any tool calls that don't have corresponding responses.
+//
+// NewTyped 创建一个新的泛型 patch tool calls middleware。
+// 该 middleware 会在每次模型调用前扫描消息历史，并为任何没有对应响应的工具调用插入占位工具消息。
 func NewTyped[M adk.MessageType](_ context.Context, cfg *Config) (adk.TypedChatModelAgentMiddleware[M], error) {
 	if cfg == nil {
 		cfg = &Config{}
@@ -59,6 +74,9 @@ func NewTyped[M adk.MessageType](_ context.Context, cfg *Config) (adk.TypedChatM
 //
 // The middleware scans the message history before each model invocation and inserts
 // placeholder tool messages for any tool calls that don't have corresponding responses.
+//
+// New 使用给定配置创建一个新的 patch tool calls middleware。
+// 该 middleware 会在每次模型调用前扫描消息历史，并为任何没有对应响应的工具调用插入占位工具消息。
 func New(ctx context.Context, cfg *Config) (adk.ChatModelAgentMiddleware, error) {
 	return NewTyped[*schema.Message](ctx, cfg)
 }
@@ -133,6 +151,7 @@ func patchToolCallsForAgenticMessage[M adk.MessageType](ctx context.Context,
 		}
 
 		// Collect tool call IDs from this assistant message.
+		// 从此 assistant 消息中收集工具调用 ID。
 		var toolCalls []struct {
 			callID string
 			name   string
@@ -170,6 +189,7 @@ func patchToolCallsForAgenticMessage[M adk.MessageType](ctx context.Context,
 func hasCorrespondingToolMessage(messages []*schema.Message, toolCallID string) bool {
 	for _, msg := range messages {
 		// Only consider successive tool messages after the tool call message
+		// 仅考虑工具调用消息之后连续的工具消息
 		if msg.Role != schema.Tool {
 			return false
 		}
@@ -183,6 +203,7 @@ func hasCorrespondingToolMessage(messages []*schema.Message, toolCallID string) 
 func hasCorrespondingAgenticToolResult(messages []*schema.AgenticMessage, toolCallID string) bool {
 	for _, msg := range messages {
 		// Only consider successive tool messages after the tool call message
+		// 仅考虑工具调用消息之后连续的工具消息
 		if msg.Role != schema.AgenticRoleTypeUser {
 			return false
 		}

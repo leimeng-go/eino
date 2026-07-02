@@ -88,6 +88,7 @@ func GetConcatFunc(typ reflect.Type) func(reflect.Value) (reflect.Value, error) 
 }
 
 // ConcatItems the caller should ensure len(items) > 1
+// ConcatItems 调用方应确保 len(items) > 1
 func ConcatItems[T any](items []T) (T, error) {
 	typ := generic.TypeOf[T]()
 	v := reflect.ValueOf(items)
@@ -96,6 +97,7 @@ func ConcatItems[T any](items []T) (T, error) {
 	var err error
 
 	// handle map kind
+	// 处理 map 类型
 	if typ.Kind() == reflect.Map {
 		cv, err = concatMaps(v)
 	} else {
@@ -140,6 +142,7 @@ func concatMaps(ms reflect.Value) (reflect.Value, error) {
 		if len(anyVals) == 1 {
 			ele := anyVals[0]
 			if ele == nil { // we cannot SetMapIndex with nil because it will delete the key
+				// 不能用 nil 调用 SetMapIndex，因为它会删除该 key
 				ret.SetMapIndex(key, reflect.Zero(typ.Elem()))
 				continue
 			}
@@ -186,6 +189,10 @@ func ConcatSliceValue(val reflect.Value) (reflect.Value, error) {
 	// if all elements in the slice are empty, return an empty value
 	// if there is exactly one non-empty element in the slice, return that non-empty element
 	// otherwise, throw an error.
+	//
+	// 如果 slice 中所有元素都为空，返回一个空值
+	// 如果 slice 中恰好有一个非空元素，返回该非空元素
+	// 否则返回错误。
 	var filtered reflect.Value
 	for i := 0; i < val.Len(); i++ {
 		oneVal := val.Index(i)

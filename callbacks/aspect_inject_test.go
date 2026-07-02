@@ -222,6 +222,7 @@ func TestEnsureRunInfo(t *testing.T) {
 	assert.Equal(t, "component2", comp)
 
 	// EnsureRunInfo on an empty Context
+	// 在空 Context 上调用 EnsureRunInfo
 	AppendGlobalHandlers(NewHandlerBuilder().OnStartFn(func(ctx context.Context, info *RunInfo, input CallbackInput) context.Context {
 		typ = info.Type
 		comp = string(info.Component)

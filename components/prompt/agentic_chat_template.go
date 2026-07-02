@@ -31,6 +31,13 @@ import (
 //	// in chain, or graph
 //	chain := compose.NewChain[map[string]any, []*schema.AgenticMessage]()
 //	chain.AppendAgenticChatTemplate(template)
+//
+// FromAgenticMessages 根据给定 templates 和格式类型创建新的 DefaultAgenticChatTemplate。
+// 例如：
+// template := prompt.FromAgenticMessages(schema.FString, &schema.AgenticMessage{})
+// 在 chain 或 graph 中使用
+// chain := compose.NewChain[map[string]any, []*schema.AgenticMessage]()
+// chain.AppendAgenticChatTemplate(template)
 func FromAgenticMessages(formatType schema.FormatType, templates ...schema.AgenticMessagesTemplate) *DefaultAgenticChatTemplate {
 	return &DefaultAgenticChatTemplate{
 		templates:  templates,
@@ -74,11 +81,13 @@ func (t *DefaultAgenticChatTemplate) Format(ctx context.Context, vs map[string]a
 }
 
 // GetType returns the type of the agentic template (DefaultAgentic).
+// GetType 返回 agentic template 的类型（DefaultAgentic）。
 func (t *DefaultAgenticChatTemplate) GetType() string {
 	return "Default"
 }
 
 // IsCallbacksEnabled checks if the callbacks are enabled for the chat template.
+// IsCallbacksEnabled 检查 chat template 是否启用回调。
 func (t *DefaultAgenticChatTemplate) IsCallbacksEnabled() bool {
 	return true
 }

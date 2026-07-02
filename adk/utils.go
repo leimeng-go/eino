@@ -54,6 +54,9 @@ func (ag *AsyncGenerator[T]) Close() {
 
 // NewAsyncIteratorPair returns a paired async iterator and generator
 // that share the same underlying channel.
+//
+// NewAsyncIteratorPair 返回一对异步迭代器和生成器
+// 它们共享同一个底层 channel。
 func NewAsyncIteratorPair[T any]() (*AsyncIterator[T], *AsyncGenerator[T]) {
 	ch := internal.NewUnboundedChan[T]()
 	return &AsyncIterator[T]{ch}, &AsyncGenerator[T]{ch}
@@ -93,6 +96,10 @@ func concatInstructions(instructions ...string) string {
 // NOT RECOMMENDED: Agent transfer with full context sharing between agents has not proven
 // to be more effective empirically. Consider using ChatModelAgent with AgentTool
 // or DeepAgent instead for most multi-agent scenarios.
+//
+// GenTransferMessages 生成 assistant 和 tool 消息，用于指示
+// 面向目标智能体的 transfer-to-agent 工具调用。
+// 不推荐：智能体之间共享完整上下文的智能体转交在实证上并未证明更有效。多数多智能体场景建议改用 ChatModelAgent 配合 AgentTool，或使用 DeepAgent。
 func GenTransferMessages(_ context.Context, destAgentName string) (Message, Message) {
 	toolCallID := uuid.NewString()
 	tooCall := schema.ToolCall{ID: toolCallID, Function: schema.FunctionCall{Name: TransferToAgentToolName, Arguments: destAgentName}}
@@ -111,6 +118,7 @@ func typedSetAutomaticClose[M MessageType](e *TypedAgentEvent[M]) {
 }
 
 // set automatic close for event's message stream
+// 为 event 的消息流设置自动关闭
 func setAutomaticClose(e *AgentEvent) {
 	typedSetAutomaticClose(e)
 }
@@ -119,6 +127,11 @@ func setAutomaticClose(e *AgentEvent) {
 // If the stream contains an error chunk, this function returns (nil, err) and
 // sets StreamErr to prevent re-consumption. The nil message ensures that
 // failed stream responses are not included in subsequent agents' context windows.
+//
+// getMessageFromWrappedEvent 从 AgentEvent 中提取消息。
+// 如果流中包含错误 chunk，此函数返回 (nil, err)，并
+// 设置 StreamErr 以防止再次消费。nil 消息可确保
+// 失败的流响应不会被包含在后续智能体的上下文窗口中。
 func getMessageFromTypedWrappedEvent[M MessageType](e *typedAgentEventWrapper[M]) (M, error) {
 	var zero M
 	if e.event.Output == nil || e.event.Output.MessageOutput == nil {
@@ -174,6 +187,11 @@ func getMessageFromWrappedEvent(e *agentEventWrapper) (Message, error) {
 // success or StreamErr on failure. The stream is always replaced with an
 // error-free, materialized version safe for gob encoding.
 // Must be called at most once (guarded by callers checking concatenatedMessage/StreamErr).
+//
+// consumeStream 会耗尽消息流，成功时设置 concatenatedMessage，
+// 失败时设置 StreamErr。该流总会被替换为一个
+// 无错误、已物化且可安全进行 gob 编码的版本。
+// 最多只能调用一次（由调用方检查 concatenatedMessage/StreamErr 来保证）。
 func (e *agentEventWrapper) consumeStream() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -205,6 +223,11 @@ func (e *agentEventWrapper) consumeStream() {
 		// ensures subsequent Recv() returns io.EOF, but we replace it anyway
 		// to make the invariant explicit: after consumeStream, MessageStream
 		// is always safe for MessageVariant.GobEncode to consume.
+		//
+		// 防御性地替换流。上面的 defer s.Close() 已经
+		// 保证后续 Recv() 返回 io.EOF，但这里仍然替换它，
+		// 以明确这个不变式：consumeStream 之后，MessageStream
+		// 始终可被 MessageVariant.GobEncode 安全消费。
 		e.AgentEvent.Output.MessageOutput.MessageStream = schema.StreamReaderFromArray(msgs)
 		return
 	}
@@ -234,6 +257,17 @@ func (e *agentEventWrapper) consumeStream() {
 // NOTE: even if the event is copied, it's still not recommended to modify
 // the Message itself or Chunks of the MessageStream, as they are not copied.
 // NOTE: if you have CustomizedOutput or CustomizedAction, they are NOT copied.
+//
+// copyTypedAgentEvent 复制 TypedAgentEvent。
+// 如果 MessageVariant 是流式的，会复制 MessageStream。
+// RunPath 会被深拷贝。
+// Copy 的结果是一个新的 TypedAgentEvent，满足：
+// - 可以安全设置 TypedAgentEvent 的字段
+// - 可以安全扩展 RunPath
+// - 可以安全地从 MessageStream 接收
+// 注意：即使 event 已复制，仍不建议修改
+// Message 本身或 MessageStream 的 Chunks，因为它们不会被复制。
+// 注意：如果有 CustomizedOutput 或 CustomizedAction，它们不会被复制。
 func copyTypedAgentEvent[M MessageType](ae *TypedAgentEvent[M]) *TypedAgentEvent[M] {
 	rp := make([]RunStep, len(ae.RunPath))
 	copy(rp, ae.RunPath)
@@ -276,6 +310,7 @@ func copyTypedAgentEvent[M MessageType](ae *TypedAgentEvent[M]) *TypedAgentEvent
 }
 
 // TypedGetMessage extracts the message from a TypedAgentEvent, concatenating a stream if present.
+// TypedGetMessage 从 TypedAgentEvent 中提取消息；如果存在流，则会将其拼接。
 func TypedGetMessage[M MessageType](e *TypedAgentEvent[M]) (M, *TypedAgentEvent[M], error) {
 	var zero M
 	if e.Output == nil || e.Output.MessageOutput == nil {
@@ -297,6 +332,9 @@ func TypedGetMessage[M MessageType](e *TypedAgentEvent[M]) (M, *TypedAgentEvent[
 
 // GetMessage extracts the Message from an AgentEvent. For streaming output,
 // it duplicates the stream and concatenates it into a single Message.
+//
+// GetMessage 从 AgentEvent 中提取 Message。对于流式输出，
+// 它会复制该流并将其拼接成单个 Message。
 func GetMessage(e *AgentEvent) (Message, *AgentEvent, error) {
 	return TypedGetMessage(e)
 }

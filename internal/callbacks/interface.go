@@ -26,6 +26,9 @@ import (
 type RunInfo struct {
 	// Name is the graph node name for display purposes, not unique.
 	// Passed from compose.WithNodeName().
+	//
+	// Name 是用于展示的图节点名称，不唯一。
+	// 由 compose.WithNodeName() 传入。
 	Name      string
 	Type      string
 	Component components.Component

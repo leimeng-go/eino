@@ -37,6 +37,7 @@ type FieldMapping struct {
 }
 
 // String returns the string representation of the FieldMapping.
+// String 返回 FieldMapping 的字符串表示。
 func (m *FieldMapping) String() string {
 	var sb strings.Builder
 	sb.WriteString("[from ")
@@ -62,6 +63,10 @@ func (m *FieldMapping) String() string {
 // This is an exclusive mapping - once set, no other field mappings can be added since the successor input
 // has already been fully mapped.
 // Field: either the field of a struct, or the key of a map.
+//
+// FromField 创建一个 FieldMapping，将单个前驱字段映射到整个后继输入。
+// 这是排他映射——一旦设置，就不能再添加其他字段映射，因为后继输入已被完整映射。
+// Field：可以是 struct 的字段，也可以是 map 的键。
 func FromField(from string) *FieldMapping {
 	return &FieldMapping{
 		from: from,
@@ -70,6 +75,9 @@ func FromField(from string) *FieldMapping {
 
 // ToField creates a FieldMapping that maps the entire predecessor output to a single successor field.
 // Field: either the field of a struct, or the key of a map.
+//
+// ToField 创建一个 FieldMapping，将整个前驱输出映射到单个后继字段。
+// Field：可以是 struct 的字段，也可以是 map 的键。
 func ToField(to string, opts ...FieldMappingOption) *FieldMapping {
 	fm := &FieldMapping{
 		to: to,
@@ -82,6 +90,9 @@ func ToField(to string, opts ...FieldMappingOption) *FieldMapping {
 
 // MapFields creates a FieldMapping that maps a single predecessor field to a single successor field.
 // Field: either the field of a struct, or the key of a map.
+//
+// MapFields 创建一个 FieldMapping，将单个前驱字段映射到单个后继字段。
+// Field：可以是 struct 的字段，也可以是 map 的键。
 func MapFields(from, to string) *FieldMapping {
 	return &FieldMapping{
 		from: from,
@@ -122,6 +133,15 @@ func (m *FieldMapping) Equals(o *FieldMapping) bool {
 //   - []string{"user"}            // top-level field
 //   - []string{"user", "name"}    // nested struct field
 //   - []string{"users", "admin"}  // map key access
+//
+// FieldPath 表示 struct 或 map 中嵌套字段的路径。
+// 路径中的每个元素可以是：
+// - struct 字段名
+// - map 键
+// 示例路径：
+// - []string{"user"}            // 顶层字段
+// - []string{"user", "name"}    // 嵌套 struct 字段
+// - []string{"users", "admin"}  // map 键访问
 type FieldPath []string
 
 func (fp *FieldPath) join() string {
@@ -139,6 +159,9 @@ func splitFieldPath(path string) FieldPath {
 
 // pathSeparator is a special character (Unit Separator) used internally to join path elements.
 // This character is chosen because it's extremely unlikely to appear in user-defined field names or map keys.
+//
+// pathSeparator 是内部用于连接路径元素的特殊字符（Unit Separator）。
+// 选择该字符是因为它极不可能出现在用户定义的字段名或 map 键中。
 const pathSeparator = "\x1F"
 
 // FromFieldPath creates a FieldMapping that maps a single predecessor field path to the entire successor input.
@@ -151,6 +174,13 @@ const pathSeparator = "\x1F"
 //	FromFieldPath(FieldPath{"user", "profile", "name"})
 //
 // Note: The field path elements must not contain the internal path separator character ('\x1F').
+//
+// FromFieldPath 创建一个 FieldMapping，将单个前驱字段路径映射到整个后继输入。
+// 这是排他映射——一旦设置，就不能再添加其他字段映射，因为后继输入已被完整映射。
+// 示例：
+// 将嵌套 'user.profile' 中的 'name' 字段映射到整个后继输入
+// FromFieldPath(FieldPath{"user", "profile", "name"})
+// 注意：字段路径元素不得包含内部路径分隔符字符（'\x1F'）。
 func FromFieldPath(fromFieldPath FieldPath) *FieldMapping {
 	return &FieldMapping{
 		from: fromFieldPath.join(),
@@ -165,6 +195,12 @@ func FromFieldPath(fromFieldPath FieldPath) *FieldMapping {
 //	ToFieldPath(FieldPath{"response", "data", "userName"})
 //
 // Note: The field path elements must not contain the internal path separator character ('\x1F').
+//
+// ToFieldPath 创建一个 FieldMapping，将整个前驱输出映射到单个后继字段路径。
+// 示例：
+// 将整个前驱输出映射到 response.data.userName
+// ToFieldPath(FieldPath{"response", "data", "userName"})
+// 注意：字段路径元素不得包含内部路径分隔符字符（'\x1F'）。
 func ToFieldPath(toFieldPath FieldPath, opts ...FieldMappingOption) *FieldMapping {
 	fm := &FieldMapping{
 		to: toFieldPath.join(),
@@ -186,6 +222,15 @@ func ToFieldPath(toFieldPath FieldPath, opts ...FieldMappingOption) *FieldMappin
 //	)
 //
 // Note: The field path elements must not contain the internal path separator character ('\x1F').
+//
+// MapFieldPaths 创建一个 FieldMapping，将单个前驱字段路径映射到单个后继字段路径。
+// 示例：
+// 将 user.profile.name 映射到 response.userName
+// MapFieldPaths(
+// FieldPath{"user", "profile", "name"},
+// FieldPath{"response", "userName"},
+// )
+// 注意：字段路径元素不得包含内部路径分隔符字符（'\x1F'）。
 func MapFieldPaths(fromFieldPath, toFieldPath FieldPath) *FieldMapping {
 	return &FieldMapping{
 		from: fromFieldPath.join(),
@@ -194,11 +239,16 @@ func MapFieldPaths(fromFieldPath, toFieldPath FieldPath) *FieldMapping {
 }
 
 // FieldMappingOption is a functional option for configuring a FieldMapping.
+// FieldMappingOption 是用于配置 FieldMapping 的函数式 option。
 type FieldMappingOption func(*FieldMapping)
 
 // WithCustomExtractor sets a custom extractor function for the FieldMapping.
 // The extractor function is used to extract a value from the 'source' of the FieldMapping.
 // NOTE: if specified in this way, Eino can only check the validity of the field mapping at request time..
+//
+// WithCustomExtractor 为 FieldMapping 设置自定义 extractor 函数。
+// extractor 函数用于从 FieldMapping 的 'source' 中提取值。
+// 注意：如果以这种方式指定，Eino 只能在请求时检查字段映射的有效性。
 func WithCustomExtractor(extractor func(input any) (any, error)) FieldMappingOption {
 	return func(m *FieldMapping) {
 		m.customExtractor = extractor
@@ -249,6 +299,7 @@ func convertTo(mappings map[string]any, typ reflect.Type) any {
 
 func assignOne(destValue reflect.Value, taken any, to string) reflect.Value {
 	if len(to) == 0 { // assign to output directly
+		// 直接赋值给输出
 		destValue.Set(reflect.ValueOf(taken))
 		return destValue
 	}
@@ -303,6 +354,7 @@ func assignOne(destValue reflect.Value, taken any, to string) reflect.Value {
 
 			if !toSet.IsValid() {
 				// just skip it, because this 'nil' is the zero value of the corresponding struct field
+				// 直接跳过，因为这个 'nil' 是对应 struct 字段的零值
 			} else {
 				field := destValue.FieldByName(path)
 				field.Set(toSet)
@@ -528,12 +580,14 @@ func fieldMap(mappings []*FieldMapping, allowMapKeyNotFound bool, uncheckedSourc
 				taken, pathInputType, err = takeOne(pathInputValue, pathInputType, path)
 				if err != nil {
 					// we deferred check from Compile time to request time for interface types, so we won't panic here
+					// 对于 interface 类型，我们将检查从 Compile 时延后到请求时，因此这里不会 panic
 					var interfaceNotValidErr *errInterfaceNotValidForFieldMapping
 					if errors.As(err, &interfaceNotValidErr) {
 						return nil, err
 					}
 
 					// map key not found can only be a request time error, so we won't panic here
+					// 找不到 map key 只能是请求时错误，所以这里不 panic
 					var mapKeyNotFoundErr *errMapKeyNotFound
 					if errors.As(err, &mapKeyNotFoundErr) {
 						if allowMapKeyNotFound {
@@ -546,6 +600,7 @@ func fieldMap(mappings []*FieldMapping, allowMapKeyNotFound bool, uncheckedSourc
 						uncheckedPath, ok := uncheckedSourcePaths[mapping.from]
 						if ok && len(uncheckedPath) >= len(fromPath)-i {
 							// the err happens on the mapping source path which is unchecked at request time, so we won't panic here
+							// err 发生在映射源路径上，该路径在请求时未检查，所以这里不 panic
 							return nil, err
 						}
 					}
@@ -644,16 +699,20 @@ func validateStructOrMap(t reflect.Type) bool {
 
 func validateFieldMapping(predecessorType reflect.Type, successorType reflect.Type, mappings []*FieldMapping) (
 	// type checkers that are deferred to request-time
+	// 延迟到请求时执行的类型检查器
 	typeHandler *handlerPair,
 	// the remaining predecessor field paths that are not checked at compile time because of interface type found
+	// 因发现 interface 类型而未在编译时检查的剩余前驱字段路径
 	uncheckedSourcePath map[string]FieldPath,
 	err error) {
 	// check if mapping is legal
+	// 检查 mapping 是否合法
 	if isFromAll(mappings) && isToAll(mappings) {
 		// unreachable
 		panic(fmt.Errorf("invalid field mappings: from all fields to all, use common edge instead"))
 	} else if !isToAll(mappings) && (!validateStructOrMap(successorType) && successorType != reflect.TypeOf((*any)(nil)).Elem()) {
 		// if user has not provided a specific struct type, graph cannot construct any struct in the runtime
+		// 如果用户未提供具体 struct 类型，graph 无法在运行时构造任何 struct
 		return nil, nil, fmt.Errorf("static check fail: successor input type should be struct or map, actual: %v", successorType)
 	} else if fromFields(mappings) && !validateStructOrMap(predecessorType) {
 		return nil, nil, fmt.Errorf("static check fail: predecessor output type should be struct or map, actual: %v", predecessorType)
@@ -672,11 +731,13 @@ func validateFieldMapping(predecessorType reflect.Type, successorType reflect.Ty
 		if len(successorRemaining) > 0 {
 			if successorFieldType == reflect.TypeOf((*any)(nil)).Elem() {
 				continue // at request time expand this 'any' to 'map[string]any'
+				// 请求时将这个 'any' 展开为 'map[string]any'
 			}
 			return nil, nil, fmt.Errorf("static check failed for mapping %s, the successor has intermediate interface type %v", mapping, successorFieldType)
 		}
 
 		if mapping.customExtractor != nil { // custom extractor applies to request-time data, so skip compile-time check
+			// 自定义 extractor 作用于请求时数据，因此跳过编译时检查
 			continue
 		}
 
@@ -711,6 +772,7 @@ func validateFieldMapping(predecessorType reflect.Type, successorType reflect.Ty
 
 		if len(predecessorRemaining) > 0 {
 			// can't check if types match at compile time, because there is interface type at some point along the source path. Defer to request time
+			// 无法在编译时检查类型是否匹配，因为 source path 上某处存在 interface 类型。延迟到请求时处理
 			if fieldCheckers == nil {
 				fieldCheckers = make(map[string]handlerPair)
 			}
@@ -726,6 +788,7 @@ func validateFieldMapping(predecessorType reflect.Type, successorType reflect.Ty
 				return nil, nil, fmt.Errorf("static check failed for mapping %s, field[%v]-[%v] is absolutely not assignable", mapping, predecessorFieldType, successorFieldType)
 			} else if at == assignableTypeMay {
 				// can't decide if types match, because the successorFieldType implements predecessorFieldType, which is an interface type
+				// 无法判断类型是否匹配，因为 successorFieldType 实现了 predecessorFieldType，而后者是 interface 类型
 				if fieldCheckers == nil {
 					fieldCheckers = make(map[string]handlerPair)
 				}

@@ -41,6 +41,23 @@ import (
 //			field2: items[0].field2 + items[1].field2,
 //		}, nil
 //	})
+//
+// RegisterStreamChunkConcatFunc 注册一个用于拼接流 chunk 的函数。
+// 当你想拼接特定类型的流 chunk 时需要它。
+// 例如，你调用 Invoke()，但节点只实现了 Stream()。
+// 在进程初始化时调用
+// 非线程安全
+// 例如：
+// type testStruct struct {
+// field1 string
+// field2 int
+// }
+// compose.RegisterStreamChunkConcatFunc(func(items []testStruct) (testStruct, error) {
+// return testStruct{
+// field1: items[1].field1, // 可根据你的场景实现 inplace 逻辑
+// field2: items[0].field2 + items[1].field2,
+// }, nil
+// })
 func RegisterStreamChunkConcatFunc[T any](fn func([]T) (T, error)) {
 	internal.RegisterStreamChunkConcatFunc(fn)
 }

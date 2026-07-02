@@ -27,9 +27,11 @@ import (
 
 func TestAppendGlobalHandlers(t *testing.T) {
 	// Clear global handlers before test
+	// 测试前清空全局处理器
 	callbacks.GlobalHandlers = nil
 
 	// Create test handlers
+	// 创建测试处理器
 	handler1 := NewHandlerBuilder().
 		OnStartFn(func(ctx context.Context, info *RunInfo, input CallbackInput) context.Context {
 			return ctx
@@ -40,17 +42,20 @@ func TestAppendGlobalHandlers(t *testing.T) {
 		}).Build()
 
 	// Test appending first handler
+	// 测试追加第一个处理器
 	AppendGlobalHandlers(handler1)
 	assert.Equal(t, 1, len(callbacks.GlobalHandlers))
 	assert.Contains(t, callbacks.GlobalHandlers, handler1)
 
 	// Test appending second handler
+	// 测试追加第二个处理器
 	AppendGlobalHandlers(handler2)
 	assert.Equal(t, 2, len(callbacks.GlobalHandlers))
 	assert.Contains(t, callbacks.GlobalHandlers, handler1)
 	assert.Contains(t, callbacks.GlobalHandlers, handler2)
 
 	// Test appending nil handler
+	// 测试追加 nil 处理器
 	AppendGlobalHandlers([]Handler{}...)
 	assert.Equal(t, 2, len(callbacks.GlobalHandlers))
 }

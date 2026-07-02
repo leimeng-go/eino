@@ -24,32 +24,40 @@ import (
 )
 
 // Invoke is the type of the invokable lambda function.
+// Invoke 是可调用 lambda 函数的类型。
 type Invoke[I, O, TOption any] func(ctx context.Context, input I, opts ...TOption) (output O, err error)
 
 // Stream is the type of the streamable lambda function.
+// Stream 是可流式处理的 lambda 函数的类型。
 type Stream[I, O, TOption any] func(ctx context.Context,
 	input I, opts ...TOption) (output *schema.StreamReader[O], err error)
 
 // Collect is the type of the collectable lambda function.
+// Collect 是可收集的 lambda 函数的类型。
 type Collect[I, O, TOption any] func(ctx context.Context,
 	input *schema.StreamReader[I], opts ...TOption) (output O, err error)
 
 // Transform is the type of the transformable lambda function.
+// Transform 是可转换的 lambda 函数的类型。
 type Transform[I, O, TOption any] func(ctx context.Context,
 	input *schema.StreamReader[I], opts ...TOption) (output *schema.StreamReader[O], err error)
 
 // InvokeWOOpt is the type of the invokable lambda function without options.
+// InvokeWOOpt 是不带 options 的可调用 lambda 函数的类型。
 type InvokeWOOpt[I, O any] func(ctx context.Context, input I) (output O, err error)
 
 // StreamWOOpt is the type of the streamable lambda function without options.
+// StreamWOOpt 是不带 options 的可流式处理 lambda 函数的类型。
 type StreamWOOpt[I, O any] func(ctx context.Context,
 	input I) (output *schema.StreamReader[O], err error)
 
 // CollectWOOpt is the type of the collectable lambda function without options.
+// CollectWOOpt 是不带 options 的可收集 lambda 函数的类型。
 type CollectWOOpt[I, O any] func(ctx context.Context,
 	input *schema.StreamReader[I]) (output O, err error)
 
 // TransformWOOpts is the type of the transformable lambda function without options.
+// TransformWOOpts 是不带 options 的可转换 lambda 函数的类型。
 type TransformWOOpts[I, O any] func(ctx context.Context,
 	input *schema.StreamReader[I]) (output *schema.StreamReader[O], err error)
 
@@ -61,6 +69,14 @@ type TransformWOOpts[I, O any] func(ctx context.Context,
 //	lambda := compose.InvokableLambda(func(ctx context.Context, input string) (output string, err error) {
 //		return input, nil
 //	})
+//
+// Lambda 是包装用户提供的 lambda 函数的节点。
+// 它可作为 Graph 或 Chain（包括 Parallel 和 Branch）中的节点。
+// 使用 AnyLambda/InvokableLambda/StreamableLambda/CollectableLambda/TransformableLambda 创建 Lambda。
+// 例如：
+// lambda := compose.InvokableLambda(func(ctx context.Context, input string) (output string, err error) {
+// return input, nil
+// })
 type Lambda struct {
 	executor *composableRunnable
 }
@@ -69,18 +85,28 @@ type lambdaOpts struct {
 	// same as executorMeta.isComponentCallbackEnabled
 	// indicates whether the executable lambda user provided could execute the callback aspect itself.
 	// if it could, the callback in the corresponding graph node won't be executed anymore
+	//
+	// 与 executorMeta.isComponentCallbackEnabled 相同
+	// 表示用户提供的可执行 lambda 是否可以自行执行 callback aspect。
+	// 如果可以，对应图节点中的回调将不再执行
 	enableComponentCallback bool
 
 	// same as executorMeta.componentImplType
 	// for AnyLambda, the value comes from the user's explicit config
 	// if componentImplType is empty, then the class name or func name in the instance will be inferred, but no guarantee.
+	//
+	// 与 executorMeta.componentImplType 相同
+	// 对于 AnyLambda，该值来自用户的显式配置
+	// 如果 componentImplType 为空，则会从实例中推断 class name 或 func name，但不保证准确。
 	componentImplType string
 }
 
 // LambdaOpt is the option for creating a Lambda.
+// LambdaOpt 是创建 Lambda 的选项。
 type LambdaOpt func(o *lambdaOpts)
 
 // WithLambdaCallbackEnable enables the callback aspect of the lambda function.
+// WithLambdaCallbackEnable 启用 lambda 函数的回调方面。
 func WithLambdaCallbackEnable(y bool) LambdaOpt {
 	return func(o *lambdaOpts) {
 		o.enableComponentCallback = y
@@ -88,6 +114,7 @@ func WithLambdaCallbackEnable(y bool) LambdaOpt {
 }
 
 // WithLambdaType sets the type of the lambda function.
+// WithLambdaType 设置 lambda 函数的类型。
 func WithLambdaType(t string) LambdaOpt {
 	return func(o *lambdaOpts) {
 		o.componentImplType = t
@@ -97,11 +124,13 @@ func WithLambdaType(t string) LambdaOpt {
 type unreachableOption struct{}
 
 // InvokableLambdaWithOption creates a Lambda with invokable lambda function and options.
+// InvokableLambdaWithOption 使用可调用的 lambda 函数和选项创建 Lambda。
 func InvokableLambdaWithOption[I, O, TOption any](i Invoke[I, O, TOption], opts ...LambdaOpt) *Lambda {
 	return anyLambda(i, nil, nil, nil, opts...)
 }
 
 // InvokableLambda creates a Lambda with invokable lambda function without options.
+// InvokableLambda 使用不带选项的可调用 lambda 函数创建 Lambda。
 func InvokableLambda[I, O any](i InvokeWOOpt[I, O], opts ...LambdaOpt) *Lambda {
 	f := func(ctx context.Context, input I, opts_ ...unreachableOption) (output O, err error) {
 		return i(ctx, input)
@@ -111,11 +140,13 @@ func InvokableLambda[I, O any](i InvokeWOOpt[I, O], opts ...LambdaOpt) *Lambda {
 }
 
 // StreamableLambdaWithOption creates a Lambda with streamable lambda function and options.
+// StreamableLambdaWithOption 使用可流式处理的 lambda 函数和选项创建 Lambda。
 func StreamableLambdaWithOption[I, O, TOption any](s Stream[I, O, TOption], opts ...LambdaOpt) *Lambda {
 	return anyLambda(nil, s, nil, nil, opts...)
 }
 
 // StreamableLambda creates a Lambda with streamable lambda function without options.
+// StreamableLambda 使用不带选项的可流式处理 lambda 函数创建 Lambda。
 func StreamableLambda[I, O any](s StreamWOOpt[I, O], opts ...LambdaOpt) *Lambda {
 	f := func(ctx context.Context, input I, opts_ ...unreachableOption) (
 		output *schema.StreamReader[O], err error) {
@@ -127,11 +158,13 @@ func StreamableLambda[I, O any](s StreamWOOpt[I, O], opts ...LambdaOpt) *Lambda 
 }
 
 // CollectableLambdaWithOption creates a Lambda with collectable lambda function and options.
+// CollectableLambdaWithOption 使用可收集的 lambda 函数和选项创建 Lambda。
 func CollectableLambdaWithOption[I, O, TOption any](c Collect[I, O, TOption], opts ...LambdaOpt) *Lambda {
 	return anyLambda(nil, nil, c, nil, opts...)
 }
 
 // CollectableLambda creates a Lambda with collectable lambda function without options.
+// CollectableLambda 使用不带选项的可收集 lambda 函数创建 Lambda。
 func CollectableLambda[I, O any](c CollectWOOpt[I, O], opts ...LambdaOpt) *Lambda {
 	f := func(ctx context.Context, input *schema.StreamReader[I],
 		opts_ ...unreachableOption) (output O, err error) {
@@ -143,11 +176,13 @@ func CollectableLambda[I, O any](c CollectWOOpt[I, O], opts ...LambdaOpt) *Lambd
 }
 
 // TransformableLambdaWithOption creates a Lambda with transformable lambda function and options.
+// TransformableLambdaWithOption 使用可转换的 lambda 函数和选项创建 Lambda。
 func TransformableLambdaWithOption[I, O, TOption any](t Transform[I, O, TOption], opts ...LambdaOpt) *Lambda {
 	return anyLambda(nil, nil, nil, t, opts...)
 }
 
 // TransformableLambda creates a Lambda with transformable lambda function without options.
+// TransformableLambda 使用不带选项的可转换 lambda 函数创建 Lambda。
 func TransformableLambda[I, O any](t TransformWOOpts[I, O], opts ...LambdaOpt) *Lambda {
 
 	f := func(ctx context.Context, input *schema.StreamReader[I],
@@ -170,6 +205,17 @@ func TransformableLambda[I, O any](t TransformWOOpts[I, O], opts ...LambdaOpt) *
 //		// ...
 //	}
 //
+// lambda := compose.AnyLambda(invokeFunc, streamFunc, nil, nil)
+//
+// AnyLambda 使用任意 lambda 函数创建 Lambda。
+// 你可以只实现四种 lambda 函数中的一个或多个，其余使用 nil。
+// 例如：
+// invokeFunc := func(ctx context.Context, input string, opts ...myOption) (output string, err error) {
+// ...
+// }
+// streamFunc := func(ctx context.Context, input string, opts ...myOption) (output *schema.StreamReader[string], err error) {
+// ...
+// }
 // lambda := compose.AnyLambda(invokeFunc, streamFunc, nil, nil)
 func AnyLambda[I, O, TOption any](i Invoke[I, O, TOption], s Stream[I, O, TOption],
 	c Collect[I, O, TOption], t Transform[I, O, TOption], opts ...LambdaOpt) (*Lambda, error) {
@@ -221,6 +267,14 @@ func getLambdaOpt(opts ...LambdaOpt) *lambdaOpts {
 //
 //	chain.AddChatModel(chatModel) // chatModel returns *schema.Message, but we need []*schema.Message
 //	chain.AddLambda(lambda) // convert *schema.Message to []*schema.Message
+//
+// ToList 创建一个将输入 I 转换为 []I 的 Lambda。
+// 当你想把单个输入转换为输入列表时很有用。
+// 例如：
+// lambda := compose.ToList[*schema.Message]()
+// chain := compose.NewChain[[]*schema.Message, []*schema.Message]()
+// chain.AddChatModel(chatModel) // chatModel 返回 *schema.Message，但这里需要 []*schema.Message
+// chain.AddLambda(lambda) // 将 *schema.Message 转换为 []*schema.Message
 func ToList[I any](opts ...LambdaOpt) *Lambda {
 	i := func(ctx context.Context, input I, opts_ ...unreachableOption) (output []I, err error) {
 		return []I{input}, nil
@@ -254,6 +308,22 @@ func ToList[I any](opts ...LambdaOpt) *Lambda {
 //		Role:    schema.MessageRoleUser,
 //		Content: "return a json string for my struct",
 //	})
+//
+// MessageParser 创建一个 lambda，将消息解析为对象 T，通常用在 chatmodel 之后。
+// 用法：
+// parser := schema.NewMessageJSONParser[MyStruct](&schema.MessageJSONParseConfig{
+// ParseFrom: schema.MessageParseFromContent,
+// })
+// parserLambda := MessageParser(parser)
+// chain := NewChain[*schema.Message, MyStruct]()
+// chain.AppendChatModel(chatModel)
+// chain.AppendLambda(parserLambda)
+// r, err := chain.Compile(context.Background())
+// parsed 是 MyStruct 对象
+// parsed, err := r.Invoke(context.Background(), &schema.Message{
+// Role:    schema.MessageRoleUser,
+// Content: "return a json string for my struct",
+// })
 func MessageParser[T any](p schema.MessageParser[T], opts ...LambdaOpt) *Lambda {
 	i := func(ctx context.Context, input *schema.Message, opts_ ...unreachableOption) (output T, err error) {
 		return p.Parse(ctx, input)

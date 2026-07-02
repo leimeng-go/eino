@@ -45,6 +45,15 @@ import (
 //	docs, _ := retriever.Retrieve(ctx, "what is eino?", retriever.WithTopK(5))
 //
 //	graph.AddRetrieverNode("retriever", retriever)
+//
+// Retriever 根据给定查询从存储中获取最相关的文档。
+// Retrieve 接受自然语言查询字符串，并返回按相关性排序（最相关在前）的匹配 [schema.Document] 值。相关性分数和后端特定元数据可在 [schema.Document].MetaData 中获取。
+// 设置 [Options.Embedding] 时，实现会先将查询转换为向量再搜索。embedder 必须与索引时使用的模型相同——参见 [indexer.Options.Embedding]。
+// [Options.ScoreThreshold] 是过滤条件，不是排序：分数低于阈值的文档会被完全排除。[Options.TopK] 限制返回结果数量。
+// Retrieve 可单独使用，也可通过 AddRetrieverNode 添加到 Graph：
+// retriever, _ := redis.NewRetriever(ctx, cfg)
+// docs, _ := retriever.Retrieve(ctx, "what is eino?", retriever.WithTopK(5))
+// graph.AddRetrieverNode("retriever", retriever)
 type Retriever interface {
 	Retrieve(ctx context.Context, query string, opts ...Option) ([]*schema.Document, error)
 }

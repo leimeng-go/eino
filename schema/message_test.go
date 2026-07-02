@@ -52,6 +52,7 @@ func TestMessageTemplate(t *testing.T) {
 	assert.Nil(t, err)
 
 	// len(ms) == 2
+	// len(ms) == 2
 	assert.Equal(t, 2, len(ms))
 	assert.Equal(t, ms[0], m1)
 	assert.Equal(t, ms[1], m2)
@@ -426,6 +427,7 @@ func TestConcatMessage(t *testing.T) {
 			{
 				Role:    Assistant,
 				Content: "🚀",
+				// ResponseMeta: &ResponseMeta{},
 				// ResponseMeta: &ResponseMeta{},
 			},
 			{
@@ -1759,7 +1761,7 @@ func TestConcatToolResults(t *testing.T) {
 		assert.Contains(t, err.Error(), "conflicting")
 		assert.Contains(t, err.Error(), "file")
 	})
-	
+
 	t.Run("same_chunk_text_merged", func(t *testing.T) {
 		chunks := []*ToolResult{
 			{

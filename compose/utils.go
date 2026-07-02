@@ -257,6 +257,7 @@ func extractOption(nodes map[string]*chanCall, opts ...Option) (map[string][]any
 	for _, opt := range opts {
 		if len(opt.paths) == 0 {
 			// common, discard callback, filter option by type
+			// 通用，丢弃回调，按类型过滤选项
 			if len(opt.options) == 0 {
 				continue
 			}
@@ -265,6 +266,7 @@ func extractOption(nodes map[string]*chanCall, opts ...Option) (map[string][]any
 					// subgraph
 					optMap[name] = append(optMap[name], opt)
 				} else if reflect.TypeOf(opt.options[0]) == c.action.optionType { // assume that types of options are the same
+					// 假设选项类型相同
 					optMap[name] = append(optMap[name], opt.options...)
 				}
 			}
@@ -285,6 +287,9 @@ func extractOption(nodes map[string]*chanCall, opts ...Option) (map[string][]any
 				if len(opt.options) == 0 {
 					// sub graph common callbacks has been added to ctx in initNodeCallback and won't be passed to subgraph only pass options
 					// node callback also won't be passed
+					//
+					// 子图的通用回调已在 initNodeCallback 中加入 ctx，不会传递给 subgraph，只传递选项
+					// 节点回调也不会传递
 					continue
 				}
 				if curNode.action.optionType == nil {
@@ -293,7 +298,9 @@ func extractOption(nodes map[string]*chanCall, opts ...Option) (map[string][]any
 					optMap[curNodeKey] = append(optMap[curNodeKey], nOpt)
 				} else {
 					// designate to component
+					// 指定给组件
 					if curNode.action.optionType != reflect.TypeOf(opt.options[0]) { // assume that types of options are the same
+						// 假设选项类型相同
 						return nil, fmt.Errorf("option type[%s] is different from which the designated node[%s] expects[%s]",
 							reflect.TypeOf(opt.options[0]).String(), path, curNode.action.optionType.String())
 					}
@@ -305,6 +312,7 @@ func extractOption(nodes map[string]*chanCall, opts ...Option) (map[string][]any
 					return nil, fmt.Errorf("cannot designate sub path of a component, path:%s", path)
 				}
 				// designate to sub graph's nodes
+				// 指定给子图的节点
 				nOpt := opt.deepCopy()
 				nOpt.paths = []*NodePath{NewNodePath(path.path[1:]...)}
 				optMap[curNodeKey] = append(optMap[curNodeKey], nOpt)

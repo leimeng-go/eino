@@ -26,16 +26,26 @@ import (
 )
 
 // ExtParserConfig defines the configuration for the ExtParser.
+// ExtParserConfig 定义 ExtParser 的配置。
 type ExtParserConfig struct {
 	// ext -> parser.
 	// eg: map[string]Parser{
 	// 	".pdf": &PDFParser{},
 	// 	".md": &MarkdownParser{},
 	// }
+	//
+	// ext -> parser。
+	// 例如：map[string]Parser{
+	// ".pdf": &PDFParser{},
+	// ".md": &MarkdownParser{},
+	// }
 	Parsers map[string]Parser
 
 	// Fallback parser to use when no other parser is found.
 	// Default is TextParser if not set.
+	//
+	// 未找到其他 parser 时使用的 fallback parser。
+	// 未设置时默认为 TextParser。
 	FallbackParser Parser
 }
 
@@ -59,6 +69,7 @@ type ExtParser struct {
 }
 
 // NewExtParser creates a new ExtParser.
+// NewExtParser 创建新的 ExtParser。
 func NewExtParser(ctx context.Context, conf *ExtParserConfig) (*ExtParser, error) {
 	if conf == nil {
 		conf = &ExtParserConfig{}
@@ -82,6 +93,9 @@ func NewExtParser(ctx context.Context, conf *ExtParserConfig) (*ExtParser, error
 
 // GetParsers returns a copy of the registered parsers.
 // It is safe to modify the returned parsers.
+//
+// GetParsers 返回已注册 parsers 的副本。
+// 可以安全地修改返回的 parsers。
 func (p *ExtParser) GetParsers() map[string]Parser {
 	res := make(map[string]Parser, len(p.parsers))
 	for k, v := range p.parsers {
@@ -92,6 +106,7 @@ func (p *ExtParser) GetParsers() map[string]Parser {
 }
 
 // Parse parses the given reader and returns a list of documents.
+// Parse 解析给定 reader 并返回文档列表。
 func (p *ExtParser) Parse(ctx context.Context, reader io.Reader, opts ...Option) ([]*schema.Document, error) {
 	opt := GetCommonOptions(&Options{}, opts...)
 

@@ -72,6 +72,9 @@ func (a *flowAgent) deepCopy() *flowAgent {
 // NOT RECOMMENDED: Agent transfer with full context sharing between agents has not proven
 // to be more effective empirically. Consider using ChatModelAgent with AgentTool
 // or DeepAgent instead for most multi-agent scenarios.
+//
+// SetSubAgents 为给定智能体设置子智能体，并返回更新后的智能体。
+// 不推荐：智能体之间共享完整上下文的智能体转移，在经验上并未证明更有效。多数多智能体场景建议改用带 AgentTool 的 ChatModelAgent 或 DeepAgent。
 func SetSubAgents(ctx context.Context, agent Agent, subAgents []Agent) (ResumableAgent, error) {
 	return setSubAgents(ctx, agent, subAgents)
 }
@@ -83,6 +86,9 @@ type AgentOption func(options *flowAgent)
 // NOT RECOMMENDED: Agent transfer with full context sharing between agents has not proven
 // to be more effective empirically. Consider using ChatModelAgent with AgentTool
 // or DeepAgent instead for most multi-agent scenarios.
+//
+// WithDisallowTransferToParent 阻止子智能体转移到其父智能体。
+// 不推荐：智能体之间共享完整上下文的智能体转移，在经验上并未证明更有效。多数多智能体场景建议改用带 AgentTool 的 ChatModelAgent 或 DeepAgent。
 func WithDisallowTransferToParent() AgentOption {
 	return func(fa *flowAgent) {
 		fa.disallowTransferToParent = true
@@ -95,6 +101,9 @@ func WithDisallowTransferToParent() AgentOption {
 // NOT RECOMMENDED: Agent transfer with full context sharing between agents has not proven
 // to be more effective empirically. Consider using ChatModelAgent with AgentTool
 // or DeepAgent instead for most multi-agent scenarios.
+//
+// WithHistoryRewriter 设置一个 rewriter，用于在智能体转移期间转换对话历史。
+// 不推荐：智能体之间共享完整上下文的智能体转移，在经验上并未证明更有效。多数多智能体场景建议改用带 AgentTool 的 ChatModelAgent 或 DeepAgent。
 func WithHistoryRewriter(h HistoryRewriter) AgentOption {
 	return func(fa *flowAgent) {
 		fa.historyRewriter = h
@@ -125,6 +134,9 @@ func toFlowAgent(ctx context.Context, agent Agent, opts ...AgentOption) *flowAge
 // NOT RECOMMENDED: Agent transfer with full context sharing between agents has not proven
 // to be more effective empirically. Consider using ChatModelAgent with AgentTool
 // or DeepAgent instead for most multi-agent scenarios.
+//
+// AgentWithOptions 用 flow 专属选项包装智能体并返回它。
+// 不推荐：智能体之间共享完整上下文的智能体转移，在经验上并未证明更有效。多数多智能体场景建议改用带 AgentTool 的 ChatModelAgent 或 DeepAgent。
 func AgentWithOptions(ctx context.Context, agent Agent, opts ...AgentOption) Agent {
 	return toFlowAgent(ctx, agent, opts...)
 }
@@ -214,6 +226,9 @@ func rewriteMessage(msg Message, agentName string) Message {
 
 	// Convert AssistantGenMultiContent to UserInputMultiContent, since the role changes to User.
 	// Reasoning parts have no user input equivalent and are dropped.
+	//
+	// 将 AssistantGenMultiContent 转为 UserInputMultiContent，因为角色会变为 User。
+	// Reasoning 部分没有对应的用户输入形式，因此会被丢弃。
 	for _, part := range msg.AssistantGenMultiContent {
 		switch part.Type {
 		case schema.ChatMessagePartTypeText:
@@ -288,11 +303,13 @@ func (a *flowAgent) genAgentInput(ctx context.Context, runCtx *runContext, skipT
 	for _, event := range events {
 		if skipTransferMessages && event.Action != nil && event.Action.TransferToAgent != nil {
 			// If skipTransferMessages is true and the event contain transfer action, the message in this event won't be appended to history entries.
+			// 如果 skipTransferMessages 为 true 且事件包含 transfer action，则该事件中的消息不会追加到历史条目。
 			if event.Output != nil &&
 				event.Output.MessageOutput != nil &&
 				event.Output.MessageOutput.Role == schema.Tool &&
 				len(historyEntries) > 0 {
 				// If the skipped message's role is Tool, remove the previous history entry as it's also a transfer message(from ChatModelAgent and GenTransferMessages).
+				// 如果被跳过消息的角色是 Tool，则移除上一个历史条目，因为它同样是 transfer message（来自 ChatModelAgent 和 GenTransferMessages）。
 				historyEntries = historyEntries[:len(historyEntries)-1]
 			}
 			continue
@@ -470,6 +487,9 @@ func (a *flowAgent) Resume(ctx context.Context, info *ResumeInfo, opts ...AgentR
 // NOT RECOMMENDED: Agent transfer with full context sharing between agents has not proven
 // to be more effective empirically. Consider using ChatModelAgent with AgentTool
 // or DeepAgent instead for most multi-agent scenarios.
+//
+// DeterministicTransferConfig 是 AgentWithDeterministicTransferTo 的配置。
+// 不推荐：智能体之间共享完整上下文的智能体转移，在经验上并未证明更有效。多数多智能体场景建议改用带 AgentTool 的 ChatModelAgent 或 DeepAgent。
 type DeterministicTransferConfig struct {
 	Agent        Agent
 	ToAgentNames []string
@@ -510,17 +530,30 @@ func (a *flowAgent) run(
 		// If event.RunPath is already set (e.g., by agentTool), we don't modify it.
 		// If event.RunPath is nil/empty, we set it to the current runCtx.RunPath.
 		// This ensures RunPath is set exactly once and not duplicated.
+		//
+		// RunPath 所有权：eino 框架只设置 RunPath 一次。
+		// 如果 event.RunPath 已设置（例如由 agentTool 设置），我们不会修改它。
+		// 如果 event.RunPath 为 nil/empty，则将其设置为当前 runCtx.RunPath。
+		// 这确保 RunPath 只设置一次且不会重复。
 		if len(event.RunPath) == 0 {
 			event.AgentName = a.Name(ctx)
 			event.RunPath = runCtx.RunPath
 		}
 		// Recording policy: exact RunPath match (non-interrupt) indicates events belonging to this agent execution.
 		// This prevents parent recording of child/tool-internal emissions.
+		//
+		// 记录策略：RunPath 完全匹配（非中断）表示事件属于本次智能体执行。
+		// 这会防止父级记录子级/工具内部的输出。
 		if (event.Action == nil || event.Action.Interrupted == nil) && exactRunPathMatch(runCtx.RunPath, event.RunPath) {
 			// copy the event so that the copied event's stream is exclusive for any potential consumer
 			// copy before adding to session because once added to session it's stream could be consumed by genAgentInput at any time
 			// interrupt action are not added to session, because ALL information contained in it
 			// is either presented to end-user, or made available to agents through other means
+			//
+			// 复制 event，使复制后的 event 的流仅供任何潜在消费者独占使用
+			// 在加入 session 前复制，因为一旦加入 session，它的流随时可能被 genAgentInput 消费
+			// interrupt action 不会加入 session，因为其中包含的全部信息
+			// 要么会呈现给最终用户，要么会通过其他方式提供给智能体
 			copied := copyTypedAgentEvent(event)
 			setAutomaticClose(copied)
 			setAutomaticClose(event)
@@ -529,6 +562,10 @@ func (a *flowAgent) run(
 		// Action gating uses exact run-path match as well:
 		// only actions originating from this agent execution (not child/tool runs)
 		// should influence parent control flow (exit/transfer/interrupt).
+		//
+		// Action gating 同样使用精确的 run-path 匹配：
+		// 只有源自本次智能体执行（而非子级/工具运行）的 action
+		// 才应影响父级控制流（exit/transfer/interrupt）。
 		if exactRunPathMatch(runCtx.RunPath, event.RunPath) {
 			lastAction = event.Action
 		}
@@ -554,6 +591,7 @@ func (a *flowAgent) run(
 	}
 
 	// handle transferring to another agent
+	// 处理转移到另一个智能体
 	if destName != "" {
 		agentToRun := a.getAgent(ctxForSubAgents, destName)
 		if agentToRun == nil {
@@ -620,6 +658,11 @@ func wrapIterWithOnEnd(ctx context.Context, iter *AsyncIterator[*AgentEvent]) *A
 // callbacks, event recording, and run-path tracking. Transfer, sub-agent
 // orchestration, and history rewriting are handled solely by the concrete
 // flowAgent (the *schema.Message path).
+// ---------------------------------------------------------------------------
+//
+// ---------------------------------------------------------------------------
+// agentic 路径的类型化包装器（TypedAgent[*schema.AgenticMessage]）。
+// typedFlowAgent 是仅由 TypedRunner 和 AgentTool 使用的最小包装器，用于执行 TypedAgent[*schema.AgenticMessage]。它处理回调、事件记录和运行路径跟踪。Transfer、sub-agent 编排和历史重写仅由具体的 flowAgent（*schema.Message 路径）处理。
 // ---------------------------------------------------------------------------
 
 type typedFlowAgent[M MessageType] struct {

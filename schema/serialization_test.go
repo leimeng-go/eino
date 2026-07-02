@@ -167,6 +167,9 @@ func TestRegister(t *testing.T) {
 // TestRegisterStructWithUUIDField reproduces issue #607
 // uuid.UUID is a [16]byte array. Prior to the fix, calling schema.RegisterName on
 // a struct with a uuid.UUID field would panic during deserialization.
+//
+// TestRegisterStructWithUUIDField 复现 issue #607。
+// uuid.UUID 是一个 [16]byte 数组。修复前，对带有 uuid.UUID 字段的结构体调用 schema.RegisterName，会在反序列化期间 panic。
 func TestRegisterStructWithUUIDField(t *testing.T) {
 	type Item struct {
 		ID uuid.UUID

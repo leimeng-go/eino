@@ -1852,16 +1852,24 @@ func TestNewTypedAgenticMessage(t *testing.T) {
 
 	// TypedConfig requires a Model, so passing an empty config will return an error.
 	// This test verifies that NewTyped[*schema.AgenticMessage] compiles correctly.
+	//
+	// TypedConfig 需要 Model，因此传入空配置会返回错误。
+	// 此测试验证 NewTyped[*schema.AgenticMessage] 能正确编译。
 	mw, err := NewTyped(ctx, &TypedConfig[*schema.AgenticMessage]{})
 	assert.Error(t, err)
 	assert.Nil(t, mw)
 
 	// Verify the return type is correct at compile time.
+	// 在编译期验证返回类型正确。
 	var _ adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage] = mw
 }
 
 // ============================================================================
 // Generic message helpers (prefixed with 's' to avoid conflicts)
+// ============================================================================
+//
+// ============================================================================
+// 泛型消息辅助函数（以 's' 为前缀以避免冲突）
 // ============================================================================
 
 func smakeUserMsg[M adk.MessageType](content string) M {
@@ -1906,6 +1914,10 @@ func smakeAssistantMsg[M adk.MessageType](content string) M {
 // ============================================================================
 // Generic mock model
 // ============================================================================
+//
+// ============================================================================
+// 泛型 mock model
+// ============================================================================
 
 type genericMockModel[M adk.MessageType] struct {
 	response M
@@ -1922,6 +1934,10 @@ func (m *genericMockModel[M]) Stream(_ context.Context, _ []M, _ ...model.Option
 
 // ============================================================================
 // Generic tests
+// ============================================================================
+//
+// ============================================================================
+// 泛型测试
 // ============================================================================
 
 func TestSummarizationGeneric(t *testing.T) {
